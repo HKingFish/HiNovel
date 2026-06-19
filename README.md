@@ -1,5 +1,5 @@
 # HiNovel
-本项目基于 Vibe Codeing 开发。
+本项目基于 Vibe Coding 开发。目前仍为开发版本。
 
 [![CI](https://github.com/HKingFish/HiNovel/actions/workflows/ci.yml/badge.svg)](https://github.com/HKingFish/HiNovel/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
