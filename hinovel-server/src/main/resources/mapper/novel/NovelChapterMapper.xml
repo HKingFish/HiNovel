@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper">
+
+    <!--
+        查询指定章节之前的若干章（按章节号倒序取 limit 条，再正序返回）。
+        用于 AI 改写时携带前情提要。
+    -->
+    <select id="selectPreviousChapters" resultType="cn.haowl.hinovel.novel.domain.entity.NovelChapter">
+        SELECT * FROM (
+            SELECT * FROM novel_chapter
+            WHERE novel_id = #{novelId}
+              AND chapter_number &lt; #{chapterNumber}
+              AND deleted = 0
+            ORDER BY chapter_number DESC
+            LIMIT #{limit}
+        ) t ORDER BY t.chapter_number ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,147 @@
+﻿version: '3.8'
+
+services:
+  # MySQL 8.x
+  mysql:
+    image: mysql:8.0
+    container_name: hinovel-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: hinovel_platform
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./data/mysql/data:/var/lib/mysql
+      - ./data/mysql/conf:/etc/mysql/conf.d
+      - ./data/mysql/logs:/var/log/mysql
+      - ./hinovel-server/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hinovel-network
+
+  # Redis 7.x
+  redis:
+    image: redis:7.2-alpine
+    container_name: hinovel-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./data/redis/data:/data
+      - ./data/redis/conf:/usr/local/etc/redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hinovel-network
+
+  # Qdrant 向量数据库
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    container_name: hinovel-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - ./data/qdrant/storage:/qdrant/storage
+      - ./data/qdrant/snapshots:/qdrant/snapshots
+    healthcheck:
+      test: [ "CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' && exit 0 || exit 1" ]
+      interval: 10s
+      timeout: 8s
+      retries: 5
+    networks:
+      - hinovel-network
+
+  # 后端 Spring Boot 应用
+  hinovel-server:
+    build:
+      context: ./hinovel-server
+      dockerfile: Dockerfile
+    container_name: hinovel-server
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      TZ: Asia/Shanghai
+      # 数据库配置（容器内部通过服务名访问）
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: hinovel_platform
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      # Redis 配置（容器内部通过服务名访问）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Qdrant 配置（容器内部通过服务名访问，gRPC 端口）
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6334
+      # OSS 文件存储配置
+      OSS_TYPE: ${OSS_TYPE:-LOCAL}
+      OSS_LOCAL_PATH: /data/hinovel/uploads
+      OSS_LOCAL_URL_PREFIX: ${OSS_LOCAL_URL_PREFIX:-http://localhost:8080/files}
+      OSS_ALIYUN_ENDPOINT: ${OSS_ALIYUN_ENDPOINT:-}
+      OSS_ALIYUN_ACCESS_KEY_ID: ${OSS_ALIYUN_ACCESS_KEY_ID:-}
+      OSS_ALIYUN_ACCESS_KEY_SECRET: ${OSS_ALIYUN_ACCESS_KEY_SECRET:-}
+      OSS_ALIYUN_BUCKET_NAME: ${OSS_ALIYUN_BUCKET_NAME:-}
+      # Embedding 模型配置
+      EMBEDDING_TYPE: ${EMBEDDING_TYPE:-openai}
+      OPENAI_EMBEDDING_API_KEY: ${OPENAI_EMBEDDING_API_KEY:-}
+      OPENAI_EMBEDDING_BASE_URL: ${OPENAI_EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-v3}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1024}
+      ONNX_EMBEDDING_MODEL_PATH: ${ONNX_EMBEDDING_MODEL_PATH:-}
+      ONNX_EMBEDDING_TOKENIZER_PATH: ${ONNX_EMBEDDING_TOKENIZER_PATH:-}
+      ONNX_EMBEDDING_DIMENSIONS: ${ONNX_EMBEDDING_DIMENSIONS:-1024}
+      # 安全配置
+      API_KEY_SECRET: ${API_KEY_SECRET:-hinovel-default!}
+    volumes:
+      - ./data/hinovel/uploads:/data/hinovel/uploads
+      - ./data/hinovel/logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "nc -z localhost 8080 || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - hinovel-network
+
+  # 前端 Vue 应用（Nginx）
+  hinovel-web:
+    build:
+      context: ./hinovel-web
+      dockerfile: Dockerfile
+    container_name: hinovel-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    volumes:
+      - ./data/nginx/logs:/var/log/nginx
+    depends_on:
+      - hinovel-server
+    networks:
+      - hinovel-network
+
+networks:
+  hinovel-network:
+    driver: bridge

@@ -1,0 +1,53 @@
+﻿# ===== IDE 文件 =====
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.suo
+*.user
+
+# ===== 本地 AI / 编辑器配置（含私有部署信息）=====
+.kiro/
+.trae/
+.trae/rules/
+.trae/skills/
+.trae/skill-config.json
+
+# ===== Maven 构建产物 =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# ===== 前端构建产物 =====
+frontend/dist/
+frontend/node_modules/
+hinovel-web/node_modules/
+hinovel-web/dist/
+frontend/.vite/
+
+# ===== 日志文件 =====
+logs/
+*.log
+*.log.*
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 环境变量（含敏感信息，禁止提交）=====
+.env
+.env.local
+.env.*.local
+
+# ===== 运行时数据目录 =====
+uploads/
+/data/
+data/
+
+# ===== 测试覆盖率报告 =====
+coverage/
+*.exec

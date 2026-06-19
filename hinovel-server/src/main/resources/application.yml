@@ -1,0 +1,150 @@
+﻿server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
+  application:
+    name: hinovel-platform
+
+  # 排除 Spring Security 自动配置，使用 Sa-Token 替代
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration
+
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:hinovel_platform}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 30000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+  # 启用 JDK 21 虚拟线程，提升 I/O 密集型场景并发吞吐量
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+# MyBatis Plus
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.haowl.cn.*.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# Sa-Token 认证配置
+sa-token:
+  # Token 有效期（秒），默认 24 小时
+  timeout: 604800
+  # Token 临时有效期（秒），默认 24 小时
+  active-timeout: 604800
+  # 是否允许同一账号多地同时登录
+  is-concurrent: true
+  # 在多人登录同一账号时，是否共用一个 Token
+  is-share: false
+  # Token 风格：uuid
+  token-style: uuid
+  # 是否输出操作日志
+  is-log: false
+
+# HiNOVEL 平台自定义配置
+hinovel:
+  # 限流配置
+  rate-limit:
+    llm-per-minute: 30
+  # 缓存 TTL 配置（秒）
+  cache:
+    agent-ttl: 1800
+    user-ttl: 600
+  # OSS 文件存储配置
+  oss:
+    type: ${OSS_TYPE:LOCAL}
+    local:
+      base-path: ${OSS_LOCAL_PATH:./data/hinovel/uploads}
+      access-url-prefix: ${OSS_LOCAL_URL_PREFIX:http://localhost:8080/files}
+    aliyun:
+      endpoint: ${OSS_ALIYUN_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+      access-key-id: ${OSS_ALIYUN_ACCESS_KEY_ID:}
+      access-key-secret: ${OSS_ALIYUN_ACCESS_KEY_SECRET:}
+      bucket-name: ${OSS_ALIYUN_BUCKET_NAME:hinovel-files}
+    max-file-size: 52428800
+    allowed-types: pdf,txt,md,png,jpg,jpeg
+  # Embedding 模型配置
+  # type=openai：使用 OpenAI 兼容接口（阿里云百炼 text-embedding-v3，中文效果好）
+  # type=onnx：使用本地 ONNX 模型（如 BGE-M3，进程内推理，无需网络调用）
+  embedding:
+    type: ${EMBEDDING_TYPE:openai}
+    openai:
+      api-key: ${OPENAI_EMBEDDING_API_KEY:}
+      base-url: ${OPENAI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+      model-name: ${OPENAI_EMBEDDING_MODEL:text-embedding-v3}
+      dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1024}
+    onnx:
+      model-path: ${ONNX_EMBEDDING_MODEL_PATH:}
+      tokenizer-path: ${ONNX_EMBEDDING_TOKENIZER_PATH:}
+      dimensions: ${ONNX_EMBEDDING_DIMENSIONS:1024}
+  # 安全配置
+  security:
+    # API 密钥加密密钥（AES-128，至少 16 个字符，生产环境务必修改）
+    api-key-secret: ${API_KEY_SECRET}
+  # Qdrant 向量数据库连接配置
+  ai:
+    qdrant:
+      host: ${QDRANT_HOST:localhost}
+      port: ${QDRANT_PORT:6334}
+
+# Milvus 向量数据库配置（LangChain4J 自动配置）
+langchain4j:
+  # OpenAI 自动配置占位（实际由 EmbeddingModelConfig 手动创建 Bean 覆盖）
+  open-ai:
+    embedding-model:
+      api-key: ${OPENAI_EMBEDDING_API_KEY:unused}
+
+# 链路追踪配置（Micrometer Tracing）
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+# 日志配置
+logging:
+  level:
+    com.haowl.cn: DEBUG
+    dev.langchain4j: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}][%X{spanId}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}][%X{spanId}] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/hinovel.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      file-name-pattern: /app/logs/hinovel-%d{yyyy-MM-dd}.%i.log
