@@ -1,0 +1,52 @@
+name: Bug 报告
+description: 报告一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交 Bug 前请先搜索是否已有相同 Issue。安全问题请通过 [Security Advisory](https://github.com/HKingFish/HiNovel/security/advisories/new) 私下报告。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述遇到的问题与期望行为
+      placeholder: 点击「AI 续写」后页面无响应，期望出现流式输出
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 尽量提供可复现的最小步骤
+      placeholder: |
+        1. 启动 Docker 部署
+        2. 登录 admin 账号
+        3. 进入小说编辑页
+        4. 点击「续写」
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: OS、JDK/Node 版本、部署方式等
+      placeholder: |
+        - OS: Windows 11
+        - 部署方式: Docker Compose
+        - JDK: 21
+        - Node.js: 20
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 相关后端日志、浏览器控制台错误或截图
+    validations:
+      required: false

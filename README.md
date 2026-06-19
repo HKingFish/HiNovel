@@ -113,6 +113,12 @@ cd hinovel-web && npm install && npm run dev
 
 **生产环境部署后请立即修改默认密码**，并确保 `.env` 中已设置强密码的 `API_KEY_SECRET` 与 `MYSQL_ROOT_PASSWORD`。
 
+若数据库未自动初始化（例如 `data/mysql/data` 已有旧数据），可手动执行：
+
+```powershell
+.\scripts\init-db.ps1
+```
+
 更多部署细节、端口说明与更新流程请参阅 [DEPLOY.md](./DEPLOY.md)。
 
 ## 配置说明

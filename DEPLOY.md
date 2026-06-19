@@ -121,9 +121,56 @@ docker compose logs -f hinovel-server
 ### 验证部署
 
 1. 访问 http://localhost（或你配置的 `WEB_PORT`）
-2. 注册账号并登录
+2. 使用默认管理员登录：`admin` / `Admin@123456`（生产环境请立即修改密码）
 3. 在「LLM 配置」中添加你的大模型 Provider
 4. 创建小说并测试 AI 续写 / 对话功能
+
+---
+
+## 数据库初始化
+
+### 自动初始化（推荐）
+
+MySQL 容器**首次启动**且 `data/mysql/data` 为空时，会自动执行：
+
+1. `hinovel-server/sql/schema.sql` — 建表
+2. `hinovel-server/sql/seed.sql` — 初始数据（含 admin 账号、内置 Agent 模板）
+
+> **注意**：初始化在 **MySQL 容器首次启动**时执行，**不在** Docker 镜像构建阶段执行。若 `data/mysql/data` 已有数据，脚本不会再次运行。
+
+### 手动初始化
+
+容器已运行但库表未创建，或需要重新灌库时：
+
+```powershell
+# Windows
+.\scripts\init-db.ps1
+
+# 清空并重建（会删除 hinovel_platform 全部数据）
+.\scripts\init-db.ps1 -Force
+```
+
+```bash
+# Linux / macOS / Git Bash
+bash scripts/init-db.sh
+bash scripts/init-db.sh --force
+```
+
+若需完全重新自动初始化，停止容器后删除 MySQL 数据目录再启动：
+
+```powershell
+docker compose down
+Remove-Item -Recurse -Force .\data\mysql\data\*
+docker compose up -d mysql
+```
+
+默认管理员：
+
+| 字段 | 值 |
+|------|-----|
+| 用户名 | `admin` |
+| 邮箱 | `admin@hinovel.com` |
+| 密码 | `Admin@123456` |
 
 ---
 

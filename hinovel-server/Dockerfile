@@ -1,5 +1,7 @@
 ﻿# 多阶段构建：使用 JDK 21 构建，支持虚拟线程
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
+ARG MAVEN_IMAGE=maven:3.9.6-eclipse-temurin-21
+ARG JRE_IMAGE=eclipse-temurin:21-jre-alpine
+FROM ${MAVEN_IMAGE} AS builder
 WORKDIR /app
 
 # 配置阿里云 Maven 镜像源加速依赖下载
@@ -28,7 +30,7 @@ RUN mvn dependency:go-offline -B
 COPY src/ src/
 RUN mvn clean package -DskipTests -B
 
-FROM eclipse-temurin:21-jre-alpine
+FROM ${JRE_IMAGE}
 WORKDIR /app
 RUN apk add --no-cache curl tzdata && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \

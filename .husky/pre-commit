@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+cd hinovel-web && npx lint-staged

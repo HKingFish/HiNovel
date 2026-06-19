@@ -1,14 +1,12 @@
-﻿version: '3.8'
-
-services:
+﻿services:
   # MySQL 8.x
   mysql:
-    image: mysql:8.0
+    image: ${DOCKER_IMAGE_MYSQL:-mysql:8.0}
     container_name: hinovel-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
-      MYSQL_DATABASE: hinovel_platform
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root123}}
+      MYSQL_DATABASE: ${MYSQL_DB:-hinovel_platform}
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
       TZ: Asia/Shanghai
@@ -18,9 +16,10 @@ services:
       - ./data/mysql/data:/var/lib/mysql
       - ./data/mysql/conf:/etc/mysql/conf.d
       - ./data/mysql/logs:/var/log/mysql
-      - ./hinovel-server/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./hinovel-server/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./hinovel-server/sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123}" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root123}}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,9 +28,11 @@ services:
 
   # Redis 7.x
   redis:
-    image: redis:7.2-alpine
+    image: ${DOCKER_IMAGE_REDIS:-redis:7.2-alpine}
     container_name: hinovel-redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -39,7 +40,7 @@ services:
       - ./data/redis/data:/data
       - ./data/redis/conf:/usr/local/etc/redis
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,7 +49,7 @@ services:
 
   # Qdrant 向量数据库
   qdrant:
-    image: qdrant/qdrant:v1.12.5
+    image: ${DOCKER_IMAGE_QDRANT:-qdrant/qdrant:v1.12.5}
     container_name: hinovel-qdrant
     restart: unless-stopped
     ports:
@@ -70,47 +71,45 @@ services:
     build:
       context: ./hinovel-server
       dockerfile: Dockerfile
+      args:
+        MAVEN_IMAGE: ${DOCKER_IMAGE_MAVEN:-maven:3.9.6-eclipse-temurin-21}
+        JRE_IMAGE: ${DOCKER_IMAGE_JRE:-eclipse-temurin:21-jre-alpine}
     container_name: hinovel-server
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       TZ: Asia/Shanghai
-      # 数据库配置（容器内部通过服务名访问）
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_DB: hinovel_platform
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
-      # Redis 配置（容器内部通过服务名访问）
+      MYSQL_DB: ${MYSQL_DB:-hinovel_platform}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD:-root123}}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      # Qdrant 配置（容器内部通过服务名访问，gRPC 端口）
       QDRANT_HOST: qdrant
-      QDRANT_PORT: 6334
-      # OSS 文件存储配置
+      QDRANT_PORT: ${QDRANT_PORT:-6334}
       OSS_TYPE: ${OSS_TYPE:-LOCAL}
-      OSS_LOCAL_PATH: /data/hinovel/uploads
+      OSS_LOCAL_PATH: ${OSS_LOCAL_PATH:-/data/hinovel/uploads}
       OSS_LOCAL_URL_PREFIX: ${OSS_LOCAL_URL_PREFIX:-http://localhost:8080/files}
       OSS_ALIYUN_ENDPOINT: ${OSS_ALIYUN_ENDPOINT:-}
       OSS_ALIYUN_ACCESS_KEY_ID: ${OSS_ALIYUN_ACCESS_KEY_ID:-}
       OSS_ALIYUN_ACCESS_KEY_SECRET: ${OSS_ALIYUN_ACCESS_KEY_SECRET:-}
       OSS_ALIYUN_BUCKET_NAME: ${OSS_ALIYUN_BUCKET_NAME:-}
-      # Embedding 模型配置
       EMBEDDING_TYPE: ${EMBEDDING_TYPE:-openai}
       OPENAI_EMBEDDING_API_KEY: ${OPENAI_EMBEDDING_API_KEY:-}
       OPENAI_EMBEDDING_BASE_URL: ${OPENAI_EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-v3}
       OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1024}
-      ONNX_EMBEDDING_MODEL_PATH: ${ONNX_EMBEDDING_MODEL_PATH:-}
-      ONNX_EMBEDDING_TOKENIZER_PATH: ${ONNX_EMBEDDING_TOKENIZER_PATH:-}
+      ONNX_EMBEDDING_MODEL_PATH: ${ONNX_EMBEDDING_MODEL_PATH:-/data/models/bge-m3/model.onnx}
+      ONNX_EMBEDDING_TOKENIZER_PATH: ${ONNX_EMBEDDING_TOKENIZER_PATH:-/data/models/bge-m3/tokenizer.json}
       ONNX_EMBEDDING_DIMENSIONS: ${ONNX_EMBEDDING_DIMENSIONS:-1024}
-      # 安全配置
-      API_KEY_SECRET: ${API_KEY_SECRET:-hinovel-default!}
+      API_KEY_SECRET: ${API_KEY_SECRET}
     volumes:
       - ./data/hinovel/uploads:/data/hinovel/uploads
       - ./data/hinovel/logs:/app/logs
+      - ./data/models:/data/models
     depends_on:
       mysql:
         condition: service_healthy
@@ -131,6 +130,9 @@ services:
     build:
       context: ./hinovel-web
       dockerfile: Dockerfile
+      args:
+        NODE_IMAGE: ${DOCKER_IMAGE_NODE:-node:20-alpine}
+        NGINX_IMAGE: ${DOCKER_IMAGE_NGINX:-nginx:1.25-alpine}
     container_name: hinovel-web
     restart: unless-stopped
     ports:

@@ -11,18 +11,23 @@ import java.util.List;
 /**
  * 环境变量校验器。
  *
- * <p>在 Spring 容器初始化前校验关键环境变量是否已配置，
+ * <p>在 Spring 容器初始化前校验应用运行必需的环境变量是否已配置，
  * 缺失则直接终止启动（fail fast），避免带默认值硬跑导致线上事故。</p>
+ *
+ * <p>注意：{@code MYSQL_ROOT_PASSWORD} 仅用于 MySQL 容器初始化，
+ * 后端连接数据库使用 {@code MYSQL_PASSWORD}。</p>
  *
  * @author haowl
  */
 @Slf4j
 public class EnvConfigValidator implements ApplicationListener<ApplicationEnvironmentPreparedEvent> {
 
-    /** 必须配置的环境变量列表（缺失任意一个则启动失败） */
+    /**
+     * 必须配置的环境变量列表（缺失任意一个则启动失败）
+     */
     private static final String[] REQUIRED_ENV_KEYS = {
-            "MYSQL_ROOT_PASSWORD",
-            "API_KEY_SECRET"
+        "MYSQL_PASSWORD",
+        "API_KEY_SECRET"
     };
 
     @Override
@@ -39,8 +44,8 @@ public class EnvConfigValidator implements ApplicationListener<ApplicationEnviro
 
         if (!missingKeys.isEmpty()) {
             String errorMessage = String.format(
-                    "关键环境变量缺失，应用启动终止。缺失项：%s。请在 .env 文件或系统环境变量中配置后重试。",
-                    String.join(", ", missingKeys)
+                "关键环境变量缺失，应用启动终止。缺失项：%s。请在 .env 文件或系统环境变量中配置后重试。",
+                String.join(", ", missingKeys)
             );
             log.error(errorMessage);
             throw new IllegalStateException(errorMessage);
