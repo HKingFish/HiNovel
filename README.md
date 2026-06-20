@@ -1,10 +1,13 @@
 # HiNovel
-本项目基于 Vibe Coding 开发。目前仍为开发版本。
 
 [![CI](https://github.com/HKingFish/HiNovel/actions/workflows/ci.yml/badge.svg)](https://github.com/HKingFish/HiNovel/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 HiNovel 是一个面向小说创作者的 AI 辅助写作平台，提供章节编辑、人物图谱、RAG 知识库检索、多 Agent 协作等能力，帮助作者更高效地完成长篇创作。
+
+**重要提示**：本项目是兴趣使然，最初是作为 LangChain4j 框架的学习实践项目，全程通过 Vibe Coding 完成开发。目前仍处于**开发测试阶段（各种 BUG 层出不穷）**，主要用于个人技术研究和学习。
+ > ⚠️ **警告**：本项目未经系统性测试，存在已知和未知的 Bug，**不推荐用于任何生产环境或实际业务场景**。
+ > 
 
 ## 功能特性
 
