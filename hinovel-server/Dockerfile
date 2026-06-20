@@ -4,26 +4,6 @@ ARG JRE_IMAGE=eclipse-temurin:21-jre-alpine
 FROM ${MAVEN_IMAGE} AS builder
 WORKDIR /app
 
-# 配置阿里云 Maven 镜像源加速依赖下载
-RUN mkdir -p /root/.m2 && \
-    echo '<?xml version="1.0" encoding="UTF-8"?>\n\
-<settings>\n\
-  <mirrors>\n\
-    <mirror>\n\
-      <id>aliyun-central</id>\n\
-      <mirrorOf>central</mirrorOf>\n\
-      <name>阿里云中央仓库镜像</name>\n\
-      <url>https://maven.aliyun.com/repository/central</url>\n\
-    </mirror>\n\
-    <mirror>\n\
-      <id>aliyun-public</id>\n\
-      <mirrorOf>*</mirrorOf>\n\
-      <name>阿里云公共仓库镜像</name>\n\
-      <url>https://maven.aliyun.com/repository/public</url>\n\
-    </mirror>\n\
-  </mirrors>\n\
-</settings>' > /root/.m2/settings.xml
-
 COPY pom.xml .
 # 预下载依赖（利用 Docker 缓存层加速构建）
 RUN mvn dependency:go-offline -B
