@@ -4,6 +4,9 @@
 -- 生产环境部署后请立即修改密码
 -- ========================================================
 
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 USE hinovel_platform;
 
 -- 默认管理员（ID 固定为 1，便于关联初始数据）
