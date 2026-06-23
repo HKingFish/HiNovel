@@ -2,8 +2,8 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.ChapterPublishService;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.common.response.ApiResponse;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
@@ -223,7 +223,7 @@ public class NovelChapterController {
         var outline = chapterOutlineService.getByChapterId(chapterId);
         if (outline == null || outline.getAiOutlineContent() == null
                 || outline.getAiOutlineContent().isBlank()) {
-            return ApiResponse.error(ErrorCode.PARAM_ERROR, "暂无 AI 生成的大纲可替换");
+            return ApiResponse.error(GlobalErrorCodeConstants.PARAM_ERROR, "暂无 AI 生成的大纲可替换");
         }
         outline.setOutlineContent(outline.getAiOutlineContent());
         chapterOutlineService.saveOrUpdateOutline(outline);

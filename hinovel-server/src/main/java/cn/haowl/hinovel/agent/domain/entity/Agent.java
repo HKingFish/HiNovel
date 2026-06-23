@@ -4,7 +4,7 @@ import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
 
@@ -111,7 +111,7 @@ public class Agent extends BaseEntity {
      */
     public static Agent createUserAgent(Long userId, String name, String description, String systemPrompt) {
         if (userId == null || name == null || name.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         Agent agent = new Agent();
         agent.setUserId(userId);
@@ -172,7 +172,7 @@ public class Agent extends BaseEntity {
     public void configureTemperature(BigDecimal temperature) {
         if (temperature != null && (temperature.compareTo(BigDecimal.ZERO) < 0
                 || temperature.compareTo(TEMPERATURE_MAX) > 0)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         this.temperature = temperature;
     }
@@ -184,7 +184,7 @@ public class Agent extends BaseEntity {
      */
     public void configureMaxTokens(Integer maxTokens) {
         if (maxTokens != null && maxTokens < 1) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         this.maxTokens = maxTokens;
     }
@@ -205,7 +205,7 @@ public class Agent extends BaseEntity {
      */
     public void updateName(String name) {
         if (name == null || name.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         this.name = name;
     }

@@ -1,6 +1,5 @@
 package cn.haowl.hinovel.common.exception;
 
-import cn.haowl.hinovel.common.response.ErrorCode;
 import lombok.Getter;
 
 /**
@@ -22,24 +21,31 @@ public class BusinessException extends RuntimeException {
     private final int code;
 
     /**
-     * 使用错误码构造业务异常。
-     *
-     * @param errorCode 错误码枚举
+     * 错误消息。
      */
-    public BusinessException(ErrorCode errorCode) {
-        super(errorCode.getMessage());
+    private final String message;
+
+    /**
+     * 使用新的 ErrorCode 对象构造业务异常。
+     *
+     * @param errorCode 错误码对象
+     */
+    public BusinessException(cn.haowl.hinovel.common.exception.ErrorCode errorCode) {
+        super(errorCode.getMsg());
         this.code = errorCode.getCode();
+        this.message = errorCode.getMsg();
     }
 
     /**
-     * 使用错误码和自定义消息构造业务异常。
+     * 使用新的 ErrorCode 对象和自定义消息构造业务异常。
      *
-     * @param errorCode 错误码枚举
+     * @param errorCode 错误码对象
      * @param message   自定义错误消息
      */
-    public BusinessException(ErrorCode errorCode, String message) {
+    public BusinessException(cn.haowl.hinovel.common.exception.ErrorCode errorCode, String message) {
         super(message);
         this.code = errorCode.getCode();
+        this.message = message;
     }
 
     /**
@@ -51,5 +57,6 @@ public class BusinessException extends RuntimeException {
     public BusinessException(int code, String message) {
         super(message);
         this.code = code;
+        this.message = message;
     }
 }

@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.novel.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -54,9 +54,9 @@ public class NovelDomainService {
      */
     public Novel validateOwnership(Long novelId, Long userId) {
         Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         if (!novel.belongsTo(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new BusinessException(GlobalErrorCodeConstants.FORBIDDEN);
         }
         return novel;
     }
@@ -146,7 +146,7 @@ public class NovelDomainService {
      */
     public void refreshNovelStats(Long novelId) {
         Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
 
         List<NovelChapter> chapters = novelChapterRepository.findByNovelIdWithoutContent(novelId);
 

@@ -1,21 +1,13 @@
 package cn.haowl.hinovel.agent.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
-import cn.haowl.hinovel.agent.application.service.agent.EditorAgent;
+import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
+import cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants;
 import cn.haowl.hinovel.common.response.ApiResponse;
-import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
-import cn.haowl.hinovel.novel.application.service.ChapterService;
-import cn.haowl.hinovel.novel.application.service.NovelChapterService;
-import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
-import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
-import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
-import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
-import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
@@ -28,8 +20,6 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
-
-import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
 
 /**
  * AI 功能控制器。
@@ -46,13 +36,8 @@ import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
 @RequiredArgsConstructor
 public class AIController {
 
-    private final AuthorAgent authorAgentService;
-    private final EditorAgent editorAgentService;
+    private final AIService aiService;
     private final QaAgent qaAgentService;
-    private final ChapterService chapterService;
-    private final ChapterOutlineService chapterOutlineService;
-    private final NovelSettingsService novelSettingsService;
-    private final NovelChapterService novelChapterService;
 
 
     /**
@@ -68,72 +53,8 @@ public class AIController {
     @Operation(summary = "AI 流式改写", description = "根据大纲流式改写章节内容（SSE）")
     @PostMapping(value = "/rewrite", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> aiRewrite(@RequestBody AIAuthorRequest request) {
-        NovelChapter chapter = chapterService.getById(request.getChapterId());
-        if (chapter == null) {
-            log.warn("AI 改写失败，章节不存在，chapterId={}", request.getChapterId());
-            return Flux.just(ServerSentEvent.<String>builder()
-                    .event("error")
-                    .data("章节不存在")
-                    .build());
-        }
-
-        // 获取章节大纲（优先使用请求中的大纲内容）
-        ChapterOutline outline = chapterOutlineService.getByChapterId(request.getChapterId());
-        if (outline == null) {
-            outline = new ChapterOutline();
-            outline.setChapterId(request.getChapterId());
-            outline.setNovelId(chapter.getNovelId());
-        }
-        // 请求中携带了大纲内容时，覆盖数据库中的大纲
-        if (request.getOutline() != null && !request.getOutline().isBlank()) {
-            outline.setOutlineContent(request.getOutline());
-        }
-        if (request.getPlotPoints() != null && !request.getPlotPoints().isBlank()) {
-            outline.setPlotPoints(request.getPlotPoints());
-        }
-        if (request.getEmotionTone() != null && !request.getEmotionTone().isBlank()) {
-            outline.setEmotionTone(request.getEmotionTone());
-        }
-        if (request.getSceneSetting() != null && !request.getSceneSetting().isBlank()) {
-            outline.setSceneSetting(request.getSceneSetting());
-        }
-        // 章节内容以前端传过来的为准
-        if (request.getContent() != null) {
-            outline.setChapterContent(request.getContent());
-        }
-
-        // 读取小说有效配置，决定改写时携带的上下文
-        NovelSettings settings = novelSettingsService.getEffectiveSettings(
-                chapter.getNovelId(), chapter.getCreator());
-
-        // 根据配置加载前几章内容作为前情提要
-        List<NovelChapter> previousChapters = List.of();
-        int contextChapters = settings.getRewriteContextChapters() != null
-                ? settings.getRewriteContextChapters() : 0;
-        if (contextChapters > 0) {
-            previousChapters = novelChapterService.getPreviousChapters(
-                    chapter.getNovelId(), chapter.getChapterNumber(), contextChapters);
-        }
-
-        // 根据配置决定是否携带全文大纲
-        String novelOutlineContent = null;
-        if (ENABLED == settings.getRewriteIncludeOutline()) {
-            novelOutlineContent = loadNovelOutlineContent(chapter.getNovelId());
-        }
-
-        // 将 Flux<String> 包装为 Flux<ServerSentEvent>，避免 String 被 JSON 序列化加引号
         Long userId = StpUtil.getLoginIdAsLong();
-        return authorAgentService.streamRewriteChapterByOutline(
-                        chapter, outline, previousChapters,
-                        novelOutlineContent, request.getUserRequirement(), userId)
-                .map(token -> ServerSentEvent.<String>builder().data(token).build())
-                .onErrorResume(e -> {
-                    log.error("AI 改写流式异常，异常信息：{}", e.getMessage());
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
-                            .build());
-                });
+        return aiService.aiRewrite(request, userId);
     }
 
     /**
@@ -148,37 +69,8 @@ public class AIController {
     @Operation(summary = "AI 审核", description = "审核章节内容的一致性和质量")
     @PostMapping("/audit")
     public ApiResponse<AIAuditorResponse> aiAudit(@RequestBody AIAuditorRequest request) {
-        NovelChapter chapter = chapterService.getById(request.getChapterId());
-        if (chapter == null) {
-            return ApiResponse.error(404, "章节不存在");
-        }
-
-        // 使用请求中的内容覆盖数据库中的章节内容（前端可能传入编辑中的最新内容）
-        if (request.getContent() != null && !request.getContent().isBlank()) {
-            chapter.setContent(request.getContent());
-        }
-
-        // 获取章节大纲
-        ChapterOutline outline = chapterOutlineService.getByChapterId(request.getChapterId());
-
-        // 根据配置决定审核时是否携带全文大纲
-        NovelSettings settings = novelSettingsService.getEffectiveSettings(
-                chapter.getNovelId(), chapter.getCreator());
-        String novelOutline = null;
-        if (ENABLED == settings.getAuditIncludeOutline()) {
-            // 优先使用前端传入的全文大纲，其次从数据库加载
-            if (request.getNovelOutline() != null && !request.getNovelOutline().isBlank()) {
-                novelOutline = request.getNovelOutline();
-            } else {
-                novelOutline = loadNovelOutlineContent(chapter.getNovelId());
-            }
-        }
-
-        // 调用编辑 Agent 审核
         Long userId = StpUtil.getLoginIdAsLong();
-        AIAuditorResponse response =
-                editorAgentService.auditChapter(chapter, outline, novelOutline, userId);
-
+        AIAuditorResponse response = aiService.aiAudit(request, userId);
         return ApiResponse.success(response);
     }
 
@@ -191,15 +83,14 @@ public class AIController {
     @Operation(summary = "批量审核", description = "批量审核章节内容")
     @PostMapping("/audit/batch")
     public ApiResponse<AIAuditBatchResponse> aiBatchAudit(@RequestBody AIAuditBatchRequest request) {
-        NovelChapter chapter = chapterService.getById(request.getChapterId());
-        if (chapter == null) {
-            return ApiResponse.error(404, "章节不存在");
+        if (request.getChapterId() == null) {
+            return ApiResponse.error(AgentErrorCodeConstants.AUDIT_CHAPTER_NOT_EXISTS, "章节不存在");
         }
 
         AIAuditBatchResponse response = new AIAuditBatchResponse();
-        response.setId("mock-batch-audit-id-1");
+        response.setId(AgentConstants.MOCK_BATCH_AUDIT_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
         response.setOverallAssessment(AgentConstants.AUDIT_PASS);
-        response.setSummary("所有审核通过");
+        response.setSummary(AgentConstants.MOCK_BATCH_AUDIT_SUMMARY);
         response.setAudits(List.of());
 
         return ApiResponse.success(response);
@@ -214,33 +105,17 @@ public class AIController {
     @Operation(summary = "重新生成", description = "重新生成章节内容")
     @PostMapping("/regenerate")
     public ApiResponse<AIAuthorResponse> aiRegenerate(@RequestBody AIAuthorRequest request) {
-        NovelChapter chapter = chapterService.getById(request.getChapterId());
-        if (chapter == null) {
-            return ApiResponse.error(404, "章节不存在");
+        if (request.getChapterId() == null) {
+            return ApiResponse.error(AgentErrorCodeConstants.REWRITE_CHAPTER_NOT_EXISTS, "章节不存在");
         }
 
         AIAuthorResponse response = new AIAuthorResponse();
-        response.setId("mock-regenerate-id-1");
-        response.setContent("重新生成的内容...");
+        response.setId(AgentConstants.MOCK_REGENERATE_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
+        response.setContent(AgentConstants.MOCK_REGENERATE_CONTENT);
         response.setWordCount(response.getContent().length());
-        response.setProcessingTime(1800);
+        response.setProcessingTime(AgentConstants.MOCK_REGENERATE_PROCESSING_TIME_MS);
 
         return ApiResponse.success(response);
-    }
-
-    /**
-     * 加载小说全文大纲内容。
-     *
-     * @param novelId 小说 ID
-     * @return 全文大纲内容，不存在或为空时返回 null
-     */
-    private String loadNovelOutlineContent(Long novelId) {
-        NovelOutline novelOutline = novelChapterService.getNovelOutline(novelId);
-        if (novelOutline == null || novelOutline.getOutlineContent() == null
-                || novelOutline.getOutlineContent().isBlank()) {
-            return null;
-        }
-        return novelOutline.getOutlineContent();
     }
 
     // ==================== AI 问答接口 ====================

@@ -2,7 +2,7 @@ package cn.haowl.hinovel.user.application.service;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.user.application.command.LoginCommand;
 import cn.haowl.hinovel.user.application.command.RegisterCommand;
 import cn.haowl.hinovel.user.application.query.UserQuery;
@@ -86,7 +86,7 @@ public class AuthApplicationService {
      */
     public TokenResponse.UserInfo getCurrentUserInfo(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         return new TokenResponse.UserInfo(
                 user.getId(), user.getUsername(),
                 user.getEmail(), user.getRole(), user.getAvatarUrl()
@@ -102,17 +102,17 @@ public class AuthApplicationService {
     public User getUser(UserQuery query) {
         if (query.getUserId() != null) {
             return userRepository.findById(query.getUserId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         }
         if (query.getUsername() != null) {
             return userRepository.findByUsername(query.getUsername())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         }
         if (query.getEmail() != null) {
             return userRepository.findByEmail(query.getEmail())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         }
-        throw new BusinessException(ErrorCode.PARAM_ERROR);
+        throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
     }
 
     /**

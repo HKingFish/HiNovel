@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.infra.oss.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants;
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
 import cn.haowl.hinovel.infra.oss.constant.OssConstants;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
@@ -74,17 +74,17 @@ public class OssDomainService {
      */
     private void validateFile(MultipartFile file) {
         if (file.getSize() > ossProperties.getMaxFileSize()) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TOO_LARGE);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_FILE_TOO_LARGE);
         }
 
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || !originalFilename.contains(".")) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TYPE_NOT_ALLOWED);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_FILE_TYPE_NOT_ALLOWED);
         }
 
         String extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
         if (!ossProperties.getAllowedTypeList().contains(extension)) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TYPE_NOT_ALLOWED);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_FILE_TYPE_NOT_ALLOWED);
         }
     }
 }

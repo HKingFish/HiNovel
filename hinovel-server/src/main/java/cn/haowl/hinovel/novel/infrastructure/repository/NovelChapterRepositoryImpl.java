@@ -2,7 +2,7 @@ package cn.haowl.hinovel.novel.infrastructure.repository;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper;
@@ -34,7 +34,7 @@ public class NovelChapterRepositoryImpl implements NovelChapterRepository {
     public NovelChapter save(NovelChapter chapter) {
         if (novelChapterMapper.existSameTitle(
                 chapter.getNovelId(), chapter.getId(), chapter.getTitle())) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "小说已存在相同标题的章节");
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR, "小说已存在相同标题的章节");
         }
 
         if (chapter.getId() == null) {

@@ -2,7 +2,7 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
 
@@ -69,7 +69,7 @@ public class Novel extends BaseEntity {
      */
     public static Novel create(Long userId, String title, String description) {
         if (title == null || title.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         Novel novel = new Novel();
         novel.setUserId(userId);
@@ -88,7 +88,7 @@ public class Novel extends BaseEntity {
      */
     public void updateTitle(String title) {
         if (title == null || title.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         this.title = title;
     }

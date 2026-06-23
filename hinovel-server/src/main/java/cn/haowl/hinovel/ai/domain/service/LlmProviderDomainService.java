@@ -4,7 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
 import cn.haowl.hinovel.ai.domain.repository.LlmProviderRepository;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.common.service.ApiKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,7 @@ public class LlmProviderDomainService {
     public LlmProvider create(String name, String providerType, String baseUrl,
                               String apiKey, List<String> models, Long userId) {
         if (llmProviderRepository.existsByNameAndUserId(name, userId)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         // 加密 API 密钥后再存储
         String encryptedApiKey = apiKeyService.encrypt(apiKey);
@@ -57,7 +57,7 @@ public class LlmProviderDomainService {
      */
     public LlmProvider getById(Long id) {
         return llmProviderRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
     }
 
     /**

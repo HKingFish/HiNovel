@@ -146,4 +146,41 @@ public final class AgentConstants {
      * 首次请求计数值（用于判断是否需要设置过期时间）。
      */
     public static final long FIRST_REQUEST_COUNT = 1L;
+
+    // ==================== Mock 响应常量 ====================
+
+    /**
+     * Mock 重新生成响应 ID 前缀。
+     */
+    public static final String MOCK_REGENERATE_ID_PREFIX = "mock-regenerate-id-";
+
+    /**
+     * Mock 批量审核响应 ID 前缀。
+     */
+    public static final String MOCK_BATCH_AUDIT_ID_PREFIX = "mock-batch-audit-id-";
+
+    /**
+     * Mock 重新生成默认内容。
+     */
+    public static final String MOCK_REGENERATE_CONTENT = "重新生成的内容...";
+
+    /**
+     * Mock 批量审核默认摘要。
+     */
+    public static final String MOCK_BATCH_AUDIT_SUMMARY = "所有审核通过";
+
+    /**
+     * Mock 重新生成处理时间（毫秒）。
+     */
+    public static final long MOCK_REGENERATE_PROCESSING_TIME_MS = 1800L;
+
+    /**
+     * Mock 批量审核处理时间（毫秒）。
+     */
+    public static final long MOCK_BATCH_AUDIT_PROCESSING_TIME_MS = 3000L;
+
+    /**
+     * Mock 响应 ID 序号起始值。
+     */
+    public static final int MOCK_RESPONSE_ID_START = 1;
 }

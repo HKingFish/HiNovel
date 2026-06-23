@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -208,10 +208,10 @@ public class NovelChapterService {
         chapterDomainService.getChapter(chapterId);
 
         NovelChapterVersion version = versionRepository.findById(versionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "版本不存在"));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "版本不存在"));
 
         if (!version.belongsToChapter(chapterId)) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "版本不属于该章节");
+            throw new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "版本不属于该章节");
         }
 
         version.updateRemark(remark);

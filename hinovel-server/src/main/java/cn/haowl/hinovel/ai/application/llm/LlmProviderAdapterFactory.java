@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.ai.application.llm;
 
+import cn.haowl.hinovel.ai.enums.AiErrorCodeConstants;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +76,7 @@ public class LlmProviderAdapterFactory {
         LlmProviderAdapter adapter = adapterMap.get(providerType);
         if (adapter == null) {
             log.error("未找到 providerType={} 对应的适配器，已注册类型：{}", providerType, adapterMap.keySet());
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
+            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
                     "不支持的 LLM 提供方类型：" + providerType);
         }
         return adapter.buildStreamingModel(baseUrl, apiKey, modelName, temperature, maxTokens, topP);

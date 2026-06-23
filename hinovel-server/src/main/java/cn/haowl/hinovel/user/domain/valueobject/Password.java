@@ -1,7 +1,8 @@
 package cn.haowl.hinovel.user.domain.valueobject;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
+import cn.haowl.hinovel.user.enums.UserErrorCodeConstants;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -47,7 +48,7 @@ public final class Password implements Serializable {
      */
     public static Password ofEncoded(String encodedPassword) {
         if (encodedPassword == null || encodedPassword.isBlank()) {
-            throw new BusinessException(ErrorCode.PASSWORD_INVALID);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         return new Password(encodedPassword);
     }
@@ -60,13 +61,13 @@ public final class Password implements Serializable {
      */
     private static void validatePassword(String password) {
         if (password == null || password.isBlank()) {
-            throw new BusinessException(ErrorCode.PASSWORD_INVALID);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         if (password.length() < MIN_LENGTH) {
-            throw new BusinessException(ErrorCode.PASSWORD_TOO_SHORT);
+            throw new BusinessException(UserErrorCodeConstants.PASSWORD_FORMAT_ERROR);
         }
         if (password.length() > MAX_LENGTH) {
-            throw new BusinessException(ErrorCode.PASSWORD_TOO_LONG);
+            throw new BusinessException(UserErrorCodeConstants.PASSWORD_FORMAT_ERROR);
         }
     }
 

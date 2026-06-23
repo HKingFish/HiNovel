@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacter;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
@@ -139,7 +139,7 @@ public class NovelCharacterService {
      */
     public NovelCharacter getCharacterById(Long userId, Long characterId) {
         NovelCharacter character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
 
         // 验证权限
         novelService.getNovelById(userId, character.getNovelId());
@@ -172,9 +172,9 @@ public class NovelCharacterService {
 
         // 验证人物存在
         characterRepository.findById(request.getCharacterId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         characterRepository.findById(request.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
 
         // 通过工厂方法创建关系（内部校验自关联）
         NovelCharacterRelation relation = NovelCharacterRelation.create(
@@ -195,7 +195,7 @@ public class NovelCharacterService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteRelation(Long userId, Long relationId) {
         NovelCharacterRelation relation = characterRepository.findRelationById(relationId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
 
         // 验证权限
         novelService.getNovelById(userId, relation.getNovelId());

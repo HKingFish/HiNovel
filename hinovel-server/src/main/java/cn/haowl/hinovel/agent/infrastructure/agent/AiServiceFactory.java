@@ -6,9 +6,10 @@ import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
+import cn.haowl.hinovel.ai.enums.AiErrorCodeConstants;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -509,11 +510,11 @@ public class AiServiceFactory {
     private LlmProviderPort resolveProviderByAgentId(Long agentId) {
         Agent agent = agentMapper.selectById(agentId);
         if (agent == null) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+            throw new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND,
                     "Agent 不存在，ID：" + agentId);
         }
         if (agent.getLlmProviderId() == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
+            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
                     "Agent 未配置 LLM 提供方，Agent ID：" + agentId);
         }
         return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
@@ -529,11 +530,11 @@ public class AiServiceFactory {
     private LlmProviderPort resolveProviderByNovel(Long novelId, AgentRole role) {
         Agent agent = resolveAgent(novelId, role);
         if (agent == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
+            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
                     "该小说未配置" + getRoleName(role) + "，请先在小说设置中绑定");
         }
         if (agent.getLlmProviderId() == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
+            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
                     getRoleName(role) + "未配置 LLM 提供方");
         }
         return llmProviderFactory.getByProviderId(agent.getLlmProviderId());

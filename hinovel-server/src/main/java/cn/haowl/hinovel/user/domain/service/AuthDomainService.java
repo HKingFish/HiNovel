@@ -1,9 +1,10 @@
 package cn.haowl.hinovel.user.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
+import cn.haowl.hinovel.user.enums.UserErrorCodeConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,10 +34,10 @@ public class AuthDomainService {
      */
     public User register(String username, String email, String password) {
         if (userRepository.existsByEmail(email)) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            throw new BusinessException(UserErrorCodeConstants.EMAIL_ALREADY_EXISTS);
         }
         if (userRepository.existsByUsername(username)) {
-            throw new BusinessException(ErrorCode.USERNAME_ALREADY_EXISTS);
+            throw new BusinessException(UserErrorCodeConstants.USERNAME_ALREADY_EXISTS);
         }
         User user = User.create(username, email, password, passwordEncoder);
         return userRepository.save(user);
@@ -51,14 +52,14 @@ public class AuthDomainService {
      */
     public User authenticate(String account, String password) {
         User user = userRepository.findByUsernameOrEmail(account)
-                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
+            .orElseThrow(() -> new BusinessException(UserErrorCodeConstants.LOGIN_FAILED));
 
         if (!user.verifyPassword(password, passwordEncoder)) {
-            throw new BusinessException(ErrorCode.LOGIN_FAILED);
+            throw new BusinessException(UserErrorCodeConstants.LOGIN_FAILED);
         }
 
         if (user.isDisabled()) {
-            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
+            throw new BusinessException(UserErrorCodeConstants.ACCOUNT_DISABLED);
         }
 
         return user;
@@ -73,7 +74,7 @@ public class AuthDomainService {
      */
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
         user.changePassword(oldPassword, newPassword, passwordEncoder);
         userRepository.save(user);
     }

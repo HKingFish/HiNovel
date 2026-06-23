@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.infra.oss.provider;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants;
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
@@ -60,10 +60,10 @@ public class AliyunOssProvider implements OssProvider {
             log.info("阿里云 OSS 文件上传成功，Bucket：{}，Key：{}", bucketName, objectKey);
         } catch (OSSException e) {
             log.error("阿里云 OSS 上传失败，错误码：{}，异常：{}", e.getErrorCode(), e.getMessage());
-            throw new BusinessException(ErrorCode.OSS_UPLOAD_FAILED);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_UPLOAD_FAILED);
         } catch (IOException e) {
             log.error("读取上传文件流失败，异常：{}", e.getMessage());
-            throw new BusinessException(ErrorCode.OSS_UPLOAD_FAILED);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_UPLOAD_FAILED);
         }
 
         return getAccessUrl(objectKey);
@@ -80,7 +80,7 @@ public class AliyunOssProvider implements OssProvider {
             log.info("阿里云 OSS 文件删除成功，Bucket：{}，Key：{}", bucketName, objectKey);
         } catch (OSSException e) {
             log.error("阿里云 OSS 删除失败，错误码：{}，异常：{}", e.getErrorCode(), e.getMessage());
-            throw new BusinessException(ErrorCode.OSS_DELETE_FAILED);
+            throw new BusinessException(InfraErrorCodeConstants.OSS_DELETE_FAILED);
         }
     }
 

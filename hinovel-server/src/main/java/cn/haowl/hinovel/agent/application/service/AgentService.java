@@ -3,9 +3,10 @@ package cn.haowl.hinovel.agent.application.service;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
+import cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -98,11 +99,11 @@ public class AgentService {
      */
     public Agent getById(Long agentId, Long userId) {
         Agent agent = agentRepository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Agent 不存在"));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "Agent 不存在"));
 
         // 权限校验：非内置 Agent 只能被创建者访问
         if (agent.isUserDefined() && !agent.belongsTo(userId)) {
-            throw new BusinessException(ErrorCode.AGENT_NOT_OWNED);
+            throw new BusinessException(AgentErrorCodeConstants.AGENT_NOT_OWNED);
         }
         return agent;
     }
@@ -118,11 +119,11 @@ public class AgentService {
     @Transactional(rollbackFor = Exception.class)
     public Agent update(Long agentId, Long userId, AgentRequest request) {
         Agent agent = agentRepository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Agent 不存在"));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "Agent 不存在"));
 
         // 内置 Agent 所有用户均可修改；用户自建 Agent 仅限创建者修改
         if (agent.isUserDefined() && !agent.belongsTo(userId)) {
-            throw new BusinessException(ErrorCode.AGENT_NOT_OWNED);
+            throw new BusinessException(AgentErrorCodeConstants.AGENT_NOT_OWNED);
         }
 
         // 通过富方法更新属性
@@ -156,11 +157,11 @@ public class AgentService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long agentId, Long userId) {
         Agent agent = agentRepository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Agent 不存在"));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "Agent 不存在"));
 
         // 内置 Agent 所有用户均可删除；用户自建 Agent 仅限创建者删除
         if (agent.isUserDefined() && !agent.belongsTo(userId)) {
-            throw new BusinessException(ErrorCode.AGENT_NOT_OWNED);
+            throw new BusinessException(AgentErrorCodeConstants.AGENT_NOT_OWNED);
         }
 
         agentRepository.deleteById(agentId);
@@ -177,7 +178,7 @@ public class AgentService {
     public Agent getWithCache(Long agentId) {
         String cacheKey = AgentConstants.REDIS_KEY_PREFIX_AGENT_CONFIG + agentId;
         Agent agent = agentRepository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Agent 不存在"));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "Agent 不存在"));
 
         redisTemplate.opsForValue().set(
                 cacheKey, String.valueOf(agentId),
@@ -203,7 +204,7 @@ public class AgentService {
     public Agent getBuiltinNovelAgent() {
         return agentRepository.findBuiltinByName(AgentConstants.BUILTIN_AGENT_NOVEL_ASSISTANT)
                 .orElseThrow(() -> new BusinessException(
-                        ErrorCode.RESOURCE_NOT_FOUND, "内置小说 Agent 未初始化，请联系管理员"));
+                    GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "内置小说 Agent 未初始化，请联系管理员"));
     }
 
     /**
@@ -214,6 +215,6 @@ public class AgentService {
     public Agent getBuiltinInterviewAgent() {
         return agentRepository.findBuiltinByName(AgentConstants.BUILTIN_AGENT_INTERVIEW_ASSISTANT)
                 .orElseThrow(() -> new BusinessException(
-                        ErrorCode.RESOURCE_NOT_FOUND, "内置面试助手 Agent 未初始化，请联系管理员"));
+                    GlobalErrorCodeConstants.RESOURCE_NOT_FOUND, "内置面试助手 Agent 未初始化，请联系管理员"));
     }
 }

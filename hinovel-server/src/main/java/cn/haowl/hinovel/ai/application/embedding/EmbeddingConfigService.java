@@ -3,7 +3,7 @@ package cn.haowl.hinovel.ai.application.embedding;
 import cn.haowl.hinovel.ai.domain.entity.EmbeddingConfig;
 import cn.haowl.hinovel.ai.domain.repository.EmbeddingConfigRepository;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.common.service.ApiKeyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,9 +46,9 @@ public class EmbeddingConfigService {
      */
     public EmbeddingConfig getById(Long id, Long userId) {
         EmbeddingConfig config = embeddingConfigRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.NOT_FOUND));
         if (!config.getUserId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new BusinessException(GlobalErrorCodeConstants.FORBIDDEN);
         }
         return config;
     }

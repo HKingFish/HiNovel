@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.domain.entity;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.constant.NovelChapterStatus;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -83,7 +83,7 @@ public class NovelChapter extends BaseEntity {
      */
     public static NovelChapter createDraft(Long novelId, Integer chapterNumber, String title) {
         if (novelId == null || chapterNumber == null || chapterNumber < 1) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         NovelChapter chapter = new NovelChapter();
         chapter.setNovelId(novelId);
@@ -108,7 +108,7 @@ public class NovelChapter extends BaseEntity {
      */
     public void publish() {
         if (this.content == null || this.content.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR);
         }
         this.status = NovelChapterStatus.PUBLISHED;
         this.needRepublish = CommonConstants.DISABLED;

@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.common.response;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
+import cn.haowl.hinovel.common.exception.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
@@ -99,23 +100,25 @@ public class ApiResponse<T> {
     }
 
     /**
-     * 失败响应（使用 ErrorCode 枚举）。
+     * 失败响应（使用新的 ErrorCode 对象）。
      *
-     * @param errorCode 错误码枚举
+     * @param errorCode 错误码对象
      * @param <T>       数据类型
      * @return API 响应
+     * @see ErrorCode
      */
     public static <T> ApiResponse<T> error(ErrorCode errorCode) {
-        return new ApiResponse<>(errorCode.getCode(), errorCode.getMessage(), null);
+        return new ApiResponse<>(errorCode.getCode(), errorCode.getMsg(), null);
     }
 
     /**
-     * 失败响应（使用 ErrorCode 枚举，自定义消息）。
+     * 失败响应（使用新的 ErrorCode 对象，自定义消息）。
      *
-     * @param errorCode 错误码枚举
+     * @param errorCode 错误码对象
      * @param message   错误消息
      * @param <T>       数据类型
      * @return API 响应
+     * @see ErrorCode
      */
     public static <T> ApiResponse<T> error(ErrorCode errorCode, String message) {
         return new ApiResponse<>(errorCode.getCode(), message, null);
