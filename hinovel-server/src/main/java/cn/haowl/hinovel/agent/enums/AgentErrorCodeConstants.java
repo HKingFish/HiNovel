@@ -167,7 +167,7 @@ public interface AgentErrorCodeConstants {
      */
     ErrorCode AGENT_NOT_EXISTS = new ErrorCode(
         AGENT_CONFIG_ERROR_CODE_MIN + 1,
-        "Agent 不存在"
+        "Agent 不存在，ID：{}"
     );
 
     /**
@@ -232,5 +232,29 @@ public interface AgentErrorCodeConstants {
     ErrorCode AGENT_BUILTIN_NOT_INITIALIZED = new ErrorCode(
         AGENT_CONFIG_ERROR_CODE_MIN + 9,
         "内置 Agent 未初始化，请联系管理员"
+    );
+
+    /**
+     * Agent 未配置 LLM 提供方。
+     */
+    ErrorCode AGENT_LLM_PROVIDER_NOT_CONFIGURED = new ErrorCode(
+        AGENT_CONFIG_ERROR_CODE_MIN + 10,
+        "Agent 未配置 LLM 提供方，Agent ID：{}"
+    );
+
+    /**
+     * 小说未配置指定角色的 Agent。
+     */
+    ErrorCode NOVEL_AGENT_NOT_CONFIGURED = new ErrorCode(
+        AGENT_CONFIG_ERROR_CODE_MIN + 11,
+        "该小说未配置 {}，请先在小说设置中绑定"
+    );
+
+    /**
+     * Agent 角色未配置 LLM 提供方。
+     */
+    ErrorCode AGENT_ROLE_PROVIDER_NOT_CONFIGURED = new ErrorCode(
+        AGENT_CONFIG_ERROR_CODE_MIN + 12,
+        "{} 未配置 LLM 提供方"
     );
 }

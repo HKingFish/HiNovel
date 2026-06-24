@@ -3,9 +3,7 @@ package cn.haowl.hinovel.agent.application.service.impl;
 import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
 import cn.haowl.hinovel.agent.application.service.agent.EditorAgent;
-import cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants;
 import cn.haowl.hinovel.agent.interfaces.controller.AIController;
-import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.ChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
@@ -22,7 +20,10 @@ import reactor.core.publisher.Flux;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AUDIT_CHAPTER_NOT_EXISTS;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.REWRITE_CHAPTER_NOT_EXISTS;
 import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * AI 功能应用服务实现类。
@@ -49,7 +50,7 @@ public class AIServiceImpl implements AIService {
         NovelChapter chapter = chapterService.getById(request.getChapterId());
         if (chapter == null) {
             log.warn("AI 改写失败，章节不存在，chapterId={}", request.getChapterId());
-            throw new BusinessException(AgentErrorCodeConstants.REWRITE_CHAPTER_NOT_EXISTS);
+            throw exception(REWRITE_CHAPTER_NOT_EXISTS);
         }
 
         // 获取章节大纲（优先使用请求中的大纲内容）
@@ -114,7 +115,7 @@ public class AIServiceImpl implements AIService {
     public AIController.AIAuditorResponse aiAudit(AIController.AIAuditorRequest request, Long userId) {
         NovelChapter chapter = chapterService.getById(request.getChapterId());
         if (chapter == null) {
-            throw new BusinessException(AgentErrorCodeConstants.AUDIT_CHAPTER_NOT_EXISTS);
+            throw exception(AUDIT_CHAPTER_NOT_EXISTS);
         }
 
         // 使用请求中的内容覆盖数据库中的章节内容（前端可能传入编辑中的最新内容）

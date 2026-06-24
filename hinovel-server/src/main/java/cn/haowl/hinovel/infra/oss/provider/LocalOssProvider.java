@@ -1,7 +1,5 @@
 package cn.haowl.hinovel.infra.oss.provider;
 
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants;
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +12,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_DELETE_FAILED;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_UPLOAD_FAILED;
 
 /**
  * 本地文件存储实现。
@@ -51,7 +53,7 @@ public class LocalOssProvider implements OssProvider {
             log.info("本地文件上传成功，路径：{}", absolutePath);
         } catch (IOException e) {
             log.error("本地文件上传失败，路径：{}，异常：{}", absolutePath, e.getMessage());
-            throw new BusinessException(InfraErrorCodeConstants.OSS_UPLOAD_FAILED);
+            throw exception(OSS_UPLOAD_FAILED);
         }
 
         return getAccessUrl(objectKey);
@@ -73,7 +75,7 @@ public class LocalOssProvider implements OssProvider {
             }
         } catch (IOException e) {
             log.error("本地文件删除失败，路径：{}，异常：{}", targetPath, e.getMessage());
-            throw new BusinessException(InfraErrorCodeConstants.OSS_DELETE_FAILED);
+            throw exception(OSS_DELETE_FAILED);
         }
     }
 

@@ -1,11 +1,13 @@
 package cn.haowl.hinovel.user.domain.valueobject;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.user.enums.UserErrorCodeConstants;
 
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.regex.Pattern;
+
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.EMAIL_FORMAT_ERROR;
 
 /**
  * 邮箱值对象。
@@ -38,10 +40,10 @@ public final class Email implements Serializable {
      */
     public static Email of(String email) {
         if (email == null || email.isBlank()) {
-            throw new BusinessException(UserErrorCodeConstants.EMAIL_FORMAT_ERROR);
+            throw exception(EMAIL_FORMAT_ERROR);
         }
         if (!EMAIL_PATTERN.matcher(email).matches()) {
-            throw new BusinessException(UserErrorCodeConstants.EMAIL_FORMAT_ERROR);
+            throw exception(EMAIL_FORMAT_ERROR);
         }
         return new Email(email.toLowerCase().trim());
     }

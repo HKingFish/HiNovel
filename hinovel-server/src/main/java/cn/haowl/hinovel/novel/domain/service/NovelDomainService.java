@@ -1,7 +1,6 @@
 package cn.haowl.hinovel.novel.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -12,6 +11,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * 小说领域服务。
@@ -54,9 +57,9 @@ public class NovelDomainService {
      */
     public Novel validateOwnership(Long novelId, Long userId) {
         Novel novel = novelRepository.findById(novelId)
-            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> exception(NOT_FOUND));
         if (!novel.belongsTo(userId)) {
-            throw new BusinessException(GlobalErrorCodeConstants.FORBIDDEN);
+            throw exception(FORBIDDEN);
         }
         return novel;
     }
@@ -146,7 +149,7 @@ public class NovelDomainService {
      */
     public void refreshNovelStats(Long novelId) {
         Novel novel = novelRepository.findById(novelId)
-            .orElseThrow(() -> new BusinessException(GlobalErrorCodeConstants.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> exception(NOT_FOUND));
 
         List<NovelChapter> chapters = novelChapterRepository.findByNovelIdWithoutContent(novelId);
 

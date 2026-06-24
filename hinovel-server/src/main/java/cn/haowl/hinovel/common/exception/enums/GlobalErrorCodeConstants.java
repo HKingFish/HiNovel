@@ -31,6 +31,11 @@ public interface GlobalErrorCodeConstants {
     // ==================== 参数校验错误 ====================
 
     /**
+     * 请求参数错误。
+     */
+    ErrorCode BAD_REQUEST = new ErrorCode(1_000_001_000, "请求参数错误");
+
+    /**
      * 参数错误。
      */
     ErrorCode PARAM_ERROR = new ErrorCode(1_000_001_001, "参数错误");
@@ -38,12 +43,17 @@ public interface GlobalErrorCodeConstants {
     /**
      * 参数不能为空。
      */
-    ErrorCode PARAM_NOT_NULL = new ErrorCode(1_000_001_002, "参数 {0} 不能为空");
+    ErrorCode PARAM_NOT_NULL = new ErrorCode(1_000_001_002, "参数 {} 不能为空");
 
     /**
      * 参数格式错误。
      */
-    ErrorCode PARAM_FORMAT_ERROR = new ErrorCode(1_000_001_003, "参数 {0} 格式错误");
+    ErrorCode PARAM_FORMAT_ERROR = new ErrorCode(1_000_001_003, "参数 {} 格式错误");
+
+    /**
+     * 参数值无效。
+     */
+    ErrorCode PARAM_INVALID = new ErrorCode(1_000_001_004, "参数 {} 值无效");
 
     // ==================== 认证授权错误 [1-000-010-xxx] ====================
 

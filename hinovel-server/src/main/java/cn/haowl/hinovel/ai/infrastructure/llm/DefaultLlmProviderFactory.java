@@ -4,14 +4,16 @@ import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderQueryPort;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
-import cn.haowl.hinovel.ai.enums.AiErrorCodeConstants;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static cn.haowl.hinovel.ai.enums.AiErrorCodeConstants.LLM_PROVIDER_DISABLED;
+import static cn.haowl.hinovel.ai.enums.AiErrorCodeConstants.LLM_PROVIDER_NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_NOT_NULL;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * LLM 提供方工厂默认实现。
@@ -41,7 +43,7 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     @Override
     public LlmProviderPort getByProviderId(Long providerId) {
         if (providerId == null) {
-            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR, "提供方 ID 不能为空");
+            throw exception(PARAM_NOT_NULL, "提供方 ID");
         }
         return providerCache.computeIfAbsent(providerId, this::createByProviderId);
     }
@@ -49,7 +51,7 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     @Override
     public LlmProviderPort getByProvider(LlmProvider provider) {
         if (provider == null || provider.getId() == null) {
-            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR, "提供方配置不能为空");
+            throw exception(PARAM_NOT_NULL, "提供方配置");
         }
         return providerCache.computeIfAbsent(provider.getId(), id -> createAdapter(provider));
     }
@@ -57,7 +59,7 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     @Override
     public LlmProviderPort getAvailableProvider(Long preferredProviderId) {
         if (preferredProviderId == null) {
-            throw new BusinessException(GlobalErrorCodeConstants.PARAM_ERROR, "提供方 ID 不能为空");
+            throw exception(PARAM_NOT_NULL, "提供方 ID");
         }
         // 优先使用指定的 Provider
         if (healthTracker.isHealthy(preferredProviderId)) {
@@ -116,12 +118,10 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     private LlmProviderPort createByProviderId(Long providerId) {
         LlmProvider provider = llmProviderQueryPort.getWithDecryptedKey(providerId);
         if (provider == null) {
-            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
-                    "未找到 LLM 提供方配置，ID：" + providerId);
+            throw exception(LLM_PROVIDER_NOT_FOUND, providerId);
         }
         if (!provider.isActive()) {
-            throw new BusinessException(AiErrorCodeConstants.LLM_PROVIDER_UNAVAILABLE,
-                    "LLM 提供方已停用，ID：" + providerId);
+            throw exception(LLM_PROVIDER_DISABLED, providerId);
         }
         return createAdapter(provider);
     }

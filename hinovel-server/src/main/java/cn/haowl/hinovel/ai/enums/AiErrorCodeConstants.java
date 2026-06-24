@@ -36,14 +36,6 @@ public interface AiErrorCodeConstants {
     );
 
     /**
-     * LLM Provider 已禁用。
-     */
-    ErrorCode LLM_PROVIDER_DISABLED = new ErrorCode(
-        AI_LLM_PROVIDER_ERROR_CODE_MIN + 3,
-        "LLM Provider 已禁用"
-    );
-
-    /**
      * LLM Provider 配置无效。
      */
     ErrorCode LLM_PROVIDER_CONFIG_INVALID = new ErrorCode(
@@ -64,14 +56,38 @@ public interface AiErrorCodeConstants {
      */
     ErrorCode LLM_PROVIDER_UNAVAILABLE = new ErrorCode(
         AI_LLM_PROVIDER_ERROR_CODE_MIN + 6,
-        "LLM Provider 不可用"
+        "LLM Provider 不可用：{}"
+    );
+
+    /**
+     * LLM Provider 不存在。
+     */
+    ErrorCode LLM_PROVIDER_NOT_FOUND = new ErrorCode(
+        AI_LLM_PROVIDER_ERROR_CODE_MIN + 7,
+        "未找到 LLM 提供方配置，ID：{}"
+    );
+
+    /**
+     * 不支持的 LLM 提供方类型。
+     */
+    ErrorCode LLM_PROVIDER_TYPE_NOT_SUPPORTED = new ErrorCode(
+        AI_LLM_PROVIDER_ERROR_CODE_MIN + 8,
+        "不支持的 LLM 提供方类型：{}"
+    );
+
+    /**
+     * LLM Provider 已停用。
+     */
+    ErrorCode LLM_PROVIDER_DISABLED = new ErrorCode(
+        AI_LLM_PROVIDER_ERROR_CODE_MIN + 9,
+        "LLM 提供方已停用，ID：{}"
     );
 
     /**
      * LLM Provider API Key 无效。
      */
     ErrorCode LLM_PROVIDER_API_KEY_INVALID = new ErrorCode(
-        AI_LLM_PROVIDER_ERROR_CODE_MIN + 6,
+        AI_LLM_PROVIDER_ERROR_CODE_MIN + 7,
         "LLM Provider API Key 无效"
     );
 

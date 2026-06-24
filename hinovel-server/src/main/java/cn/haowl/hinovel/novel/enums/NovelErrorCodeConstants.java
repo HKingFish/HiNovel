@@ -132,6 +132,14 @@ public interface NovelErrorCodeConstants {
         "章节保存失败"
     );
 
+    /**
+     * 版本不属于该章节。
+     */
+    ErrorCode VERSION_NOT_BELONG_TO_CHAPTER = new ErrorCode(
+        NOVEL_CHAPTER_ERROR_CODE_MIN + 9,
+        "版本不属于该章节"
+    );
+
     // ==================== Novel 大纲模块 [1-002-003-xxx] ====================
 
     /**

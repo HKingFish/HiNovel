@@ -1,15 +1,17 @@
 package cn.haowl.hinovel.user.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
-import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.user.constant.UserRole;
 import cn.haowl.hinovel.user.constant.UserStatus;
-import cn.haowl.hinovel.user.enums.UserErrorCodeConstants;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Objects;
+
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ACCOUNT_DISABLED;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ORIGINAL_PASSWORD_WRONG;
 
 /**
  * 用户实体。
@@ -90,7 +92,7 @@ public class User extends BaseEntity {
      */
     public boolean changePassword(String oldPassword, String newPassword, PasswordEncoder passwordEncoder) {
         if (!passwordEncoder.matches(oldPassword, this.password)) {
-            throw new BusinessException(UserErrorCodeConstants.ORIGINAL_PASSWORD_WRONG);
+            throw exception(ORIGINAL_PASSWORD_WRONG);
         }
         this.password = passwordEncoder.encode(newPassword);
         return true;
@@ -101,7 +103,7 @@ public class User extends BaseEntity {
      */
     public void disable() {
         if (UserStatus.DISABLED.name().equals(this.status)) {
-            throw new BusinessException(UserErrorCodeConstants.ACCOUNT_DISABLED);
+            throw exception(ACCOUNT_DISABLED);
         }
         this.status = UserStatus.DISABLED.name();
     }
