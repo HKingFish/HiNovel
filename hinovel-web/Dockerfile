@@ -8,9 +8,9 @@ COPY package.json .
 RUN npm install
 
 COPY . .
-RUN NODE_OPTIONS='--max-old-space-size=1024' npm run build
+#RUN NODE_OPTIONS='--max-old-space-size=1024' npm run build
 # 高性能机器不用限制
-# RUN npm run build
+RUN npm run build
 
 # 运行阶段（Nginx）
 FROM ${NGINX_IMAGE}
