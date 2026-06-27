@@ -118,12 +118,12 @@ services:
       - hinovel-network
 
   # 前端 Vue 应用（Nginx）
+  # 说明：前端产物 dist/ 由宿主机通过 npm run build 预先构建，镜像仅托管静态文件
   hinovel-web:
     build:
       context: ./hinovel-web
       dockerfile: Dockerfile
       args:
-        NODE_IMAGE: ${DOCKER_IMAGE_NODE:-node:20-alpine}
         NGINX_IMAGE: ${DOCKER_IMAGE_NGINX:-nginx:1.25-alpine}
     container_name: hinovel-web
     restart: unless-stopped

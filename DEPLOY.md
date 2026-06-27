@@ -4,14 +4,20 @@
 
 ## 环境要求
 
-| 组件 | 版本要求 |
-|------|----------|
-| Docker | 24.0+ |
-| Docker Compose | 2.20+ |
-| 内存 | 建议 4 GB 以上 |
-| 磁盘 | 建议 20 GB 以上 |
+| 组件 | 版本要求 | 说明 |
+|------|----------|------|
+| Docker | 24.0+ | 容器运行时 |
+| Docker Compose | 2.20+ | 多服务编排 |
+| Node.js | 20+ | **Docker 部署也需要**，用于在宿主机构建前端产物 |
+| 内存 | 建议 4 GB 以上 | |
+| 磁盘 | 建议 20 GB 以上 | |
 
-本地开发额外需要：JDK 21+、Maven 3.9+、Node.js 20+。
+本地开发额外需要：JDK 21+、Maven 3.9+。
+
+> **为什么 Docker 部署也需要 Node.js？**
+> 前端产物 `dist/` 由宿主机通过 `npm run build` 预先构建，Docker 镜像只托管静态文件。
+> 这样可避免在容器内执行 Vite/Rollup 构建时，因 overlay2 文件系统 IO 瓶颈与内存峰值导致服务器卡死。
+> `docker-build.sh` 的 `up`/`build`/`web` 命令会自动调用宿主机 npm 完成前端构建。
 
 ---
 
@@ -98,14 +104,22 @@ bash docker-build.sh up
 bash docker-build.sh status    # 查看服务状态
 bash docker-build.sh logs        # 查看后端日志（默认 hinovel-server）
 bash docker-build.sh logs hinovel-web
-bash docker-build.sh restart     # 重启所有服务
+bash docker-build.sh restart     # 重启所有服务（不重新构建）
 bash docker-build.sh down        # 停止并移除容器（数据保留在 ../data）
-bash docker-build.sh build       # 仅构建镜像，不启动
+bash docker-build.sh build       # 构建前端产物并构建镜像（不启动）
+bash docker-build.sh web         # 单独重新构建并部署前端
+bash docker-build.sh server      # 单独重新构建并部署后端
 ```
 
-也可直接使用 Docker Compose：
+> **注意**：`up`/`build`/`web` 命令会在宿主机执行 `npm run build` 生成前端产物，需要宿主机已安装 Node.js 20+。
+
+若直接使用 Docker Compose，需先手动构建前端产物：
 
 ```bash
+# 1. 宿主机构建前端
+cd hinovel-web && npm ci && npm run build && cd ..
+
+# 2. 构建并启动
 docker compose up -d --build
 docker compose ps
 docker compose logs -f hinovel-server
@@ -214,15 +228,25 @@ npm run dev
 
 更新代码后，只需重建对应服务镜像，**MySQL / Redis / Qdrant 不会被重启**。
 
+推荐使用一键脚本（自动处理前端构建）：
+
+```bash
+# 更新前端（宿主机 build + 重启 web 容器）
+bash docker-build.sh web
+
+# 更新后端（重启 server 容器）
+bash docker-build.sh server
+```
+
+也可手动使用 Docker Compose：
+
 ```bash
 # 更新后端
 docker compose up -d --build hinovel-server
 
-# 更新前端
+# 更新前端（必须先在宿主机 build，再重建镜像）
+cd hinovel-web && npm run build && cd ..
 docker compose up -d --build hinovel-web
-
-# 同时更新
-docker compose up -d --build hinovel-server hinovel-web
 ```
 
 查看更新日志：
