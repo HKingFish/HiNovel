@@ -3,7 +3,7 @@
         <!-- 顶部标题栏 -->
         <header class="editor-header">
             <div class="header-left">
-                <el-button :icon="ArrowLeft" type="primary" plain @click="goBack" class="back-btn"> 返回 </el-button>
+                <el-button :icon="ArrowLeft" type="primary" plain class="back-btn" @click="goBack"> 返回 </el-button>
                 <el-input v-model="chapterTitle" placeholder="请输入章节标题" class="chapter-title-input" />
             </div>
             <div class="header-center">
@@ -21,8 +21,8 @@
                 <el-button
                     :type="isFocusMode ? 'warning' : 'default'"
                     :icon="isFocusMode ? Close : FullScreen"
-                    @click="toggleFocusMode"
                     class="focus-mode-btn"
+                    @click="toggleFocusMode"
                 >
                     {{ isFocusMode ? '退出专注' : '专注模式' }}
                 </el-button>
@@ -98,8 +98,8 @@
 
                     <div
                         v-show="!isSidebarCollapsed"
-                        class="sidebar-content"
                         ref="chapterListRef"
+                        class="sidebar-content"
                         @scroll="handleChapterListScroll"
                     >
                         <!-- 章节筛选工具栏 -->
@@ -254,7 +254,7 @@
                     <span class="quick-jump-arrow" @click="scrollJumpRail(-1)">
                         <el-icon :size="10"><ArrowUp /></el-icon>
                     </span>
-                    <div class="quick-jump-list" ref="quickJumpListRef">
+                    <div ref="quickJumpListRef" class="quick-jump-list">
                         <span
                             v-for="anchor in quickJumpAnchors"
                             :key="anchor"
@@ -394,12 +394,12 @@
                             size="default"
                             :icon="hasUnsavedChanges ? Warning : Check"
                             :loading="isSaving"
-                            @click="manualSave"
                             :class="[
                                 'save-btn',
                                 hasUnsavedChanges ? 'save-btn-unsaved' : 'save-btn-saved',
                                 { 'save-btn-pulse': hasUnsavedChanges },
                             ]"
+                            @click="manualSave"
                         >
                             {{ hasUnsavedChanges ? '未保存' : '已保存' }}
                         </el-button>
@@ -509,7 +509,7 @@
 
                     <!-- 人物图谱面板 -->
                     <div v-show="activeFunctionTab === 'character'" class="function-tab-content">
-                        <div class="tab-panel-body character-graph-body" v-loading="isLoadingCharacterGraph">
+                        <div v-loading="isLoadingCharacterGraph" class="tab-panel-body character-graph-body">
                             <!-- 人物详情内联卡片 -->
                             <transition name="slide-up">
                                 <div v-if="showCharacterDetail && selectedCharacter" class="character-inline-detail">
@@ -808,7 +808,7 @@
                         </div>
                         <div class="tab-panel-body chat-panel-body">
                             <div class="chat-messages-wrapper">
-                                <div class="inline-chat-messages" ref="chatMessagesRef" @scroll="handleChatScroll">
+                                <div ref="chatMessagesRef" class="inline-chat-messages" @scroll="handleChatScroll">
                                     <!-- 加载更多历史消息提示 -->
                                     <div v-if="chatLoadingMore" class="chat-loading-more">加载中...</div>
                                     <div
@@ -924,8 +924,8 @@
                                     type="danger"
                                     :icon="CircleClose"
                                     size="default"
-                                    @click="handleStopChat"
                                     class="stop-btn"
+                                    @click="handleStopChat"
                                 >
                                     停止
                                 </el-button>
@@ -934,9 +934,9 @@
                                     type="primary"
                                     :icon="Promotion"
                                     size="default"
-                                    @click="sendChatMessage"
                                     :disabled="!chatInput.trim()"
                                     class="send-btn"
+                                    @click="sendChatMessage"
                                 >
                                     发送
                                 </el-button>
@@ -1156,8 +1156,8 @@
                             <el-button
                                 type="primary"
                                 :loading="isSavingSettings"
-                                @click="saveSettingsPanel"
                                 class="settings-save-btn"
+                                @click="saveSettingsPanel"
                             >
                                 <el-icon>
                                     <Check />
@@ -1282,8 +1282,8 @@
                 <el-button
                     type="primary"
                     :loading="isCreatingChapter"
-                    @click="addChapter"
                     :disabled="!newChapterTitle.trim()"
+                    @click="addChapter"
                 >
                     创建
                 </el-button>
@@ -1317,8 +1317,8 @@
                 <el-button
                     type="primary"
                     :loading="isUpdatingChapter"
-                    @click="updateChapter"
                     :disabled="!editingChapter.title.trim()"
+                    @click="updateChapter"
                 >
                     保存
                 </el-button>
@@ -1333,7 +1333,7 @@
             class="resync-confirm-dialog"
             align-center
         >
-            <div class="resync-confirm-body" v-if="resyncChapter">
+            <div v-if="resyncChapter" class="resync-confirm-body">
                 <div class="resync-icon-wrapper">
                     <el-icon :size="36" color="#e6a23c"><WarningFilled /></el-icon>
                 </div>
@@ -1420,7 +1420,7 @@
                     </div>
                 </div>
 
-                <div class="audit-issues" v-if="auditResult.issues.length > 0">
+                <div v-if="auditResult.issues.length > 0" class="audit-issues">
                     <h3 class="issues-title">发现的问题</h3>
                     <div
                         v-for="issue in auditResult.issues"
@@ -1471,7 +1471,7 @@
                                 <span class="reason-label">原因：</span>
                                 <span class="reason-content">{{ issue.reason }}</span>
                             </div>
-                            <div class="issue-suggestion" v-if="issue.suggestion">
+                            <div v-if="issue.suggestion" class="issue-suggestion">
                                 <span class="suggestion-label">建议：</span>
                                 <span class="suggestion-content">{{ issue.suggestion }}</span>
                             </div>
@@ -1482,9 +1482,9 @@
                 <div class="audit-actions">
                     <el-button @click="showAuditResult = false">关闭</el-button>
                     <el-button
+                        v-if="auditResult.overallAssessment !== 'pass'"
                         type="primary"
                         @click="regenerateContent"
-                        v-if="auditResult.overallAssessment !== 'pass'"
                     >
                         重新生成
                     </el-button>
