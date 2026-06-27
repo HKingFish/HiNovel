@@ -13,9 +13,9 @@ services:
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - ./data/mysql/data:/var/lib/mysql
-      - ./data/mysql/conf:/etc/mysql/conf.d
-      - ./data/mysql/logs:/var/log/mysql
+      - ../data/mysql/data:/var/lib/mysql
+      - ../data/mysql/conf:/etc/mysql/conf.d
+      - ../data/mysql/logs:/var/log/mysql
       - ./hinovel-server/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./hinovel-server/sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     healthcheck:
@@ -37,8 +37,8 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - ./data/redis/data:/data
-      - ./data/redis/conf:/usr/local/etc/redis
+      - ../data/redis/data:/data
+      - ../data/redis/conf:/usr/local/etc/redis
     healthcheck:
       test: [ "CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi" ]
       interval: 10s
@@ -56,8 +56,8 @@ services:
       - "${QDRANT_HTTP_PORT:-6333}:6333"
       - "${QDRANT_GRPC_PORT:-6334}:6334"
     volumes:
-      - ./data/qdrant/storage:/qdrant/storage
-      - ./data/qdrant/snapshots:/qdrant/snapshots
+      - ../data/qdrant/storage:/qdrant/storage
+      - ../data/qdrant/snapshots:/qdrant/snapshots
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' && exit 0 || exit 1" ]
       interval: 10s
@@ -99,9 +99,9 @@ services:
       OSS_ALIYUN_BUCKET_NAME: ${OSS_ALIYUN_BUCKET_NAME:-}
       API_KEY_SECRET: ${API_KEY_SECRET}
     volumes:
-      - ./data/hinovel/uploads:/data/hinovel/uploads
-      - ./data/hinovel/logs:/app/logs
-      - ./data/models:/data/models
+      - ../data/hinovel/uploads:/data/hinovel/uploads
+      - ../data/hinovel/logs:/app/logs
+      - ../data/models:/data/models
     depends_on:
       mysql:
         condition: service_healthy
@@ -130,7 +130,7 @@ services:
     ports:
       - "${WEB_PORT:-80}:80"
     volumes:
-      - ./data/nginx/logs:/var/log/nginx
+      - ../data/nginx/logs:/var/log/nginx
     depends_on:
       - hinovel-server
     networks:

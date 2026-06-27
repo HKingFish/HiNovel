@@ -21,11 +21,11 @@ fi
 # 创建宿主机数据挂载目录
 init_data_dirs() {
     echo ">>> 初始化数据目录..."
-    mkdir -p data/mysql/data data/mysql/conf data/mysql/logs
-    mkdir -p data/redis/data data/redis/conf
-    mkdir -p data/qdrant/storage data/qdrant/snapshots
-    mkdir -p data/hinovel/uploads data/hinovel/logs
-    mkdir -p data/nginx/logs
+    mkdir -p ../data/mysql/data ../data/mysql/conf ../data/mysql/logs
+    mkdir -p ../data/redis/data ../data/redis/conf
+    mkdir -p ../data/qdrant/storage ../data/qdrant/snapshots
+    mkdir -p ../data/hinovel/uploads ../data/hinovel/logs
+    mkdir -p ../data/nginx/logs
 }
 
 ACTION=${1:-"up"}
@@ -56,7 +56,7 @@ case $ACTION in
         docker-compose ps
         ;;
     "down")
-        echo ">>> 停止并移除所有容器（数据保留在 ./data 目录）..."
+        echo ">>> 停止并移除所有容器（数据保留在 ../data 目录）..."
         docker-compose down
         ;;
     "restart")

@@ -56,10 +56,10 @@ API_KEY_SECRET=your_random_secret_16chars
 
 ### 3. 数据目录
 
-容器数据通过 Volume 挂载到宿主机 `./data` 目录，删除容器不会丢失数据：
+容器数据通过 Volume 挂载到宿主机 `../data` 目录（项目根目录的上一级），删除容器不会丢失数据，且与代码仓库隔离：
 
 ```
-data/
+../data/
 ├── mysql/
 │   ├── data/          # MySQL 数据文件
 │   ├── conf/          # 自定义配置
@@ -99,7 +99,7 @@ bash docker-build.sh status    # 查看服务状态
 bash docker-build.sh logs        # 查看后端日志（默认 hinovel-server）
 bash docker-build.sh logs hinovel-web
 bash docker-build.sh restart     # 重启所有服务
-bash docker-build.sh down        # 停止并移除容器（数据保留在 ./data）
+bash docker-build.sh down        # 停止并移除容器（数据保留在 ../data）
 bash docker-build.sh build       # 仅构建镜像，不启动
 ```
 
@@ -124,12 +124,12 @@ docker compose logs -f hinovel-server
 
 ### 自动初始化（推荐）
 
-MySQL 容器**首次启动**且 `data/mysql/data` 为空时，会自动执行：
+MySQL 容器**首次启动**且 `../data/mysql/data` 为空时，会自动执行：
 
 1. `hinovel-server/sql/schema.sql` — 建表
 2. `hinovel-server/sql/seed.sql` — 初始数据（含 admin 账号、内置 Agent 模板）
 
-> **注意**：初始化在 **MySQL 容器首次启动**时执行，**不在** Docker 镜像构建阶段执行。若 `data/mysql/data` 已有数据，脚本不会再次运行。
+> **注意**：初始化在 **MySQL 容器首次启动**时执行，**不在** Docker 镜像构建阶段执行。若 `../data/mysql/data` 已有数据，脚本不会再次运行。
 
 ### 手动初始化
 
@@ -153,7 +153,7 @@ bash scripts/init-db.sh --force
 
 ```powershell
 docker compose down
-Remove-Item -Recurse -Force .\data\mysql\data\*
+Remove-Item -Recurse -Force ..\data\mysql\data\*
 docker compose up -d mysql
 ```
 
@@ -256,7 +256,7 @@ docker exec -i hinovel-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hinovel_platf
 0 3 * * * /path/to/HiNovel/scripts/mysql_backup.sh >> /var/log/hinovel-backup.log 2>&1
 ```
 
-5. **日志与监控**：应用日志位于 `data/hinovel/logs/`，建议接入日志采集与告警
+5. **日志与监控**：应用日志位于 `../data/hinovel/logs/`，建议接入日志采集与告警
 6. **Embedding 选型**：
    - `openai`（推荐入门）：调用 OpenAI 兼容 API，配置简单
    - `onnx`：本地 BGE-M3 模型，无 API 费用，需自行准备模型文件

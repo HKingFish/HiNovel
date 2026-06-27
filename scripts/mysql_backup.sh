@@ -15,7 +15,7 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 fi
 
 # 备份配置
-BACKUP_DIR="$PROJECT_DIR/data/mysql/backup"
+BACKUP_DIR="$PROJECT_DIR/../data/mysql/backup"
 MYSQL_CONTAINER="hinovel-mysql"
 DATABASE_NAME="hinovel_platform"
 MYSQL_USER="root"
