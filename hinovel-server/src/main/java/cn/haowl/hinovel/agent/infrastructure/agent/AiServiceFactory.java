@@ -23,6 +23,12 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.*;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -166,9 +172,20 @@ public class AiServiceFactory {
     public <T> T buildStreamingByNovelWithTools(Long novelId, AgentRole role,
                                                 Class<T> serviceClass, Object... tools) {
         LlmProviderPort providerPort = resolveProviderByNovel(novelId, role);
-        return AiServices.builder(serviceClass)
+        // 过滤掉 null 工具（如用户未配置 Embedding 时 retrievalTool 为 null）
+        List<Object> validTools = tools == null ? Collections.emptyList()
+            : Arrays.stream(tools)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        if (validTools.isEmpty()) {
+            // 无有效工具，构建不带 Tool 的 AiService
+            return AiServices.builder(serviceClass)
                 .streamingChatModel(providerPort.getStreamingChatModel())
-                .tools(tools)
+                .build();
+        }
+        return AiServices.builder(serviceClass)
+            .streamingChatModel(providerPort.getStreamingChatModel())
+            .tools(validTools.toArray())
                 .build();
     }
 

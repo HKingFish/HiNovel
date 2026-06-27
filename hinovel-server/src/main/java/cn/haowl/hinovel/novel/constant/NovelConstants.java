@@ -21,10 +21,10 @@ public final class NovelConstants {
     /**
      * AI 改写时默认携带的前几章数量。
      */
-    public static final int DEFAULT_REWRITE_CONTEXT_CHAPTERS = 2;
+    public static final int DEFAULT_REWRITE_CONTEXT_CHAPTERS = 5;
 
     /**
      * AI 问答时默认携带的历史消息条数。
      */
-    public static final int DEFAULT_QA_CONTEXT_LENGTH = 10;
+    public static final int DEFAULT_QA_CONTEXT_LENGTH = 20;
 }

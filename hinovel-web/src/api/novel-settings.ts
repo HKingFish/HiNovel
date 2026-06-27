@@ -21,7 +21,10 @@ export interface NovelSettings {
 }
 
 /**
- * 创建默认配置（前端默认值）
+ * 创建默认配置（仅用于 ref 初始化占位，避免加载时界面闪烁）。
+ *
+ * 注意：此值仅为乐观占位，权威默认值由后端 `NovelSettings.createDefault()` 返回。
+ * 如需修改默认值，请修改后端 `cn.haowl.hinovel.novel.domain.entity.NovelSettings#createDefault()`。
  */
 export const createDefaultSettings = (): NovelSettings => ({
     autoAuditAfterRewrite: 1,
@@ -54,10 +57,16 @@ export const saveNovelSettings = (novelId: number, settings: NovelSettings) =>
     http.put<never, { data: NovelSettings }>(`/api/novel/settings/${novelId}`, settings)
 
 /**
- * 获取用户默认配置
+ * 获取用户默认配置（后端保证非 null：未保存过时返回系统默认配置）
  */
 export const getUserDefaultSettings = () =>
-    http.get<never, { data: NovelSettings | null }>('/api/novel/settings/user-default')
+  http.get<never, { data: NovelSettings }>('/api/novel/settings/user-default')
+
+/**
+ * 获取系统默认配置（不查数据库，供「恢复默认」按钮使用）
+ */
+export const getSystemDefaultSettings = () =>
+  http.get<never, { data: NovelSettings }>('/api/novel/settings/system-default')
 
 /**
  * 保存用户默认配置

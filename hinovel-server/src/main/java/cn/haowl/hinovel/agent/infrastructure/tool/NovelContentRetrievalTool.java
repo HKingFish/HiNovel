@@ -45,31 +45,23 @@ public class NovelContentRetrievalTool {
     }
 
     /**
-     * 根据工厂和小说 ID 创建检索工具实例（使用系统默认 Embedding 模型）。
+     * 根据工厂、小说 ID 和用户 ID 创建检索工具实例。
      *
-     * @param vectorStoreFactory 向量存储工厂
-     * @param novelId            小说 ID
-     * @return 检索工具实例
-     */
-    public static NovelContentRetrievalTool create(VectorStoreFactory vectorStoreFactory,
-                                                   Long novelId) {
-        String collectionName = "novel_" + novelId;
-        VectorStorePort vectorStore = vectorStoreFactory.getByCollection(collectionName);
-        return new NovelContentRetrievalTool(vectorStore, novelId);
-    }
-
-    /**
-     * 根据工厂、小说 ID 和用户 ID 创建检索工具实例（优先使用用户自定义 Embedding 模型）。
+     * <p>使用用户在数据库中配置的 Embedding 模型。若用户未配置 Embedding 模型，
+     * 返回 null 表示不启用 RAG 功能，调用方应据此跳过工具挂载。</p>
      *
      * @param vectorStoreFactory 向量存储工厂
      * @param novelId            小说 ID
      * @param userId             用户 ID
-     * @return 检索工具实例
+     * @return 检索工具实例；用户未配置 Embedding 模型时返回 null
      */
     public static NovelContentRetrievalTool create(VectorStoreFactory vectorStoreFactory,
                                                    Long novelId, Long userId) {
         String collectionName = "novel_" + novelId;
         VectorStorePort vectorStore = vectorStoreFactory.getByCollection(collectionName, userId);
+        if (vectorStore == null) {
+            return null;
+        }
         return new NovelContentRetrievalTool(vectorStore, novelId);
     }
 

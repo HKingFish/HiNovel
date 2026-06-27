@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 8080
   servlet:
     context-path: /
@@ -96,20 +96,6 @@ hinovel:
       bucket-name: ${OSS_ALIYUN_BUCKET_NAME:hinovel-files}
     max-file-size: 52428800
     allowed-types: pdf,txt,md,png,jpg,jpeg
-  # Embedding 模型配置
-  # type=openai：使用 OpenAI 兼容接口（阿里云百炼 text-embedding-v3，中文效果好）
-  # type=onnx：使用本地 ONNX 模型（如 BGE-M3，进程内推理，无需网络调用）
-  embedding:
-    type: ${EMBEDDING_TYPE:openai}
-    openai:
-      api-key: ${OPENAI_EMBEDDING_API_KEY:}
-      base-url: ${OPENAI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-      model-name: ${OPENAI_EMBEDDING_MODEL:text-embedding-v3}
-      dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1024}
-    onnx:
-      model-path: ${ONNX_EMBEDDING_MODEL_PATH:}
-      tokenizer-path: ${ONNX_EMBEDDING_TOKENIZER_PATH:}
-      dimensions: ${ONNX_EMBEDDING_DIMENSIONS:1024}
   # 安全配置
   security:
     # API 密钥加密密钥（AES-128，至少 16 个字符，生产环境务必修改）
@@ -120,12 +106,11 @@ hinovel:
       host: ${QDRANT_HOST:localhost}
       port: ${QDRANT_PORT:6334}
 
-# Milvus 向量数据库配置（LangChain4J 自动配置）
+# LangChain4J 自动配置占位（Embedding 模型由用户在数据库配置后动态构建）
 langchain4j:
-  # OpenAI 自动配置占位（实际由 EmbeddingModelConfig 手动创建 Bean 覆盖）
   open-ai:
     embedding-model:
-      api-key: ${OPENAI_EMBEDDING_API_KEY:unused}
+      api-key: unused
 
 # 链路追踪配置（Micrometer Tracing）
 management:

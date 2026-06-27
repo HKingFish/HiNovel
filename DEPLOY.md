@@ -50,13 +50,6 @@ cp .env.example .env
 MYSQL_PASSWORD=your_mysql_password
 MYSQL_ROOT_PASSWORD=your_root_password
 API_KEY_SECRET=your_random_secret_16chars
-
-# Embedding（RAG 功能依赖，二选一）
-EMBEDDING_TYPE=openai
-OPENAI_EMBEDDING_API_KEY=sk-your-key
-OPENAI_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-OPENAI_EMBEDDING_MODEL=text-embedding-v3
-OPENAI_EMBEDDING_DIMENSIONS=1024
 ```
 
 > **安全提示**：`API_KEY_SECRET` 用于加密数据库中存储的 LLM API Key，部署后请勿随意更改，否则已加密的 Key 将无法解密。
