@@ -33,6 +33,11 @@ echo ">>> 项目目录: $PROJECT_DIR"
 # 进入项目目录
 cd "$PROJECT_DIR"
 
+# 解决 Git 安全目录问题（当仓库所有者与当前用户不一致时）
+echo ""
+echo ">>> 配置 Git 安全目录..."
+git config --global --add safe.directory "$PROJECT_DIR"
+
 # 拉取最新代码
 echo ""
 echo ">>> 拉取最新代码..."
