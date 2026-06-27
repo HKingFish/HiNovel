@@ -722,16 +722,7 @@
                                 <div v-if="previewVersionId" class="inline-version-preview">
                                     <div class="preview-header">
                                         <span>版本预览</span>
-                                        <el-button
-                                            text
-                                            size="small"
-                                            @click="
-                                                previewVersionId = null
-                                                previewVersionContent = ''
-                                            "
-                                        >
-                                            关闭
-                                        </el-button>
+                                        <el-button text size="small" @click="closePreviewVersion"> 关闭 </el-button>
                                     </div>
                                     <div class="preview-content">
                                         <pre>{{ previewVersionContent }}</pre>
@@ -4291,6 +4282,12 @@ const loadHistoryVersions = async () => {
 const previewVersion = (version: ChapterVersion) => {
     previewVersionId.value = version.id
     previewVersionContent.value = version.content || ''
+}
+
+// 关闭版本预览
+const closePreviewVersion = () => {
+    previewVersionId.value = null
+    previewVersionContent.value = ''
 }
 
 // 恢复版本
