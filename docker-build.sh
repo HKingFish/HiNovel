@@ -66,7 +66,7 @@ case $ACTION in
         echo ""
         echo "=========================================="
         echo "  所有服务已启动！"
-        echo "  前端地址：http://localhost:${WEB_PORT:-80}"
+        echo "  前端地址：http://localhost:${WEB_PORT:-3000}"
         echo "  后端地址：http://localhost:${SERVER_PORT:-8080}"
         echo "  Qdrant：  http://localhost:${QDRANT_HTTP_PORT:-6333}/dashboard"
         echo "=========================================="
@@ -108,7 +108,7 @@ case $ACTION in
         echo ">>> 重新构建并启动前端服务..."
         $DC up -d --build hinovel-web
         echo ""
-        echo "前端已更新：http://localhost:${WEB_PORT:-80}"
+        echo "前端已更新：http://localhost:${WEB_PORT:-3000}"
         $DC ps hinovel-web
         ;;
     # 单独重新部署后端：重建并重启 server 容器（后端仍为容器内 Maven 构建）

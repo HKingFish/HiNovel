@@ -25,12 +25,14 @@
 
 | 服务 | 默认端口 | 环境变量 | 说明 |
 |------|----------|----------|------|
-| 前端（Nginx） | 80 | `WEB_PORT` | Web 访问入口 |
+| 前端（Nginx） | 3000 | `WEB_PORT` | Web 访问入口，默认 3000 避免与服务器已有 nginx/apache 80 端口冲突 |
 | 后端（Spring Boot） | 8080 | `SERVER_PORT` | REST API |
 | MySQL | 3306 | `MYSQL_PORT` | 关系型数据库 |
 | Redis | 6379 | `REDIS_PORT` | 缓存 / Session |
 | Qdrant HTTP | 6333 | `QDRANT_HTTP_PORT` | 向量库 REST / 管理面板 |
 | Qdrant gRPC | 6334 | `QDRANT_GRPC_PORT` | Java 客户端连接端口 |
+
+> **端口冲突提示**：若服务器 80 端口未被占用且希望前端直接走 80，在 `.env` 中设置 `WEB_PORT=80`。
 
 ---
 
@@ -127,7 +129,7 @@ docker compose logs -f hinovel-server
 
 ### 验证部署
 
-1. 访问 http://localhost（或你配置的 `WEB_PORT`）
+1. 访问 http://localhost:3000（或你配置的 `WEB_PORT`）
 2. 使用默认管理员登录：`admin` / `Admin@123456`（生产环境请立即修改密码）
 3. 在「LLM 配置」中添加你的大模型 Provider
 4. 创建小说并测试 AI 续写 / 对话功能
