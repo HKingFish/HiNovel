@@ -125,9 +125,9 @@ public class NovelSettings extends BaseEntity {
      */
     public static NovelSettings createDefault() {
         NovelSettings settings = new NovelSettings();
-        settings.setAutoAuditAfterRewrite(CommonConstants.ENABLED);
-        settings.setAutoOutlineAfterPublish(CommonConstants.ENABLED);
-        settings.setAutoVectorAfterPublish(CommonConstants.ENABLED);
+        settings.setAutoAuditAfterRewrite(CommonConstants.DISABLED);
+        settings.setAutoOutlineAfterPublish(CommonConstants.DISABLED);
+        settings.setAutoVectorAfterPublish(CommonConstants.DISABLED);
         settings.setRewriteContextChapters(NovelConstants.DEFAULT_REWRITE_CONTEXT_CHAPTERS);
         settings.setRewriteIncludeOutline(CommonConstants.ENABLED);
         settings.setAuditIncludeOutline(CommonConstants.ENABLED);

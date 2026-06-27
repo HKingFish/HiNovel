@@ -60,13 +60,23 @@ public class NovelSettingsController {
     }
 
     /**
-     * 获取用户默认配置
+     * 获取用户默认配置（未保存过时返回系统默认配置）
      */
-    @Operation(summary = "获取用户默认配置", description = "获取当前用户的默认 AI 功能配置")
+    @Operation(summary = "获取用户默认配置", description = "获取当前用户的默认 AI 功能配置，未保存过时返回系统默认配置")
     @GetMapping("/user-default")
     public ApiResponse<NovelSettings> getUserDefaultSettings() {
         Long userId = StpUtil.getLoginIdAsLong();
         NovelSettings settings = novelSettingsService.getUserDefaultSettings(userId);
+        return ApiResponse.success(settings);
+    }
+
+    /**
+     * 获取系统默认配置（不查数据库，供「恢复默认」按钮使用）
+     */
+    @Operation(summary = "获取系统默认配置", description = "返回系统默认的 AI 功能配置，不查询数据库")
+    @GetMapping("/system-default")
+    public ApiResponse<NovelSettings> getSystemDefaultSettings() {
+        NovelSettings settings = novelSettingsService.getSystemDefaultSettings();
         return ApiResponse.success(settings);
     }
 

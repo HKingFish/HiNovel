@@ -1,8 +1,6 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
@@ -17,6 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * 章节应用服务。
@@ -151,7 +152,7 @@ public class ChapterService {
 
         if (chapter.getDeleted() != null
                 && chapter.getDeleted().equals(CommonConstants.DELETED_TRUE)) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+            throw exception(NOT_FOUND);
         }
 
         // 验证权限

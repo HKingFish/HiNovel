@@ -1,14 +1,13 @@
 package cn.haowl.hinovel.agent.infrastructure.agent;
 
 import cn.haowl.hinovel.agent.domain.entity.Agent;
+import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
 import cn.haowl.hinovel.common.constant.CommonConstants;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -16,11 +15,22 @@ import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
-import lombok.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.*;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * AiService 构建工厂。
@@ -44,27 +54,6 @@ public class AiServiceFactory {
     private final AgentMapper agentMapper;
     private final LlmCallLogService llmCallLogService;
 
-    /**
-     * Agent 角色枚举，用于从 NovelAgentConfig 中选取对应的 Agent ID。
-     */
-    @Getter
-    @AllArgsConstructor
-    public enum AgentRole {
-        /**
-         * 作者 Agent
-         */
-        AUTHOR("作者 Agent"),
-        /**
-         * 编辑 Agent
-         */
-        EDITOR("编辑 Agent"),
-        /**
-         * 问答 Agent
-         */
-        QA("问答 Agent");
-
-        private String name;
-    }
 
     /**
      * 调用上下文，封装 Agent 和 LLM 提供方的元信息，用于调用记录。
@@ -183,9 +172,20 @@ public class AiServiceFactory {
     public <T> T buildStreamingByNovelWithTools(Long novelId, AgentRole role,
                                                 Class<T> serviceClass, Object... tools) {
         LlmProviderPort providerPort = resolveProviderByNovel(novelId, role);
-        return AiServices.builder(serviceClass)
+        // 过滤掉 null 工具（如用户未配置 Embedding 时 retrievalTool 为 null）
+        List<Object> validTools = tools == null ? Collections.emptyList()
+            : Arrays.stream(tools)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        if (validTools.isEmpty()) {
+            // 无有效工具，构建不带 Tool 的 AiService
+            return AiServices.builder(serviceClass)
                 .streamingChatModel(providerPort.getStreamingChatModel())
-                .tools(tools)
+                .build();
+        }
+        return AiServices.builder(serviceClass)
+            .streamingChatModel(providerPort.getStreamingChatModel())
+            .tools(validTools.toArray())
                 .build();
     }
 
@@ -509,12 +509,10 @@ public class AiServiceFactory {
     private LlmProviderPort resolveProviderByAgentId(Long agentId) {
         Agent agent = agentMapper.selectById(agentId);
         if (agent == null) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
-                    "Agent 不存在，ID：" + agentId);
+            throw exception(AGENT_NOT_EXISTS, agentId);
         }
         if (agent.getLlmProviderId() == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
-                    "Agent 未配置 LLM 提供方，Agent ID：" + agentId);
+            throw exception(AGENT_LLM_PROVIDER_NOT_CONFIGURED, agentId);
         }
         return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
     }
@@ -529,12 +527,10 @@ public class AiServiceFactory {
     private LlmProviderPort resolveProviderByNovel(Long novelId, AgentRole role) {
         Agent agent = resolveAgent(novelId, role);
         if (agent == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
-                    "该小说未配置" + getRoleName(role) + "，请先在小说设置中绑定");
+            throw exception(NOVEL_AGENT_NOT_CONFIGURED, getRoleName(role));
         }
         if (agent.getLlmProviderId() == null) {
-            throw new BusinessException(ErrorCode.LLM_PROVIDER_UNAVAILABLE,
-                    getRoleName(role) + "未配置 LLM 提供方");
+            throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, getRoleName(role));
         }
         return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
     }

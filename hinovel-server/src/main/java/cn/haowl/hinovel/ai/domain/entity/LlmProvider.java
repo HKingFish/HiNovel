@@ -3,14 +3,15 @@ package cn.haowl.hinovel.ai.domain.entity;
 import cn.haowl.hinovel.ai.constant.LlmProviderType;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * LLM 提供方实体。
@@ -80,10 +81,10 @@ public class LlmProvider extends BaseEntity {
     public static LlmProvider create(String name, String providerType, String baseUrl,
                                      String apiKey, List<String> models, Long userId) {
         if (name == null || name.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw exception(PARAM_ERROR);
         }
         if (providerType == null || providerType.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
+            throw exception(PARAM_ERROR);
         }
         LlmProvider provider = new LlmProvider();
         provider.setName(name);

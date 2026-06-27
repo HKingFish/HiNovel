@@ -1,7 +1,5 @@
 package cn.haowl.hinovel.infra.oss.domain.service;
 
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
 import cn.haowl.hinovel.infra.oss.constant.OssConstants;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
@@ -10,6 +8,10 @@ import cn.haowl.hinovel.infra.oss.provider.OssProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TOO_LARGE;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TYPE_NOT_ALLOWED;
 
 /**
  * OSS 领域服务。
@@ -70,21 +72,21 @@ public class OssDomainService {
      * 验证文件。
      *
      * @param file 文件
-     * @throws BusinessException 文件不符合要求时抛出
+     * @throws cn.haowl.hinovel.common.exception.BusinessException 文件不符合要求时抛出
      */
     private void validateFile(MultipartFile file) {
         if (file.getSize() > ossProperties.getMaxFileSize()) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TOO_LARGE);
+            throw exception(OSS_FILE_TOO_LARGE);
         }
 
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || !originalFilename.contains(".")) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TYPE_NOT_ALLOWED);
+            throw exception(OSS_FILE_TYPE_NOT_ALLOWED);
         }
 
         String extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
         if (!ossProperties.getAllowedTypeList().contains(extension)) {
-            throw new BusinessException(ErrorCode.OSS_FILE_TYPE_NOT_ALLOWED);
+            throw exception(OSS_FILE_TYPE_NOT_ALLOWED);
         }
     }
 }

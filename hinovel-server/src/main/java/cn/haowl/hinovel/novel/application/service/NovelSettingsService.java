@@ -47,13 +47,28 @@ public class NovelSettingsService {
     }
 
     /**
-     * 获取用户级别默认配置
+     * 获取用户级别默认配置。
+     *
+     * <p>若用户未保存过配置，返回系统默认配置（{@link NovelSettings#createDefault()}），
+     * 保证前端始终拿到一份完整的默认值，无需在前端硬编码兜底。</p>
      *
      * @param userId 用户 ID
-     * @return 用户默认配置（不存在时返回 null）
+     * @return 用户默认配置（未保存过时返回系统默认配置，不返回 null）
      */
     public NovelSettings getUserDefaultSettings(Long userId) {
-        return novelSettingsMapper.selectUserDefault(userId);
+        NovelSettings settings = novelSettingsMapper.selectUserDefault(userId);
+        return settings != null ? settings : NovelSettings.createDefault();
+    }
+
+    /**
+     * 获取系统默认配置（不查数据库）。
+     *
+     * <p>供前端「恢复默认」按钮调用，确保默认值的唯一权威来源在后端。</p>
+     *
+     * @return 系统默认配置
+     */
+    public NovelSettings getSystemDefaultSettings() {
+        return NovelSettings.createDefault();
     }
 
     /**
@@ -120,5 +135,6 @@ public class NovelSettingsService {
         target.setAuditIncludeOutline(source.getAuditIncludeOutline());
         target.setQaIncludeOutline(source.getQaIncludeOutline());
         target.setQaContextLength(source.getQaContextLength());
+        target.setAutoSaveContent(source.getAutoSaveContent());
     }
 }

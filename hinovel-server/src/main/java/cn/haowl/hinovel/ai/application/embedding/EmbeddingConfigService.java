@@ -2,14 +2,16 @@ package cn.haowl.hinovel.ai.application.embedding;
 
 import cn.haowl.hinovel.ai.domain.entity.EmbeddingConfig;
 import cn.haowl.hinovel.ai.domain.repository.EmbeddingConfigRepository;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.common.service.ApiKeyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * 嵌入式模型配置应用服务。
@@ -46,9 +48,9 @@ public class EmbeddingConfigService {
      */
     public EmbeddingConfig getById(Long id, Long userId) {
         EmbeddingConfig config = embeddingConfigRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+            .orElseThrow(() -> exception(NOT_FOUND));
         if (!config.getUserId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw exception(FORBIDDEN);
         }
         return config;
     }

@@ -3,8 +3,6 @@ package cn.haowl.hinovel.agent.infrastructure.interceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.infrastructure.config.RateLimitProperties;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.concurrent.TimeUnit;
+
+import static cn.haowl.hinovel.ai.enums.AiErrorCodeConstants.LLM_RATE_LIMIT_EXCEEDED;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * LLM API 频率限制拦截器
@@ -53,7 +54,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         int maxRequests = rateLimitProperties.getLlmPerMinute();
         if (requestCount != null && requestCount > maxRequests) {
             log.warn("用户 {} 超过频率限制: {}/{} 次/分钟", userId, requestCount, maxRequests);
-            throw new BusinessException(ErrorCode.LLM_RATE_LIMIT_EXCEEDED);
+            throw exception(LLM_RATE_LIMIT_EXCEEDED);
         }
 
         return true;

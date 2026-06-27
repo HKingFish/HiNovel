@@ -2,9 +2,9 @@ package cn.haowl.hinovel.agent.application.service.agent;
 
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
+import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
-import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatMessageMapper;

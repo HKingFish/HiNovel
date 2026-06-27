@@ -1,10 +1,13 @@
 package cn.haowl.hinovel.user.domain.valueobject;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 
 import java.io.Serializable;
 import java.util.Objects;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.PASSWORD_FORMAT_ERROR;
 
 /**
  * 密码值对象。
@@ -47,7 +50,7 @@ public final class Password implements Serializable {
      */
     public static Password ofEncoded(String encodedPassword) {
         if (encodedPassword == null || encodedPassword.isBlank()) {
-            throw new BusinessException(ErrorCode.PASSWORD_INVALID);
+            throw exception(PARAM_ERROR);
         }
         return new Password(encodedPassword);
     }
@@ -60,13 +63,13 @@ public final class Password implements Serializable {
      */
     private static void validatePassword(String password) {
         if (password == null || password.isBlank()) {
-            throw new BusinessException(ErrorCode.PASSWORD_INVALID);
+            throw exception(PARAM_ERROR);
         }
         if (password.length() < MIN_LENGTH) {
-            throw new BusinessException(ErrorCode.PASSWORD_TOO_SHORT);
+            throw exception(PASSWORD_FORMAT_ERROR);
         }
         if (password.length() > MAX_LENGTH) {
-            throw new BusinessException(ErrorCode.PASSWORD_TOO_LONG);
+            throw exception(PASSWORD_FORMAT_ERROR);
         }
     }
 

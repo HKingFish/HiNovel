@@ -1,7 +1,5 @@
 package cn.haowl.hinovel.novel.application.service;
 
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -14,6 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_BELONG_TO_CHAPTER;
 
 /**
  * 小说章节应用服务。
@@ -208,10 +210,10 @@ public class NovelChapterService {
         chapterDomainService.getChapter(chapterId);
 
         NovelChapterVersion version = versionRepository.findById(versionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "版本不存在"));
+            .orElseThrow(() -> exception(NOT_FOUND));
 
         if (!version.belongsToChapter(chapterId)) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "版本不属于该章节");
+            throw exception(VERSION_NOT_BELONG_TO_CHAPTER);
         }
 
         version.updateRemark(remark);

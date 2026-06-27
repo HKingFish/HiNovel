@@ -78,6 +78,12 @@ public class ChapterVectorService {
 
         try {
             VectorStorePort vectorStore = vectorStoreFactory.getByCollection(collectionName, userId);
+            // 用户未配置 Embedding 模型时，跳过向量存储（不启用 RAG）
+            if (vectorStore == null) {
+                log.info("用户 {} 未配置 Embedding 模型，跳过章节向量存储，小说ID={}，章节ID={}",
+                    userId, novelId, chapterId);
+                return;
+            }
             List<TextSegment> segments = new ArrayList<>();
 
             // 切片并存储章节正文

@@ -3,12 +3,10 @@ package cn.haowl.hinovel.common.exception;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.common.response.ApiResponse;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,7 +20,6 @@ import java.util.stream.Collectors;
  * 全局异常处理器。
  *
  * <p>统一处理业务异常、Sa-Token 认证异常、参数校验异常。</p>
- * <p>支持国际化：通过 Accept-Language 请求头返回对应语言的错误消息。</p>
  *
  * @author haowl
  * @since 2024
@@ -31,29 +28,6 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
-
-    private final MessageSource messageSource;
-
-    /**
-     * 解析国际化消息。
-     *
-     * <p>找不到时回退到 ErrorCode 默认消息。</p>
-     *
-     * @param errorCode 错误码
-     * @return 国际化消息
-     */
-    private String resolveMessage(ErrorCode errorCode) {
-        try {
-            return messageSource.getMessage(
-                    errorCode.getMessageKey(),
-                    null,
-                    errorCode.getDefaultMessage(),
-                    LocaleContextHolder.getLocale()
-            );
-        } catch (Exception e) {
-            return errorCode.getDefaultMessage();
-        }
-    }
 
     /**
      * 处理业务异常。
@@ -79,7 +53,10 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleNotLoginException(NotLoginException e) {
         log.warn("Sa-Token 未登录: {}", e.getMessage());
-        return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), resolveMessage(ErrorCode.UNAUTHORIZED));
+        return ApiResponse.error(
+            GlobalErrorCodeConstants.UNAUTHORIZED.getCode(),
+            GlobalErrorCodeConstants.UNAUTHORIZED.getMsg()
+        );
     }
 
     /**
@@ -92,7 +69,10 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleNotRoleException(NotRoleException e) {
         log.warn("Sa-Token 角色不足: {}", e.getMessage());
-        return ApiResponse.error(ErrorCode.FORBIDDEN.getCode(), resolveMessage(ErrorCode.FORBIDDEN));
+        return ApiResponse.error(
+            GlobalErrorCodeConstants.FORBIDDEN.getCode(),
+            GlobalErrorCodeConstants.FORBIDDEN.getMsg()
+        );
     }
 
     /**
@@ -105,7 +85,10 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleNotPermissionException(NotPermissionException e) {
         log.warn("Sa-Token 权限不足: {}", e.getMessage());
-        return ApiResponse.error(ErrorCode.FORBIDDEN.getCode(), resolveMessage(ErrorCode.FORBIDDEN));
+        return ApiResponse.error(
+            GlobalErrorCodeConstants.FORBIDDEN.getCode(),
+            GlobalErrorCodeConstants.FORBIDDEN.getMsg()
+        );
     }
 
     /**
@@ -123,7 +106,10 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
         log.warn("参数校验失败: {}", message);
-        return ApiResponse.error(ErrorCode.PARAM_ERROR.getCode(), message);
+        return ApiResponse.error(
+            GlobalErrorCodeConstants.PARAM_ERROR.getCode(),
+            message
+        );
     }
 
     /**
@@ -139,8 +125,8 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleException(Exception e) {
         log.error("系统异常", e);
         return ApiResponse.error(
-                ErrorCode.INTERNAL_ERROR.getCode(),
-                resolveMessage(ErrorCode.INTERNAL_ERROR)
+            GlobalErrorCodeConstants.INTERNAL_ERROR.getCode(),
+            GlobalErrorCodeConstants.INTERNAL_ERROR.getMsg()
         );
     }
 }

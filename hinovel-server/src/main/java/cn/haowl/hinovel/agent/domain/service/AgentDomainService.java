@@ -2,10 +2,12 @@ package cn.haowl.hinovel.agent.domain.service;
 
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
-import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * Agent 领域服务。
@@ -44,9 +46,9 @@ public class AgentDomainService {
      */
     public Agent validateOwnership(Long agentId, Long userId) {
         Agent agent = agentRepository.findById(agentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> exception(NOT_FOUND));
         if (!agent.belongsTo(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw exception(FORBIDDEN);
         }
         return agent;
     }

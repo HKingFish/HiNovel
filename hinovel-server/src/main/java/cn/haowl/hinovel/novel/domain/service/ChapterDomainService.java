@@ -1,7 +1,6 @@
 package cn.haowl.hinovel.novel.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
-import cn.haowl.hinovel.common.response.ErrorCode;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
@@ -15,6 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_INVALID;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.CHAPTER_NUMBER_EXISTS;
+import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_BELONG_TO_CHAPTER;
 
 /**
  * 章节领域服务。
@@ -84,7 +89,7 @@ public class ChapterDomainService {
      */
     public NovelChapter getChapter(Long chapterId) {
         return chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "章节不存在"));
+            .orElseThrow(() -> exception(NOT_FOUND, "章节不存在"));
     }
 
     /**
@@ -231,15 +236,14 @@ public class ChapterDomainService {
      */
     public NovelChapter updateChapterNumber(Long chapterId, Integer chapterNumber) {
         if (chapterNumber == null || chapterNumber < 1) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Chapter number must be >= 1");
+            throw exception(PARAM_INVALID, "章节号");
         }
         NovelChapter chapter = getChapter(chapterId);
         // 检查同一小说中是否已存在该章节号（排除自身）
         chapterRepository.findByNovelIdAndChapterNumber(chapter.getNovelId(), chapterNumber)
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(chapterId)) {
-                        throw new BusinessException(ErrorCode.PARAM_ERROR,
-                                "Chapter number " + chapterNumber + " already exists");
+                        throw exception(CHAPTER_NUMBER_EXISTS);
                     }
                 });
         chapter.setChapterNumber(chapterNumber);
@@ -336,10 +340,10 @@ public class ChapterDomainService {
     public NovelChapter restoreVersion(Long chapterId, Long versionId) {
         NovelChapter chapter = getChapter(chapterId);
         NovelChapterVersion targetVersion = versionRepository.findById(versionId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "版本不存在"));
+            .orElseThrow(() -> exception(NOT_FOUND));
 
         if (!targetVersion.belongsToChapter(chapterId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "版本不属于该章节");
+            throw exception(VERSION_NOT_BELONG_TO_CHAPTER);
         }
 
         chapter.updateContent(targetVersion.getContent());
