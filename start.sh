@@ -43,11 +43,11 @@ fi
 # --------------------------------------------------------
 # 创建数据目录
 # --------------------------------------------------------
-mkdir -p data/mysql/data data/mysql/conf data/mysql/logs
-mkdir -p data/redis/data data/redis/conf
-mkdir -p data/qdrant/storage data/qdrant/snapshots
-mkdir -p data/hinovel/uploads data/hinovel/logs
-mkdir -p data/nginx/logs
+mkdir -p ../data/mysql/data ../data/mysql/conf ../data/mysql/logs
+mkdir -p ../data/redis/data ../data/redis/conf
+mkdir -p ../data/qdrant/storage ../data/qdrant/snapshots
+mkdir -p ../data/hinovel/uploads ../data/hinovel/logs
+mkdir -p ../data/nginx/logs
 mkdir -p logs
 
 # --------------------------------------------------------
