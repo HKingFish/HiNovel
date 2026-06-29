@@ -43,6 +43,7 @@
         <sa-token.version>1.39.0</sa-token.version>
         <knife4j.version>4.4.0</knife4j.version>
         <aliyun-oss.version>3.17.4</aliyun-oss.version>
+        <hutool.version>5.8.13</hutool.version>
     </properties>
 
     <dependencyManagement>
@@ -188,6 +189,12 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+        <version>${hutool.version}</version>
+      </dependency>
 
         <!-- ==================== 测试 ==================== -->
         <dependency>
