@@ -19,7 +19,7 @@ public class AuthorAgentAssister extends AgentAssister {
 
     @Override
     protected ContentAggregator buildContentAggregator() {
-
+        return null;
     }
 
 

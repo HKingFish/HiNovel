@@ -1,10 +1,9 @@
 package cn.haowl.hinovel.ai.infrastructure.rag;
 
-import dev.langchain4j.memory.chat.ChatMemoryProvider;
-import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,17 +29,16 @@ public class AgentConfig {
      * - ContentAggregator：LLM 打分重排序
      * - ContentInjector：将检索内容以带序号格式注入 UserMessage
      *
-     * @param chatModel
-     * @param chatMemoryProvider
      * @return
      */
     @Bean
-    public AuthorAgentV2 authorAgent(ChatModel chatModel, ChatMemoryProvider chatMemoryProvider) {
+    @ConditionalOnMissingBean(AuthorAgentV2.class)
+    public AuthorAgentV2 authorAgent() {
         return AiServices.builder(AuthorAgentV2.class)
-            .chatModel(chatModel)
-            .chatMemoryProvider(chatMemoryProvider)
-            .retrievalAugmentor(authorAgentAssister.buildRetrievalAugmentor())
-            .toolProvider(authorAgentAssister.buildToolProvider())
+            .chatModel(authorAgentAssister.chatModel())
+            .chatMemoryProvider(authorAgentAssister.chatMemoryProvider())
+            .retrievalAugmentor(authorAgentAssister.retrievalAugmentor())
+            .toolProvider(authorAgentAssister.toolProvider())
             .build();
     }
 
@@ -50,17 +48,16 @@ public class AgentConfig {
      * - ContentAggregator：LLM 打分重排序
      * - ContentInjector：将检索内容以带序号格式注入 UserMessage
      *
-     * @param chatModel
-     * @param chatMemoryProvider
      * @return
      */
     @Bean
-    public AuditAgentV2 auditAgentV2(ChatModel chatModel, ChatMemoryProvider chatMemoryProvider) {
+    @ConditionalOnMissingBean(AuditAgentV2.class)
+    public AuditAgentV2 auditAgentV2() {
         return AiServices.builder(AuditAgentV2.class)
-            .chatModel(chatModel)
-            .chatMemoryProvider(chatMemoryProvider)
-            .retrievalAugmentor(auditAgentAssister.buildRetrievalAugmentor())
-            .toolProvider(auditAgentAssister.buildToolProvider())
+            .chatModel(auditAgentAssister.chatModel())
+            .chatMemoryProvider(auditAgentAssister.chatMemoryProvider())
+            .retrievalAugmentor(auditAgentAssister.retrievalAugmentor())
+            .toolProvider(auditAgentAssister.toolProvider())
             .build();
     }
 

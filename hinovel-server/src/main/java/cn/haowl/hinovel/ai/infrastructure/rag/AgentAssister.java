@@ -1,6 +1,8 @@
 package cn.haowl.hinovel.ai.infrastructure.rag;
 
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.memory.chat.ChatMemoryProvider;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.rag.content.Content;
@@ -81,7 +83,7 @@ public abstract class AgentAssister {
      *
      * @return
      */
-    public RetrievalAugmentor buildRetrievalAugmentor() {
+    public RetrievalAugmentor retrievalAugmentor() {
         return DefaultRetrievalAugmentor.builder()
             // 1. QueryTransformer：短查询补充"产品"关键词，提升向量检索召回率
             .queryTransformer(this::buildQueryTransformer)
@@ -102,7 +104,24 @@ public abstract class AgentAssister {
      *
      * @return
      */
-    public ToolProvider buildToolProvider() {
+    public ToolProvider toolProvider() {
+        return null;
+    }
+
+
+    /**
+     * 模型
+     *
+     * @return
+     */
+    public abstract ChatModel chatModel();
+
+    /**
+     * 内存提供器
+     *
+     * @return
+     */
+    public ChatMemoryProvider chatMemoryProvider() {
         return null;
     }
 }
