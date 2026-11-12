@@ -5,8 +5,8 @@ import cn.haowl.hinovel.ai.application.vector.VectorStorePort;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import dev.langchain4j.data.segment.TextSegment;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -23,11 +23,15 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChapterVectorService {
 
-    private final VectorStoreFactory vectorStoreFactory;
-    private final NovelChapterRepository chapterRepository;
+    /** 按用户配置获取向量库。 */
+    @Autowired
+    private VectorStoreFactory vectorStoreFactory;
+
+    /** 章节持久化。 */
+    @Autowired
+    private NovelChapterRepository chapterRepository;
 
     /**
      * 向量集合名称前缀

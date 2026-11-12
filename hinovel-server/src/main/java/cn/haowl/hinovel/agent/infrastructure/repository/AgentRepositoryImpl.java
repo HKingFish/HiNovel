@@ -5,7 +5,7 @@ import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,10 +19,11 @@ import java.util.Optional;
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class AgentRepositoryImpl implements AgentRepository {
 
-    private final AgentMapper agentMapper;
+    /** Agent 表访问。 */
+    @Autowired
+    private AgentMapper agentMapper;
 
     @Override
     public Agent save(Agent agent) {

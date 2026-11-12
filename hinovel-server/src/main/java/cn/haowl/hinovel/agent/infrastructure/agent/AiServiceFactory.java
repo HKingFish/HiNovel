@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.agent.infrastructure.agent;
 
 import cn.haowl.hinovel.agent.application.service.SkillService;
+import cn.haowl.hinovel.agent.application.service.agent.WritingIntentAssistant;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
@@ -19,12 +20,13 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingHandle;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.Result;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
 import lombok.Builder;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,15 +58,27 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AiServiceFactory {
 
-    private final LlmProviderFactory llmProviderFactory;
-    private final NovelAgentConfigMapper novelAgentConfigMapper;
-    private final AgentMapper agentMapper;
-    private final LlmCallLogService llmCallLogService;
+    /** 按用户配置解析模型提供方。 */
+    @Autowired
+    private LlmProviderFactory llmProviderFactory;
+
+    /** 小说绑定的 Agent 配置。 */
+    @Autowired
+    private NovelAgentConfigMapper novelAgentConfigMapper;
+
+    /** Agent 元数据。 */
+    @Autowired
+    private AgentMapper agentMapper;
+
+    /** LLM 调用记录。 */
+    @Autowired
+    private LlmCallLogService llmCallLogService;
+
     /** 内置 Skill 挂载和正文。 */
-    private final SkillService skillService;
+    @Autowired
+    private SkillService skillService;
 
     /**
      * 调用上下文，封装 Agent 和 LLM 提供方的元信息，用于调用记录。
@@ -188,6 +202,33 @@ public class AiServiceFactory {
         }
         return "【本次执行的去 AI 味 Skill 读取结果】\n" + skillTool.loadDefaultSkill()
                 + "\n\n【本次请求】\n" + userPrompt;
+    }
+
+    /**
+     * 判断问答请求是否要求直接写作或润色，并记录本次同步调用。
+     *
+     * @param context        当前执行的调用上下文
+     * @param userPrompt     用于判定的用户提示词
+     * @param callScene      调用场景
+     * @param requestContent 日志中的请求摘要
+     * @return 模型返回的意图标签
+     */
+    public String judgeWritingIntent(CallContext context, String userPrompt,
+                                     String callScene, String requestContent) {
+        WritingIntentAssistant assistant = AiServices.builder(WritingIntentAssistant.class)
+                .chatModel(context.getProvider().getChatModel())
+                .build();
+        long startTime = System.currentTimeMillis();
+        try {
+            Result<String> result = assistant.judgeWritingIntent(userPrompt);
+            logSyncResponse(callScene, context, requestContent,
+                    result.finalResponse(), System.currentTimeMillis() - startTime);
+            return result.content();
+        } catch (RuntimeException e) {
+            logSyncCallFailed(callScene, context, requestContent,
+                    e.getClass().getSimpleName(), System.currentTimeMillis() - startTime);
+            throw e;
+        }
     }
 
     // ==================== TokenStream 转 Flux ====================

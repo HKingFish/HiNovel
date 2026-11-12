@@ -10,7 +10,7 @@ import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,11 +21,15 @@ import java.util.List;
 @Tag(name = "Agent 管理", description = "Agent 的创建、查询、更新、删除")
 @RestController
 @RequestMapping("/api/agent/agents")
-@RequiredArgsConstructor
 public class AgentController {
 
-    private final AgentService agentService;
-    private final LlmProviderService llmProviderService;
+    /** Agent 业务服务。 */
+    @Autowired
+    private AgentService agentService;
+
+    /** LLM 提供方查询。 */
+    @Autowired
+    private LlmProviderService llmProviderService;
 
     /**
      * 创建 Agent

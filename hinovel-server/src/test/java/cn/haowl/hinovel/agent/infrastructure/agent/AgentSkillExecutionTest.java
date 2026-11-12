@@ -10,7 +10,8 @@ import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatMessageMapper;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatSessionMapper;
-import cn.haowl.hinovel.agent.interfaces.controller.AIController.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
@@ -110,10 +112,10 @@ class AgentSkillExecutionTest {
         ChatMessageMapper messages = mock(ChatMessageMapper.class);
         NovelSettingsService settings = mock(NovelSettingsService.class);
         when(settings.getEffectiveSettings(NOVEL_ID, USER_ID)).thenReturn(new NovelSettings());
-        QaAgent qa = new QaAgent(factory(skills, provider, logs), mock(VectorStoreFactory.class),
-                sessions, messages, settings, null, null, null, mock(NovelService.class));
+        QaAgent qa = qaAgent(factory(skills, provider, logs), mock(VectorStoreFactory.class),
+                sessions, messages, settings, mock(NovelService.class));
 
-        List<QaAgent.ChatEvent> events = qa.streamChat(NOVEL_ID, SESSION_ID, "用冷峻悬疑风格写一段夜间重逢", USER_ID)
+        List<QaAgent.ChatEvent> events = qa.streamChat(command("用冷峻悬疑风格写一段夜间重逢"))
                 .collectList().block(Duration.ofSeconds(5));
 
         List<String> expectedNames = styleSucceeds ? List.of(DEFAULT_SKILL, STYLE) : List.of(DEFAULT_SKILL);
@@ -141,11 +143,11 @@ class AgentSkillExecutionTest {
     void unknownSessionRejectsChatBeforeReadingAnySkillsOrWritingMessages() {
         AiServiceFactory factory = mock(AiServiceFactory.class);
         ChatMessageMapper messages = mock(ChatMessageMapper.class);
-        QaAgent qa = new QaAgent(factory, null, mock(ChatSessionMapper.class), messages,
-                null, null, null, null, null);
+        QaAgent qa = qaAgent(factory, null, mock(ChatSessionMapper.class), messages,
+                null, null);
 
         assertEquals(1003003002, assertThrows(BusinessException.class, () ->
-                qa.streamChat(NOVEL_ID, SESSION_ID, "提问", USER_ID).blockLast(Duration.ofSeconds(5))).getCode());
+                qa.streamChat(command("提问")).blockLast(Duration.ofSeconds(5))).getCode());
         verifyNoInteractions(factory, messages);
     }
 
@@ -190,7 +192,7 @@ class AgentSkillExecutionTest {
         QaAgent qa = qa(factory(skills, provider, logs));
 
         assertEquals(Map.of("skillName", DEFAULT_SKILL),
-                qa.streamChat(NOVEL_ID, SESSION_ID, "写一段重逢", USER_ID)
+                qa.streamChat(command("写一段重逢"))
                         .take(1).blockLast(Duration.ofSeconds(5)).getData());
 
         ArgumentCaptor<LlmCallLog> calls = ArgumentCaptor.forClass(LlmCallLog.class);
@@ -215,7 +217,7 @@ class AgentSkillExecutionTest {
         });
         QaAgent qa = qa(factory(skills, provider, mock(LlmCallLogService.class)));
 
-        List<QaAgent.ChatEvent> events = qa.streamChat(NOVEL_ID, SESSION_ID, "以温暖细腻风格写一段重逢", USER_ID)
+        List<QaAgent.ChatEvent> events = qa.streamChat(command("以温暖细腻风格写一段重逢"))
                 .collectList().block(Duration.ofSeconds(5));
 
         assertEquals(List.of("她推开了门。", "\n\n本次未加载「温暖细腻」风格 Skill。"),
@@ -238,8 +240,30 @@ class AgentSkillExecutionTest {
         when(sessions.selectById(SESSION_ID)).thenReturn(ChatSession.create(NOVEL_ID, "会话"));
         NovelSettingsService settings = mock(NovelSettingsService.class);
         when(settings.getEffectiveSettings(NOVEL_ID, USER_ID)).thenReturn(new NovelSettings());
-        return new QaAgent(factory, mock(VectorStoreFactory.class), sessions, mock(ChatMessageMapper.class),
-                settings, null, null, null, mock(NovelService.class));
+        return qaAgent(factory, mock(VectorStoreFactory.class), sessions, mock(ChatMessageMapper.class),
+                settings, mock(NovelService.class));
+    }
+
+    private QaAgent qaAgent(AiServiceFactory factory, VectorStoreFactory vectorStoreFactory,
+                            ChatSessionMapper sessions, ChatMessageMapper messages,
+                            NovelSettingsService settings, NovelService novelService) {
+        QaAgent qa = new QaAgent();
+        ReflectionTestUtils.setField(qa, "aiServiceFactory", factory);
+        ReflectionTestUtils.setField(qa, "vectorStoreFactory", vectorStoreFactory);
+        ReflectionTestUtils.setField(qa, "chatSessionMapper", sessions);
+        ReflectionTestUtils.setField(qa, "chatMessageMapper", messages);
+        ReflectionTestUtils.setField(qa, "novelSettingsService", settings);
+        ReflectionTestUtils.setField(qa, "novelService", novelService);
+        return qa;
+    }
+
+    private QaChatCommand command(String question) {
+        QaChatCommand command = new QaChatCommand();
+        command.setNovelId(NOVEL_ID);
+        command.setSessionId(SESSION_ID);
+        command.setQuestion(question);
+        command.setUserId(USER_ID);
+        return command;
     }
 
     private AiServiceFactory factory(SkillService skills, LlmProviderPort provider, LlmCallLogService logs) {
@@ -252,7 +276,13 @@ class AgentSkillExecutionTest {
         Agent agent = Agent.builder().name("测试 Agent").userId(USER_ID).llmProviderId(PROVIDER_ID).build();
         agent.setId(AGENT_ID);
         when(agents.selectById(AGENT_ID)).thenReturn(agent);
-        return new AiServiceFactory(providers, configs, agents, logs, skills);
+        AiServiceFactory factory = new AiServiceFactory();
+        ReflectionTestUtils.setField(factory, "llmProviderFactory", providers);
+        ReflectionTestUtils.setField(factory, "novelAgentConfigMapper", configs);
+        ReflectionTestUtils.setField(factory, "agentMapper", agents);
+        ReflectionTestUtils.setField(factory, "llmCallLogService", logs);
+        ReflectionTestUtils.setField(factory, "skillService", skills);
+        return factory;
     }
 
     private AgentSkill skill(Long id, String name) {

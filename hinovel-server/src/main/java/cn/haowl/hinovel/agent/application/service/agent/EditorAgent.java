@@ -5,15 +5,16 @@ import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
-import cn.haowl.hinovel.agent.interfaces.controller.AIController;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditIssue;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -37,12 +38,19 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EditorAgent {
 
-    private final AiServiceFactory aiServiceFactory;
-    private final ChapterOutlineService chapterOutlineService;
-    private final ObjectMapper objectMapper;
+    /** 构建编辑 Agent 并记录调用。 */
+    @Autowired
+    private AiServiceFactory aiServiceFactory;
+
+    /** 章节大纲查询。 */
+    @Autowired
+    private ChapterOutlineService chapterOutlineService;
+
+    /** 解析审核结果 JSON。 */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 调用场景常量：审核
@@ -63,10 +71,10 @@ public class EditorAgent {
      * @param userId       当前用户 ID
      * @return 审核响应对象
      */
-    public AIController.AIAuditorResponse auditChapter(NovelChapter chapter,
-                                                       ChapterOutline outline,
-                                                       String novelOutline,
-                                                       Long userId) {
+    public AIAuditorResponse auditChapter(NovelChapter chapter,
+                                          ChapterOutline outline,
+                                          String novelOutline,
+                                          Long userId) {
         log.info("编辑 Agent 审核章节，chapterId={}，title={}", chapter.getId(), chapter.getTitle());
         long startTime = System.currentTimeMillis();
 
@@ -80,7 +88,7 @@ public class EditorAgent {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.debug("编辑 Agent 审核原始结果，chapterId={}，result={}", chapter.getId(), rawResult);
 
-            AIController.AIAuditorResponse response = parseAuditResult(rawResult, chapter.getId());
+            AIAuditorResponse response = parseAuditResult(rawResult, chapter.getId());
             response.setProcessingTime(processingTimeMs);
 
             log.info("编辑 Agent 审核完成，chapterId={}，评估={}，耗时={}ms",
@@ -108,8 +116,8 @@ public class EditorAgent {
      * @param chapterId 章节 ID（用于日志）
      * @return 审核响应对象
      */
-    private AIController.AIAuditorResponse parseAuditResult(String rawResult, Long chapterId) {
-        AIController.AIAuditorResponse response = new AIController.AIAuditorResponse();
+    private AIAuditorResponse parseAuditResult(String rawResult, Long chapterId) {
+        AIAuditorResponse response = new AIAuditorResponse();
         response.setId(UUID.randomUUID().toString());
 
         try {
@@ -161,8 +169,8 @@ public class EditorAgent {
      * @return 审核问题列表
      */
     @SuppressWarnings("unchecked")
-    private List<AIController.AIAuditIssue> parseIssues(Map<String, Object> resultMap) {
-        List<AIController.AIAuditIssue> issues = new ArrayList<>();
+    private List<AIAuditIssue> parseIssues(Map<String, Object> resultMap) {
+        List<AIAuditIssue> issues = new ArrayList<>();
         Object issuesObj = resultMap.get("issues");
         if (!(issuesObj instanceof List<?>)) {
             return issues;
@@ -170,7 +178,7 @@ public class EditorAgent {
 
         List<Map<String, Object>> issueList = (List<Map<String, Object>>) issuesObj;
         for (Map<String, Object> issueMap : issueList) {
-            AIController.AIAuditIssue issue = new AIController.AIAuditIssue();
+            AIAuditIssue issue = new AIAuditIssue();
             issue.setId(UUID.randomUUID().toString());
             issue.setOriginalText((String) issueMap.getOrDefault("originalText", ""));
             issue.setIssueType((String) issueMap.getOrDefault("issueType", "logic"));

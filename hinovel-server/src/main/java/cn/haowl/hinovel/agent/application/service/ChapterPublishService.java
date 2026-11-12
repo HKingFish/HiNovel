@@ -14,8 +14,8 @@ import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -30,16 +30,31 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChapterPublishService {
 
-    private final NovelChapterService chapterService;
-    private final ChapterOutlineService chapterOutlineService;
-    private final AiServiceFactory aiServiceFactory;
-    private final ChapterVectorService chapterVectorService;
-    private final NovelSettingsService novelSettingsService;
+    /** 章节查询与发布。 */
+    @Autowired
+    private NovelChapterService chapterService;
+
+    /** 章节大纲查询。 */
+    @Autowired
+    private ChapterOutlineService chapterOutlineService;
+
+    /** 构建总结大纲所用 Agent。 */
+    @Autowired
+    private AiServiceFactory aiServiceFactory;
+
+    /** 章节向量存储。 */
+    @Autowired
+    private ChapterVectorService chapterVectorService;
+
+    /** 小说有效配置。 */
+    @Autowired
+    private NovelSettingsService novelSettingsService;
+
     /** 发布前校验小说归属。 */
-    private final NovelDomainService novelDomainService;
+    @Autowired
+    private NovelDomainService novelDomainService;
 
     /**
      * 调用场景常量：AI 总结大纲

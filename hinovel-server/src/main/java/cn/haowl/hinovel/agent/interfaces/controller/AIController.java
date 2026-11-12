@@ -3,21 +3,29 @@ package cn.haowl.hinovel.agent.interfaces.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
-import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
-import cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants;
-import cn.haowl.hinovel.common.exception.BusinessException;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AiChatRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatSessionResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.CreateSessionRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
+import cn.haowl.hinovel.agent.interfaces.dto.RenameSessionRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.SavePartialRequest;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -34,15 +42,17 @@ import java.util.List;
  * @since 2024
  */
 @Tag(name = "AI 功能", description = "AI 改写、审核、大纲生成等功能")
-@Slf4j
 @RestController
 @RequestMapping("/api/agent/ai")
-@RequiredArgsConstructor
 public class AIController {
 
-    private final AIService aiService;
-    private final QaAgent qaAgentService;
+    /** AI 改写、审核应用服务。 */
+    @Autowired
+    private AIService aiService;
 
+    /** 问答 Agent。 */
+    @Autowired
+    private QaAgent qaAgentService;
 
     /**
      * AI 流式改写功能（SSE）。
@@ -87,17 +97,7 @@ public class AIController {
     @Operation(summary = "批量审核", description = "批量审核章节内容")
     @PostMapping("/audit/batch")
     public ApiResponse<AIAuditBatchResponse> aiBatchAudit(@RequestBody AIAuditBatchRequest request) {
-        if (request.getChapterId() == null) {
-            return ApiResponse.error(AgentErrorCodeConstants.AUDIT_CHAPTER_NOT_EXISTS, "章节不存在");
-        }
-
-        AIAuditBatchResponse response = new AIAuditBatchResponse();
-        response.setId(AgentConstants.MOCK_BATCH_AUDIT_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
-        response.setOverallAssessment(AgentConstants.AUDIT_PASS);
-        response.setSummary(AgentConstants.MOCK_BATCH_AUDIT_SUMMARY);
-        response.setAudits(List.of());
-
-        return ApiResponse.success(response);
+        return ApiResponse.success(aiService.aiBatchAudit(request));
     }
 
     /**
@@ -109,17 +109,7 @@ public class AIController {
     @Operation(summary = "重新生成", description = "重新生成章节内容")
     @PostMapping("/regenerate")
     public ApiResponse<AIAuthorResponse> aiRegenerate(@RequestBody AIAuthorRequest request) {
-        if (request.getChapterId() == null) {
-            return ApiResponse.error(AgentErrorCodeConstants.REWRITE_CHAPTER_NOT_EXISTS, "章节不存在");
-        }
-
-        AIAuthorResponse response = new AIAuthorResponse();
-        response.setId(AgentConstants.MOCK_REGENERATE_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
-        response.setContent(AgentConstants.MOCK_REGENERATE_CONTENT);
-        response.setWordCount(response.getContent().length());
-        response.setProcessingTime(AgentConstants.MOCK_REGENERATE_PROCESSING_TIME_MS);
-
-        return ApiResponse.success(response);
+        return ApiResponse.success(aiService.aiRegenerate(request));
     }
 
     // ==================== AI 问答接口 ====================
@@ -218,7 +208,10 @@ public class AIController {
     @GetMapping("/chat/messages/{sessionId}")
     public ApiResponse<List<ChatMessageResponse>> listChatMessages(
             @PathVariable Long sessionId) {
-        List<ChatMessage> messages = qaAgentService.listMessages(sessionId, StpUtil.getLoginIdAsLong());
+        ChatMessageQuery query = new ChatMessageQuery();
+        query.setSessionId(sessionId);
+        query.setUserId(StpUtil.getLoginIdAsLong());
+        List<ChatMessage> messages = qaAgentService.listMessages(query);
         List<ChatMessageResponse> responseList = messages.stream()
                 .map(ChatMessageResponse::fromEntity)
                 .toList();
@@ -239,14 +232,12 @@ public class AIController {
             @PathVariable Long sessionId,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "30") int pageSize) {
-        List<ChatMessage> messages = qaAgentService.listMessagesByCursor(
-                sessionId, cursorId, pageSize, StpUtil.getLoginIdAsLong());
-        List<ChatMessageResponse> responseList = messages.stream()
-                .map(ChatMessageResponse::fromEntity)
-                .toList();
-        // 如果返回的条数小于 pageSize，说明没有更多数据
-        boolean hasMore = messages.size() >= pageSize;
-        return ApiResponse.success(new ChatMessagePageResponse(responseList, hasMore));
+        ChatMessagePageQuery query = new ChatMessagePageQuery();
+        query.setSessionId(sessionId);
+        query.setCursorId(cursorId);
+        query.setPageSize(pageSize);
+        query.setUserId(StpUtil.getLoginIdAsLong());
+        return ApiResponse.success(qaAgentService.listMessagesPage(query));
     }
 
     /**
@@ -276,246 +267,11 @@ public class AIController {
     @Operation(summary = "AI 流式问答", description = "基于小说内容的智能问答（SSE 流式）")
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<Object>> aiChat(@Valid @RequestBody AiChatRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return qaAgentService.streamChat(
-                        request.getNovelId(), request.getSessionId(),
-                        request.getQuestion(), userId)
-                .map(event -> ServerSentEvent.builder(event.getData()).event(event.getName()).build())
-                .onErrorResume(e -> {
-                    log.error("AI 问答流式异常，异常信息：{}", e.getMessage());
-                    String message = e.getMessage() != null ? e.getMessage() : "AI 问答异常";
-                    if (e instanceof BusinessException businessException) {
-                        message = businessException.getCode() + " " + message;
-                    }
-                    return Flux.just(ServerSentEvent.<Object>builder()
-                            .event("error")
-                            .data(message)
-                            .build());
-                });
+        QaChatCommand command = new QaChatCommand();
+        command.setNovelId(request.getNovelId());
+        command.setSessionId(request.getSessionId());
+        command.setQuestion(request.getQuestion());
+        command.setUserId(StpUtil.getLoginIdAsLong());
+        return qaAgentService.streamChatSse(command);
     }
-
-    // ========== 请求/响应类 ==========
-
-    @Data
-    public static class AIAuthorRequest {
-        private Long chapterId;
-        private String content;
-        private String outline;
-        private String plotPoints;
-        private List<Long> characters;
-        private String emotionTone;
-        private String sceneSetting;
-        /**
-         * 用户临时需求（用户对改写结果不满意时，可补充具体要求）
-         */
-        private String userRequirement;
-    }
-
-    @Data
-    public static class AIAuthorResponse {
-        private String id;
-        private String content;
-        private List<String> suggestions;
-        private int wordCount;
-        private long processingTime;
-    }
-
-    @Data
-    public static class AIAuditorRequest {
-        private Long chapterId;
-        private String content;
-        private String novelOutline;
-        private List<PreviousChapter> previousChapters;
-
-        @Data
-        public static class PreviousChapter {
-            private Long chapterId;
-            private int chapterNumber;
-            private String content;
-        }
-    }
-
-    @Data
-    public static class AIAuditIssue {
-        private String id;
-        private Position position;
-        private String originalText;
-        private String issueType;
-        private String reason;
-        private String severity;
-        private String suggestion;
-
-        @Data
-        public static class Position {
-            private int start;
-            private int end;
-        }
-    }
-
-    @Data
-    public static class AIAuditorResponse {
-        private String id;
-        private String overallAssessment;
-        private List<AIAuditIssue> issues;
-        private String summary;
-        private long processingTime;
-        private String auditorId;
-        private List<Integer> coveredChapters;
-    }
-
-    @Data
-    public static class AIAuditBatchRequest {
-        private Long chapterId;
-        private String content;
-        private String novelOutline;
-        private List<ChapterRange> chapterRanges;
-
-        @Data
-        public static class ChapterRange {
-            private int startChapter;
-            private int endChapter;
-        }
-    }
-
-    @Data
-    public static class AIAuditBatchResponse {
-        private String id;
-        private List<AIAuditorResponse> audits;
-        private String overallAssessment;
-        private String summary;
-    }
-
-    // ========== 问答请求/响应类 ==========
-
-    @Data
-    public static class AiChatRequest {
-        /**
-         * 小说 ID
-         */
-        @NotNull
-        private Long novelId;
-
-        /**
-         * 会话 ID
-         */
-        @NotNull
-        private Long sessionId;
-
-        /**
-         * 用户问题
-         */
-        @NotBlank
-        private String question;
-    }
-
-    @Data
-    public static class CreateSessionRequest {
-        /**
-         * 小说 ID
-         */
-        private Long novelId;
-
-        /**
-         * 会话标题（可选）
-         */
-        private String title;
-    }
-
-    @Data
-    public static class RenameSessionRequest {
-        /**
-         * 新标题
-         */
-        private String title;
-    }
-
-    @Data
-    public static class SavePartialRequest {
-        /**
-         * 会话 ID
-         */
-        private Long sessionId;
-
-        /**
-         * 小说 ID
-         */
-        private Long novelId;
-
-        /**
-         * 已生成的部分回复内容
-         */
-        private String content;
-    }
-
-    @Data
-    public static class ChatSessionResponse {
-        private Long id;
-        private Long novelId;
-        private String title;
-        private Integer favorite;
-        private String createTime;
-        private String updateTime;
-
-        /**
-         * 从实体转换为响应对象。
-         */
-        public static ChatSessionResponse fromEntity(ChatSession session) {
-            ChatSessionResponse response = new ChatSessionResponse();
-            response.setId(session.getId());
-            response.setNovelId(session.getNovelId());
-            response.setTitle(session.getTitle());
-            response.setFavorite(session.getFavorite());
-            response.setCreateTime(session.getCreateTime() != null
-                    ? session.getCreateTime().toString() : null);
-            response.setUpdateTime(session.getUpdateTime() != null
-                    ? session.getUpdateTime().toString() : null);
-            return response;
-        }
-    }
-
-    @Data
-    public static class ChatMessageResponse {
-        private Long id;
-        private Long sessionId;
-        private String role;
-        private String content;
-        /** 对应回复首次成功加载的 Skill 名称。 */
-        private List<String> loadedSkillNames;
-        private Integer revoked;
-        private String createTime;
-
-        /**
-         * 从实体转换为响应对象。
-         */
-        public static ChatMessageResponse fromEntity(ChatMessage message) {
-            ChatMessageResponse response = new ChatMessageResponse();
-            response.setId(message.getId());
-            response.setSessionId(message.getSessionId());
-            response.setRole(message.getRole());
-            response.setContent(message.getContent());
-            response.setLoadedSkillNames(message.getLoadedSkillNames());
-            response.setRevoked(message.getRevoked());
-            response.setCreateTime(message.getCreateTime() != null
-                    ? message.getCreateTime().toString() : null);
-            return response;
-        }
-    }
-
-    /**
-     * 消息分页响应。
-     */
-    @Data
-    @AllArgsConstructor
-    public static class ChatMessagePageResponse {
-        /**
-         * 消息列表（按时间正序）
-         */
-        private List<ChatMessageResponse> messages;
-
-        /**
-         * 是否还有更早的消息
-         */
-        private boolean hasMore;
-    }
-
 }

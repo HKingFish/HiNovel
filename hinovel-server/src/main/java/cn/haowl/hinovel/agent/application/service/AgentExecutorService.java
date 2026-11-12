@@ -3,8 +3,8 @@ package cn.haowl.hinovel.agent.application.service;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,10 +17,11 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AgentExecutorService {
 
-    private final LlmProviderFactory llmProviderFactory;
+    /** 按 Agent 配置获取缓存的模型实例。 */
+    @Autowired
+    private LlmProviderFactory llmProviderFactory;
 
     /**
      * 根据 Agent 配置获取 LLM 提供方端口（需要同时使用流式和同步模型时使用）。

@@ -10,8 +10,8 @@ import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import dev.langchain4j.service.TokenStream;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -27,12 +27,15 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthorAgent {
 
-    private final AiServiceFactory aiServiceFactory;
+    /** 构建作者 Agent 并记录调用。 */
+    @Autowired
+    private AiServiceFactory aiServiceFactory;
 
-    private final VectorStoreFactory vectorStoreFactory;
+    /** 按用户配置获取小说向量库。 */
+    @Autowired
+    private VectorStoreFactory vectorStoreFactory;
     /**
      * 调用场景常量：改写
      */

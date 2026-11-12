@@ -5,8 +5,8 @@ import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.infrastructure.config.RateLimitProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -23,13 +23,18 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @EnableConfigurationProperties(RateLimitProperties.class)
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    private final StringRedisTemplate redisTemplate;
-    private final RateLimitProperties rateLimitProperties;
+    /** 频率计数存储。 */
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
+    /** 频率限制配置。 */
+    @Autowired
+    private RateLimitProperties rateLimitProperties;
+
+    /** 频率计数键前缀。 */
     private static final String RATE_LIMIT_KEY_PREFIX = "rate:limit:";
 
     @Override

@@ -9,6 +9,7 @@ import cn.haowl.hinovel.common.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.Mockito.mock;
@@ -46,7 +47,9 @@ class AgentSkillHttpTest {
     @Test
     void blankChatQuestionIsRejectedBeforeExecution() throws Exception {
         QaAgent qa = mock(QaAgent.class);
-        MockMvcBuilders.standaloneSetup(new AIController(null, qa))
+        AIController controller = new AIController();
+        ReflectionTestUtils.setField(controller, "qaAgentService", qa);
+        MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build()
                 .perform(post("/api/agent/ai/chat").contentType(MediaType.APPLICATION_JSON)

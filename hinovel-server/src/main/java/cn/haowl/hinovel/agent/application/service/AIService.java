@@ -1,6 +1,11 @@
 package cn.haowl.hinovel.agent.application.service;
 
-import cn.haowl.hinovel.agent.interfaces.controller.AIController;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 
@@ -18,7 +23,7 @@ public interface AIService {
      * @param userId  用户 ID
      * @return SSE 流式响应
      */
-    Flux<ServerSentEvent<String>> aiRewrite(AIController.AIAuthorRequest request, Long userId);
+    Flux<ServerSentEvent<String>> aiRewrite(AIAuthorRequest request, Long userId);
 
     /**
      * AI 审核功能。
@@ -27,5 +32,21 @@ public interface AIService {
      * @param userId  用户 ID
      * @return 审核结果
      */
-    AIController.AIAuditorResponse aiAudit(AIController.AIAuditorRequest request, Long userId);
+    AIAuditorResponse aiAudit(AIAuditorRequest request, Long userId);
+
+    /**
+     * AI 批量审核功能。
+     *
+     * @param request 批量审核请求
+     * @return 批量审核结果
+     */
+    AIAuditBatchResponse aiBatchAudit(AIAuditBatchRequest request);
+
+    /**
+     * AI 重新生成功能。
+     *
+     * @param request 重新生成请求
+     * @return 重新生成结果
+     */
+    AIAuthorResponse aiRegenerate(AIAuthorRequest request);
 }

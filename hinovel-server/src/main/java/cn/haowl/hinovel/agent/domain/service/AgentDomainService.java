@@ -2,7 +2,7 @@ package cn.haowl.hinovel.agent.domain.service;
 
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
@@ -18,10 +18,11 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  * @Date : 2026/3/12 23:30
  */
 @Service
-@RequiredArgsConstructor
 public class AgentDomainService {
 
-    private final AgentRepository agentRepository;
+    /** Agent 持久化。 */
+    @Autowired
+    private AgentRepository agentRepository;
 
     /**
      * 创建用户 Agent。

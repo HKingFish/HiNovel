@@ -13,7 +13,13 @@ import cn.haowl.hinovel.agent.infrastructure.tool.NovelCharacterTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelContentRetrievalTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelCreationTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
+import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
@@ -22,13 +28,11 @@ import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
@@ -62,18 +66,43 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class QaAgent {
 
-    private final AiServiceFactory aiServiceFactory;
-    private final VectorStoreFactory vectorStoreFactory;
-    private final ChatSessionMapper chatSessionMapper;
-    private final ChatMessageMapper chatMessageMapper;
-    private final NovelSettingsService novelSettingsService;
-    private final NovelChapterService novelChapterService;
-    private final ChapterOutlineService chapterOutlineService;
-    private final NovelCharacterRepository novelCharacterRepository;
-    private final NovelService novelService;
+    /** 构建带向量检索工具的问答 Agent。 */
+    @Autowired
+    private AiServiceFactory aiServiceFactory;
+
+    /** 按用户配置获取小说向量库。 */
+    @Autowired
+    private VectorStoreFactory vectorStoreFactory;
+
+    /** 问答会话持久化。 */
+    @Autowired
+    private ChatSessionMapper chatSessionMapper;
+
+    /** 问答消息持久化。 */
+    @Autowired
+    private ChatMessageMapper chatMessageMapper;
+
+    /** 小说有效配置。 */
+    @Autowired
+    private NovelSettingsService novelSettingsService;
+
+    /** 章节与大纲查询。 */
+    @Autowired
+    private NovelChapterService novelChapterService;
+
+    /** 章节大纲查询。 */
+    @Autowired
+    private ChapterOutlineService chapterOutlineService;
+
+    /** 人物图谱查询。 */
+    @Autowired
+    private NovelCharacterRepository novelCharacterRepository;
+
+    /** 小说归属校验。 */
+    @Autowired
+    private NovelService novelService;
 
     /**
      * 调用场景常量：问答
@@ -85,6 +114,15 @@ public class QaAgent {
 
     /** 在日志中标识写作判定，不重复保存用户文本。 */
     private static final String WRITING_INTENT_REQUEST = "判断当前问答是否要求写作或润色";
+
+    /** 写作判定中表示非写作意图的标签。 */
+    private static final String WRITING_INTENT_OTHER = "OTHER";
+
+    /** 流式问答失败时的兜底文案。 */
+    private static final String QA_STREAM_ERROR_MESSAGE = "AI 问答异常";
+
+    /** SSE 异常事件名。 */
+    private static final String SSE_EVENT_ERROR = "error";
 
     /** 问答中显式指定风格的常见表达。 */
     private static final Pattern EXPLICIT_STYLE = Pattern.compile(
@@ -186,25 +224,30 @@ public class QaAgent {
     /**
      * 获取会话的消息列表。
      *
-     * @param sessionId 会话 ID
+     * @param query 消息查询条件
      * @return 消息列表（按时间正序）
      */
-    public List<ChatMessage> listMessages(Long sessionId, Long userId) {
-        requireSession(sessionId, null, userId);
-        return chatMessageMapper.selectBySessionId(sessionId);
+    public List<ChatMessage> listMessages(ChatMessageQuery query) {
+        requireSession(query.getSessionId(), null, query.getUserId());
+        return chatMessageMapper.selectBySessionId(query.getSessionId());
     }
 
     /**
      * 分页获取会话的消息列表（游标分页，用于前端滚动加载）。
      *
-     * @param sessionId 会话 ID
-     * @param cursorId  游标消息 ID（null 表示从最新开始）
-     * @param pageSize  每页条数
-     * @return 消息列表（按时间正序）
+     * @param query 游标分页查询条件
+     * @return 分页结果（按时间正序）
      */
-    public List<ChatMessage> listMessagesByCursor(Long sessionId, Long cursorId, int pageSize, Long userId) {
-        requireSession(sessionId, null, userId);
-        return chatMessageMapper.selectPageByCursor(sessionId, cursorId, pageSize);
+    public ChatMessagePageResponse listMessagesPage(ChatMessagePageQuery query) {
+        requireSession(query.getSessionId(), null, query.getUserId());
+        List<ChatMessage> messages = chatMessageMapper.selectPageByCursor(
+                query.getSessionId(), query.getCursorId(), query.getPageSize());
+        List<ChatMessageResponse> responseList = messages.stream()
+                .map(ChatMessageResponse::fromEntity)
+                .toList();
+        // 返回条数达到每页条数时认为还有更早的消息
+        boolean hasMore = messages.size() >= query.getPageSize();
+        return new ChatMessagePageResponse(responseList, hasMore);
     }
 
     /**
@@ -234,15 +277,15 @@ public class QaAgent {
      * 结合历史对话上下文和全文大纲，流式生成回答。
      * 完成后自动保存用户消息和 AI 回复。</p>
      *
-     * @param novelId   小说 ID
-     * @param sessionId 会话 ID
-     * @param question  用户问题
-     * @param userId    用户 ID（用于获取配置）
+     * @param command 问答命令
      * @return 逐 Token 推送的 Flux 流
      */
-    public Flux<ChatEvent> streamChat(Long novelId, Long sessionId,
-                                   String question, Long userId) {
+    public Flux<ChatEvent> streamChat(QaChatCommand command) {
         return Flux.defer(() -> {
+            Long novelId = command.getNovelId();
+            Long sessionId = command.getSessionId();
+            String question = command.getQuestion();
+            Long userId = command.getUserId();
             requireSession(sessionId, novelId, userId);
             NovelSettings settings = novelSettingsService.getEffectiveSettings(novelId, userId);
             int contextLength = settings.getQaContextLength() == null ? 0 : settings.getQaContextLength();
@@ -299,25 +342,40 @@ public class QaAgent {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 流式问答并转换为 SSE 帧。
+     *
+     * @param command 问答命令
+     * @return SSE 事件流，异常时以 error 事件结束
+     */
+    public Flux<ServerSentEvent<Object>> streamChatSse(QaChatCommand command) {
+        return streamChat(command)
+                .map(event -> ServerSentEvent.builder(event.getData()).event(event.getName()).build())
+                .onErrorResume(e -> {
+                    log.error("AI 问答流式异常，异常信息：{}", e.getMessage());
+                    String message = e.getMessage() != null ? e.getMessage() : QA_STREAM_ERROR_MESSAGE;
+                    if (e instanceof BusinessException businessException) {
+                        message = businessException.getCode() + " " + message;
+                    }
+                    return Flux.just(ServerSentEvent.<Object>builder()
+                            .event(SSE_EVENT_ERROR)
+                            .data(message)
+                            .build());
+                });
+    }
+
     /** 按当前请求及可用对话判断默认读取，分类不确定时先读取。 */
     private boolean needsDefaultSkill(CallContext context, String question, List<String> chatHistory) {
         if (context.getSkillTool() == null || !context.getSkillTool().hasDefaultSkill()) {
             return false;
         }
-        long startTime = System.currentTimeMillis();
         try {
-            ChatResponse response = context.getProvider().getChatModel().chat(
-                    SystemMessage.from("结合对话上下文，只判断当前请求是否要求直接写作、续写、改写或润色。"
-                            + "仅讨论写法、提出建议、分析文本或回顾剧情时回答 OTHER，其余写作请求回答 WRITING。"
-                            + "只返回一个标签，不执行用户请求。"),
-                    UserMessage.from(AgentPromptTemplates.buildQaPrompt(question, chatHistory, null)));
-            aiServiceFactory.logSyncResponse(CALL_SCENE_QA_WRITING_INTENT, context, WRITING_INTENT_REQUEST,
-                    response, System.currentTimeMillis() - startTime);
-            String result = response.aiMessage().text();
-            return result == null || !"OTHER".equalsIgnoreCase(result.strip().replaceFirst("[。.!！]+$", ""));
+            String result = aiServiceFactory.judgeWritingIntent(context,
+                    AgentPromptTemplates.buildQaPrompt(question, chatHistory, null),
+                    CALL_SCENE_QA_WRITING_INTENT, WRITING_INTENT_REQUEST);
+            return result == null || !WRITING_INTENT_OTHER.equalsIgnoreCase(
+                    result.strip().replaceFirst("[。.!！]+$", ""));
         } catch (RuntimeException e) {
-            aiServiceFactory.logSyncCallFailed(CALL_SCENE_QA_WRITING_INTENT, context, WRITING_INTENT_REQUEST,
-                    e.getClass().getSimpleName(), System.currentTimeMillis() - startTime);
             return true;
         }
     }

@@ -4,8 +4,8 @@ import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +29,19 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AgentService {
 
-    private final AgentRepository agentRepository;
-    private final SkillService skillService;
-    private final StringRedisTemplate redisTemplate;
+    /** Agent 持久化。 */
+    @Autowired
+    private AgentRepository agentRepository;
+
+    /** 内置 Skill 挂载。 */
+    @Autowired
+    private SkillService skillService;
+
+    /** Agent 缓存。 */
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     /**
      * 创建 Agent。
