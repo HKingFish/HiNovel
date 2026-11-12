@@ -11,7 +11,6 @@ import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.UpdateAnnotationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -28,7 +27,6 @@ import java.util.List;
  * @author haowl
  */
 @Tag(name = "章节批注管理", description = "批注 CRUD、状态流转、AI 改写结果管理")
-@Slf4j
 @RestController
 @RequestMapping("/api/novel/annotations")
 public class NovelChapterAnnotationController {
@@ -63,16 +61,7 @@ public class NovelChapterAnnotationController {
     @PostMapping
     public ApiResponse<ChapterAnnotation> createAnnotation(@RequestBody CreateAnnotationRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
-        ChapterAnnotation annotation = ChapterAnnotation.createSelfAnnotation(
-                request.getChapterId(),
-                request.getNovelId(),
-                userId,
-                request.getStartOffset(),
-                request.getEndOffset(),
-                request.getOriginalText(),
-                request.getAnnotationContent()
-        );
-        return ApiResponse.success(annotationService.createAnnotation(annotation));
+        return ApiResponse.success(annotationService.createSelfAnnotation(request, userId));
     }
 
     /**
@@ -87,12 +76,7 @@ public class NovelChapterAnnotationController {
     public ApiResponse<Void> updateAnnotation(
             @PathVariable Long annotationId,
             @RequestBody UpdateAnnotationRequest request) {
-        ChapterAnnotation annotation = annotationService.getAnnotationById(annotationId);
-        if (annotation == null) {
-            return ApiResponse.error(404, "批注不存在");
-        }
-        annotation.setAnnotationContent(request.getAnnotationContent());
-        annotationService.updateAnnotation(annotation);
+        annotationService.updateAnnotationContent(annotationId, request.getAnnotationContent());
         return ApiResponse.success();
     }
 
@@ -178,40 +162,6 @@ public class NovelChapterAnnotationController {
     public Flux<ServerSentEvent<String>> annotationAiRewriteStream(
             @RequestBody AnnotationRewriteRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
-
-        // 快捷改写模式：不关联批注，直接使用请求参数
-        Long novelId;
-        if (request.getAnnotationId() != null && request.getAnnotationId() > 0) {
-            ChapterAnnotation annotation = annotationService.getAnnotationById(request.getAnnotationId());
-            if (annotation == null) {
-                log.warn("批注不存在，annotationId={}", request.getAnnotationId());
-                return Flux.just(ServerSentEvent.<String>builder()
-                        .event("error")
-                        .data("批注不存在")
-                        .build());
-            }
-            novelId = annotation.getNovelId();
-        } else {
-            // 快捷改写：通过 chapterId 获取 novelId
-            novelId = request.getNovelId();
-        }
-
-        return authorAgent.streamAnnotationRewrite(
-                        novelId,
-                        request.getFullChapterContent(),
-                        request.getOriginalText(),
-                        request.getAnnotationContent(),
-                        userId)
-                .map(token -> ServerSentEvent.<String>builder().data(token).build())
-                .concatWith(Flux.just(ServerSentEvent.<String>builder().data("[DONE]").build()))
-                .onErrorResume(e -> {
-                    log.error("批注 AI 改写流式异常，annotationId={}，异常信息：{}",
-                            request.getAnnotationId(), e.getMessage());
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
-                            .build());
-                });
+        return authorAgent.streamAnnotationRewriteSse(request, userId);
     }
-
 }

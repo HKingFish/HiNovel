@@ -2,11 +2,15 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.infrastructure.mapper.ChapterAnnotationMapper;
+import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
 
 /**
  * 章节批注应用服务。
@@ -32,6 +36,26 @@ public class ChapterAnnotationService {
     public ChapterAnnotation createAnnotation(ChapterAnnotation annotation) {
         annotationMapper.insert(annotation);
         return annotation;
+    }
+
+    /**
+     * 创建用户自建批注。
+     *
+     * @param request 创建批注请求
+     * @param userId  用户 ID
+     * @return 创建后的批注
+     */
+    public ChapterAnnotation createSelfAnnotation(CreateAnnotationRequest request, Long userId) {
+        ChapterAnnotation annotation = ChapterAnnotation.createSelfAnnotation(
+                request.getChapterId(),
+                request.getNovelId(),
+                userId,
+                request.getStartOffset(),
+                request.getEndOffset(),
+                request.getOriginalText(),
+                request.getAnnotationContent()
+        );
+        return createAnnotation(annotation);
     }
 
     /**
@@ -70,6 +94,22 @@ public class ChapterAnnotationService {
      * @param annotation 批注实体
      */
     public void updateAnnotation(ChapterAnnotation annotation) {
+        annotationMapper.updateById(annotation);
+    }
+
+    /**
+     * 按 ID 更新批注内容。
+     *
+     * @param annotationId 批注 ID
+     * @param content      新的批注内容
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateAnnotationContent(Long annotationId, String content) {
+        ChapterAnnotation annotation = annotationMapper.selectById(annotationId);
+        if (annotation == null) {
+            throw exception0(404, "批注不存在");
+        }
+        annotation.setAnnotationContent(content);
         annotationMapper.updateById(annotation);
     }
 

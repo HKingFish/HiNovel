@@ -84,12 +84,6 @@ public class NovelCharacterController {
     @GetMapping("/novels/{novelId}/character-graph")
     public ApiResponse<CharacterGraphVO> getCharacterGraph(@PathVariable Long novelId) {
         Long userId = StpUtil.getLoginIdAsLong();
-        List<NovelCharacter> characters = characterService.listCharactersByNovel(userId, novelId);
-        List<NovelCharacterRelation> relations = characterService.listRelationsByNovel(userId, novelId);
-
-        CharacterGraphVO vo = new CharacterGraphVO();
-        vo.setCharacters(characters);
-        vo.setRelations(relations);
-        return ApiResponse.success(vo);
+        return ApiResponse.success(characterService.getCharacterGraph(userId, novelId));
     }
 }

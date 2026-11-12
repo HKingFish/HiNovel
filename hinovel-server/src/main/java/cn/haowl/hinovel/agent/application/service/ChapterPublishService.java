@@ -14,6 +14,7 @@ import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
+import cn.haowl.hinovel.novel.interfaces.dto.PublishChapterResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
@@ -77,7 +78,7 @@ public class ChapterPublishService {
      * @param userId 当前发布用户 ID
      * @return 发布结果
      */
-    public PublishResult publishChapter(Long chapterId, Long userId) {
+    public PublishChapterResponse publishChapter(Long chapterId, Long userId) {
         NovelChapter chapter = chapterService.getChapter(chapterId);
         Long novelId = chapter.getNovelId();
         novelDomainService.validateOwnership(novelId, userId);
@@ -112,7 +113,10 @@ public class ChapterPublishService {
             log.info("小说配置关闭了发布后自动存储向量，跳过，novelId={}", novelId);
         }
 
-        return new PublishResult(true, "章节发布成功");
+        PublishChapterResponse response = new PublishChapterResponse();
+        response.setPublished(true);
+        response.setMessage("章节发布成功");
+        return response;
     }
 
     /**
@@ -204,46 +208,5 @@ public class ChapterPublishService {
         chapterVectorService.storeChapterVectors(
                 chapter.getNovelId(), chapterId,
                 chapter.getTitle(), chapter.getContent(), outlineContent, userId);
-    }
-
-    /**
-     * 发布结果。
-     */
-    public static class PublishResult {
-
-        /** 是否发布成功。 */
-        private final boolean published;
-
-        /** 结果消息。 */
-        private final String message;
-
-        /**
-         * 构造发布结果。
-         *
-         * @param published 是否发布成功
-         * @param message   结果消息
-         */
-        public PublishResult(boolean published, String message) {
-            this.published = published;
-            this.message = message;
-        }
-
-        /**
-         * 是否发布成功。
-         *
-         * @return 是否发布成功
-         */
-        public boolean isPublished() {
-            return published;
-        }
-
-        /**
-         * 获取结果消息。
-         *
-         * @return 结果消息
-         */
-        public String getMessage() {
-            return message;
-        }
     }
 }

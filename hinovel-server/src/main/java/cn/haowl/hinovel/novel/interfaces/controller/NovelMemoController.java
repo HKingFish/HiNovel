@@ -2,8 +2,8 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.response.ApiResponse;
+import cn.haowl.hinovel.novel.application.service.NovelMemoService;
 import cn.haowl.hinovel.novel.domain.entity.NovelMemo;
-import cn.haowl.hinovel.novel.infrastructure.mapper.NovelMemoMapper;
 import cn.haowl.hinovel.novel.interfaces.dto.SaveMemoRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/novel/memo")
 public class NovelMemoController {
 
-    /** 创作手记数据访问。 */
+    /** 创作手记应用服务。 */
     @Autowired
-    private NovelMemoMapper memoMapper;
+    private NovelMemoService novelMemoService;
 
     /**
      * 获取小说的创作手记。
@@ -36,8 +36,7 @@ public class NovelMemoController {
     @GetMapping("/{novelId}")
     public ApiResponse<NovelMemo> getMemo(@PathVariable Long novelId) {
         Long userId = StpUtil.getLoginIdAsLong();
-        NovelMemo memo = memoMapper.selectByNovelIdAndUserId(novelId, userId);
-        return ApiResponse.success(memo);
+        return ApiResponse.success(novelMemoService.getMemo(novelId, userId));
     }
 
     /**
@@ -51,18 +50,7 @@ public class NovelMemoController {
     @PutMapping("/{novelId}")
     public ApiResponse<Void> saveMemo(@PathVariable Long novelId, @RequestBody SaveMemoRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
-        NovelMemo memo = memoMapper.selectByNovelIdAndUserId(novelId, userId);
-        if (memo == null) {
-            memo = NovelMemo.builder()
-                    .novelId(novelId)
-                    .userId(userId)
-                    .content(request.getContent())
-                    .build();
-            memoMapper.insert(memo);
-        } else {
-            memo.setContent(request.getContent());
-            memoMapper.updateById(memo);
-        }
+        novelMemoService.saveMemo(novelId, userId, request.getContent());
         return ApiResponse.success();
     }
 }

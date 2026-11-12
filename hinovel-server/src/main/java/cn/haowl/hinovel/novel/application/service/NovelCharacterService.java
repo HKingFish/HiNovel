@@ -4,6 +4,7 @@ import cn.haowl.hinovel.novel.domain.entity.NovelCharacter;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterCreateRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterGraphVO;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterRelationCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterUpdateRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -226,6 +227,13 @@ public class NovelCharacterService {
      * @param novelId 小说 ID
      * @return 关系列表
      */
+    public CharacterGraphVO getCharacterGraph(Long userId, Long novelId) {
+        CharacterGraphVO graph = new CharacterGraphVO();
+        graph.setCharacters(listCharactersByNovel(userId, novelId));
+        graph.setRelations(listRelationsByNovel(userId, novelId));
+        return graph;
+    }
+
     public List<NovelCharacterRelation> listRelationsByNovel(Long userId, Long novelId) {
         novelService.getNovelById(userId, novelId);
         return characterRepository.findRelationsByNovelId(novelId);

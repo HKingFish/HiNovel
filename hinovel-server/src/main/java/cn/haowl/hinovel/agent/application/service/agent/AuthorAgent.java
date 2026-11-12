@@ -7,11 +7,15 @@ import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelContentRetrievalTool;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
+import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
+import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
+import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
 import dev.langchain4j.service.TokenStream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -36,6 +40,10 @@ public class AuthorAgent {
     /** 按用户配置获取小说向量库。 */
     @Autowired
     private VectorStoreFactory vectorStoreFactory;
+
+    /** 章节批注应用服务。 */
+    @Autowired
+    private ChapterAnnotationService chapterAnnotationService;
     /**
      * 调用场景常量：改写
      */
@@ -255,6 +263,50 @@ public class AuthorAgent {
         return aiServiceFactory.tokenStreamToFlux(tokenStream,
                 "annotationRewrite-novelId=" + novelId,
                 CALL_SCENE_ANNOTATION_REWRITE, callContext, userPrompt);
+    }
+
+    /**
+     * 流式批注改写（SSE 帧组装）。
+     *
+     * <p>解析批注归属的小说，完成流式改写后组装 SSE 帧，并统一处理异常事件。</p>
+     *
+     * @param request 批注改写请求
+     * @param userId  当前用户 ID
+     * @return SSE 事件流
+     */
+    public Flux<ServerSentEvent<String>> streamAnnotationRewriteSse(AnnotationRewriteRequest request, Long userId) {
+        Long novelId;
+        if (request.getAnnotationId() != null && request.getAnnotationId() > 0) {
+            ChapterAnnotation annotation = chapterAnnotationService.getAnnotationById(request.getAnnotationId());
+            if (annotation == null) {
+                log.warn("批注不存在，annotationId={}", request.getAnnotationId());
+                return Flux.just(ServerSentEvent.<String>builder()
+                        .event("error")
+                        .data("批注不存在")
+                        .build());
+            }
+            novelId = annotation.getNovelId();
+        } else {
+            // 快捷改写：直接使用请求中的小说 ID
+            novelId = request.getNovelId();
+        }
+
+        return streamAnnotationRewrite(
+                        novelId,
+                        request.getFullChapterContent(),
+                        request.getOriginalText(),
+                        request.getAnnotationContent(),
+                        userId)
+                .map(token -> ServerSentEvent.<String>builder().data(token).build())
+                .concatWith(Flux.just(ServerSentEvent.<String>builder().data("[DONE]").build()))
+                .onErrorResume(e -> {
+                    log.error("批注 AI 改写流式异常，annotationId={}，异常信息：{}",
+                            request.getAnnotationId(), e.getMessage());
+                    return Flux.just(ServerSentEvent.<String>builder()
+                            .event("error")
+                            .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
+                            .build());
+                });
     }
 
     /**

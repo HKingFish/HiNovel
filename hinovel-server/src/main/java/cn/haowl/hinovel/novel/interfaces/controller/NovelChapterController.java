@@ -68,15 +68,7 @@ public class NovelChapterController {
             @PathVariable Long novelId,
             ChapterPageQuery query) {
         query.setNovelId(novelId);
-        List<NovelChapter> chapters = chapterService.getNovelChaptersPage(query);
-        int total = chapterService.getNovelChapterCount(query);
-        ChapterPageResponse response = new ChapterPageResponse();
-        response.setList(chapters);
-        response.setTotal(total);
-        response.setPageNum(query.getPageNum());
-        response.setPageSize(query.getPageSize());
-        response.setHasMore(chapters.size() == query.getPageSize());
-        return ApiResponse.success(response);
+        return ApiResponse.success(chapterService.getNovelChaptersPage(query));
     }
 
     /**
@@ -146,11 +138,8 @@ public class NovelChapterController {
     @Operation(summary = "发布章节", description = "发布章节，异步触发AI总结大纲和向量存储")
     @PostMapping("/{chapterId}/publish")
     public ApiResponse<PublishChapterResponse> publishChapter(@PathVariable Long chapterId) {
-        ChapterPublishService.PublishResult result = chapterPublishService.publishChapter(chapterId, StpUtil.getLoginIdAsLong());
-        PublishChapterResponse response = new PublishChapterResponse();
-        response.setPublished(result.isPublished());
-        response.setMessage(result.getMessage());
-        return ApiResponse.success(response);
+        return ApiResponse.success(
+                chapterPublishService.publishChapter(chapterId, StpUtil.getLoginIdAsLong()));
     }
 
     /**

@@ -10,6 +10,7 @@ import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageQuery;
+import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -66,22 +67,22 @@ public class NovelChapterService {
      * 分页获取小说的章节（按章节号倒序）。
      *
      * @param query 分页与筛选条件
-     * @return 章节列表
+     * @return 章节分页响应
      */
-    public List<NovelChapter> getNovelChaptersPage(ChapterPageQuery query) {
-        return chapterDomainService.listChaptersPage(query.getNovelId(), query.getPageNum(), query.getPageSize(),
-                query.getStatus(), query.getVectorStored(), query.getTitle());
-    }
-
-    /**
-     * 获取小说的章节总数（支持筛选）。
-     *
-     * @param query 分页与筛选条件
-     * @return 章节总数
-     */
-    public int getNovelChapterCount(ChapterPageQuery query) {
-        return chapterDomainService.countChapters(query.getNovelId(), query.getStatus(),
+    public ChapterPageResponse getNovelChaptersPage(ChapterPageQuery query) {
+        List<NovelChapter> chapters = chapterDomainService.listChaptersPage(query.getNovelId(),
+                query.getPageNum(), query.getPageSize(), query.getStatus(),
                 query.getVectorStored(), query.getTitle());
+        int total = chapterDomainService.countChapters(query.getNovelId(), query.getStatus(),
+                query.getVectorStored(), query.getTitle());
+
+        ChapterPageResponse response = new ChapterPageResponse();
+        response.setList(chapters);
+        response.setTotal(total);
+        response.setPageNum(query.getPageNum());
+        response.setPageSize(query.getPageSize());
+        response.setHasMore(chapters.size() == query.getPageSize());
+        return response;
     }
 
     /**
