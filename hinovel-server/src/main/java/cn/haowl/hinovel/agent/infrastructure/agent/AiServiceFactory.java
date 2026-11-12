@@ -190,38 +190,6 @@ public class AiServiceFactory {
                 + "\n\n【本次请求】\n" + userPrompt;
     }
 
-    // ==================== AiService 构建 ====================
-
-    /**
-     * 根据 Agent ID 构建同步模式的 AiService 实例。
-     *
-     * @param agentId      Agent 主键 ID
-     * @param serviceClass AiService 接口类型
-     * @param <T>          AiService 接口泛型
-     * @return AiService 实例
-     */
-    public <T> T buildByAgentId(Long agentId, Class<T> serviceClass) {
-        LlmProviderPort providerPort = resolveProviderByAgentId(agentId);
-        return AiServices.builder(serviceClass)
-                .chatModel(providerPort.getChatModel())
-                .build();
-    }
-
-    /**
-     * 根据 Agent ID 构建流式模式的 AiService 实例。
-     *
-     * @param agentId      Agent 主键 ID
-     * @param serviceClass AiService 接口类型
-     * @param <T>          AiService 接口泛型
-     * @return AiService 实例（流式）
-     */
-    public <T> T buildStreamingByAgentId(Long agentId, Class<T> serviceClass) {
-        LlmProviderPort providerPort = resolveProviderByAgentId(agentId);
-        return AiServices.builder(serviceClass)
-                .streamingChatModel(providerPort.getStreamingChatModel())
-                .build();
-    }
-
     // ==================== TokenStream 转 Flux ====================
 
     /**
@@ -452,24 +420,7 @@ public class AiServiceFactory {
         llmCallLogService.saveAsync(callLog);
     }
 
-    // ==================== 内部方法：Provider 解析 ====================
-
-    /**
-     * 根据 Agent ID 解析 LLM 提供方。
-     *
-     * @param agentId Agent 主键 ID
-     * @return LLM 提供方端口
-     */
-    private LlmProviderPort resolveProviderByAgentId(Long agentId) {
-        Agent agent = agentMapper.selectById(agentId);
-        if (agent == null) {
-            throw exception(AGENT_NOT_EXISTS, agentId);
-        }
-        if (agent.getLlmProviderId() == null) {
-            throw exception(AGENT_LLM_PROVIDER_NOT_CONFIGURED, agentId);
-        }
-        return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
-    }
+    // ==================== 内部方法：Agent 解析 ====================
 
     /**
      * 根据小说 ID 和角色解析 Agent 实体。

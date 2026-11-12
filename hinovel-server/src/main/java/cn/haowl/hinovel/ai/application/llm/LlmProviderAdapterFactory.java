@@ -3,8 +3,8 @@ package cn.haowl.hinovel.ai.application.llm;
 import cn.haowl.hinovel.common.exception.BusinessException;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,13 +26,13 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class LlmProviderAdapterFactory {
 
     /**
      * 所有注册的 LLM Provider 适配器列表。
      */
-    private final List<LlmProviderAdapter> adapters;
+    @Autowired
+    private List<LlmProviderAdapter> adapters;
 
     /**
      * 提供方类型到适配器的映射缓存。

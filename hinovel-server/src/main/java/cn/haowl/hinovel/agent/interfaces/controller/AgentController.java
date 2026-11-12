@@ -5,7 +5,7 @@ import cn.haowl.hinovel.agent.application.service.AgentService;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
-import cn.haowl.hinovel.ai.domain.service.LlmProviderDomainService;
+import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +25,7 @@ import java.util.List;
 public class AgentController {
 
     private final AgentService agentService;
-    private final LlmProviderDomainService llmProviderDomainService;
+    private final LlmProviderService llmProviderService;
 
     /**
      * 创建 Agent
@@ -75,7 +75,7 @@ public class AgentController {
     @Operation(summary = "获取 LLM 提供方列表", description = "返回所有激活的 LLM 提供方，供创建 Agent 时选择")
     @GetMapping("/llm-providers")
     public ApiResponse<List<LlmProvider>> listLlmProviders() {
-        return ApiResponse.success(llmProviderDomainService.getActiveProviders());
+        return ApiResponse.success(llmProviderService.getActiveProviders());
     }
 
     /**

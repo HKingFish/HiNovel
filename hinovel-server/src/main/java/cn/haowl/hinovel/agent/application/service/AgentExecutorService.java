@@ -3,7 +3,6 @@ package cn.haowl.hinovel.agent.application.service;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
-import dev.langchain4j.model.chat.StreamingChatModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,19 +21,6 @@ import org.springframework.stereotype.Service;
 public class AgentExecutorService {
 
     private final LlmProviderFactory llmProviderFactory;
-
-    /**
-     * 根据 Agent 配置获取流式聊天模型。
-     *
-     * <p>通过工厂按提供方 ID 获取缓存实例，同一提供方配置复用同一模型客户端。</p>
-     *
-     * @param agent Agent 实体
-     * @return 流式聊天模型实例
-     */
-    public StreamingChatModel buildStreamingModel(Agent agent) {
-        LlmProviderPort providerPort = llmProviderFactory.getByProviderId(agent.getLlmProviderId());
-        return providerPort.getStreamingChatModel();
-    }
 
     /**
      * 根据 Agent 配置获取 LLM 提供方端口（需要同时使用流式和同步模型时使用）。

@@ -5,6 +5,7 @@ import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderQueryPort;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,17 +29,16 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Component
 public class DefaultLlmProviderFactory implements LlmProviderFactory {
 
-    private final LlmProviderQueryPort llmProviderQueryPort;
-    private final ProviderHealthTracker healthTracker;
+    /** LLM 提供方配置查询端口。 */
+    @Autowired
+    private LlmProviderQueryPort llmProviderQueryPort;
+
+    /** 提供方健康状态追踪器。 */
+    @Autowired
+    private ProviderHealthTracker healthTracker;
 
     /** 提供方 ID -> LLM 实例缓存，避免重复创建 */
     private final ConcurrentHashMap<Long, LlmProviderPort> providerCache = new ConcurrentHashMap<>();
-
-    public DefaultLlmProviderFactory(LlmProviderQueryPort llmProviderQueryPort,
-                                     ProviderHealthTracker healthTracker) {
-        this.llmProviderQueryPort = llmProviderQueryPort;
-        this.healthTracker = healthTracker;
-    }
 
     @Override
     public LlmProviderPort getByProviderId(Long providerId) {

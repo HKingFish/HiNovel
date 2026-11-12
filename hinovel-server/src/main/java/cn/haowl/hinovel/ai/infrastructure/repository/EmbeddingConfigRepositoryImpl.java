@@ -5,7 +5,7 @@ import cn.haowl.hinovel.ai.domain.repository.EmbeddingConfigRepository;
 import cn.haowl.hinovel.ai.infrastructure.mapper.EmbeddingConfigMapper;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,10 +18,11 @@ import java.util.Optional;
  * @date 2026/3/23 14:56
  */
 @Repository
-@RequiredArgsConstructor
 public class EmbeddingConfigRepositoryImpl implements EmbeddingConfigRepository {
 
-    private final EmbeddingConfigMapper embeddingConfigMapper;
+    /** 嵌入式模型配置数据访问映射器。 */
+    @Autowired
+    private EmbeddingConfigMapper embeddingConfigMapper;
 
     @Override
     public EmbeddingConfig save(EmbeddingConfig config) {

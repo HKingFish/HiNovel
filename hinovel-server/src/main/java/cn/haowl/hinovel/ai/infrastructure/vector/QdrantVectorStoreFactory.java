@@ -10,6 +10,7 @@ import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.grpc.Collections;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -30,19 +31,19 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class QdrantVectorStoreFactory implements VectorStoreFactory {
 
-    private final QdrantClient qdrantClient;
-    private final EmbeddingConfigService embeddingConfigService;
+    /** Qdrant 客户端。 */
+    @Autowired
+    private QdrantClient qdrantClient;
+
+    /** 嵌入式模型配置应用服务。 */
+    @Autowired
+    @Lazy
+    private EmbeddingConfigService embeddingConfigService;
 
     /**
      * 集合名称:userId -> 适配器实例缓存（用户自定义模型），避免重复创建
      */
     private final ConcurrentHashMap<String, VectorStorePort> userStoreCache = new ConcurrentHashMap<>();
-
-    public QdrantVectorStoreFactory(QdrantClient qdrantClient,
-                                    @Lazy EmbeddingConfigService embeddingConfigService) {
-        this.qdrantClient = qdrantClient;
-        this.embeddingConfigService = embeddingConfigService;
-    }
 
     @Override
     public VectorStorePort getByCollection(String collectionName, Long userId) {

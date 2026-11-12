@@ -5,7 +5,7 @@ import cn.haowl.hinovel.ai.infrastructure.mapper.LlmProviderMapper;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.service.ApiKeyService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,18 +20,19 @@ import java.util.List;
  * @since 2024
  */
 @Service
-@RequiredArgsConstructor
 public class LlmProviderQueryService implements LlmProviderQueryPort {
 
     /**
      * LLM Provider 数据访问映射器。
      */
-    private final LlmProviderMapper llmProviderMapper;
+    @Autowired
+    private LlmProviderMapper llmProviderMapper;
 
     /**
      * API 密钥加解密服务。
      */
-    private final ApiKeyService apiKeyService;
+    @Autowired
+    private ApiKeyService apiKeyService;
 
     /**
      * 根据ID获取 LLM Provider 配置（包含解密的 API Key）。

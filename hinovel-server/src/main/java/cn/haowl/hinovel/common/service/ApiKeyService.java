@@ -2,7 +2,7 @@ package cn.haowl.hinovel.common.service;
 
 import cn.haowl.hinovel.common.config.SecurityProperties;
 import cn.haowl.hinovel.common.util.ApiKeyEncryptor;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +15,15 @@ import org.springframework.stereotype.Service;
  * @author haowl
  */
 @Service
-@RequiredArgsConstructor
 @EnableConfigurationProperties(SecurityProperties.class)
 public class ApiKeyService {
 
-    private final SecurityProperties securityProperties;
+    /** 脱敏值中的掩码标记，前端回传该标记表示未修改密钥。 */
+    private static final String MASK_MARKER = "****";
+
+    /** 安全配置。 */
+    @Autowired
+    private SecurityProperties securityProperties;
 
     /**
      * 加密 API 密钥。
@@ -58,5 +62,18 @@ public class ApiKeyService {
     public String decryptAndMask(String encryptedApiKey) {
         String plainKey = decrypt(encryptedApiKey);
         return ApiKeyEncryptor.mask(plainKey);
+    }
+
+    /**
+     * 判断前端传入的 apiKey 是否为新的明文密钥。
+     *
+     * @param apiKey 前端传入的 apiKey
+     * @return 为空或包含脱敏标记时视为未修改，返回 false
+     */
+    public boolean isNewApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return false;
+        }
+        return !apiKey.contains(MASK_MARKER);
     }
 }

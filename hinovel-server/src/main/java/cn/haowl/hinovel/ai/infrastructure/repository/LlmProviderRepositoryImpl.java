@@ -5,7 +5,7 @@ import cn.haowl.hinovel.ai.domain.repository.LlmProviderRepository;
 import cn.haowl.hinovel.ai.infrastructure.mapper.LlmProviderMapper;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,10 +20,11 @@ import java.util.Optional;
  * @Date : 2026/3/12 23:30
  */
 @Repository
-@RequiredArgsConstructor
 public class LlmProviderRepositoryImpl implements LlmProviderRepository {
 
-    private final LlmProviderMapper llmProviderMapper;
+    /** LLM 提供方数据访问映射器。 */
+    @Autowired
+    private LlmProviderMapper llmProviderMapper;
 
     @Override
     public LlmProvider save(LlmProvider provider) {
