@@ -5,7 +5,6 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
 import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
 import cn.haowl.hinovel.common.response.ApiResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
@@ -26,7 +25,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @RestControllerAdvice
-@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     /**

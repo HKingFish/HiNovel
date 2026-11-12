@@ -2,7 +2,7 @@ package cn.haowl.hinovel.user.domain.service;
 
 import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -19,11 +19,15 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
  * @Date : 2026/3/12 22:30
  */
 @Service
-@RequiredArgsConstructor
 public class AuthDomainService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    /** 用户仓储。 */
+    @Autowired
+    private UserRepository userRepository;
+
+    /** 密码编码器。 */
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * 注册新用户。

@@ -2,13 +2,14 @@ package cn.haowl.hinovel.infra.oss.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.response.ApiResponse;
+import cn.haowl.hinovel.infra.oss.application.command.UploadCommand;
 import cn.haowl.hinovel.infra.oss.application.query.OssUploadLogQuery;
 import cn.haowl.hinovel.infra.oss.application.service.OssApplicationService;
 import cn.haowl.hinovel.infra.oss.constant.OssConstants;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,10 +27,11 @@ import java.util.Map;
 @Tag(name = "文件管理", description = "文件上传、查询上传记录")
 @RestController
 @RequestMapping("/api/infra/oss")
-@RequiredArgsConstructor
 public class FileController {
 
-    private final OssApplicationService ossApplicationService;
+    /** OSS 应用服务。 */
+    @Autowired
+    private OssApplicationService ossApplicationService;
 
     /**
      * 上传文件。
@@ -41,7 +43,13 @@ public class FileController {
             @RequestParam(value = "bizType", defaultValue = OssConstants.DEFAULT_BIZ_TYPE) String bizType,
             @RequestParam(value = "bizId", required = false) Long bizId) {
         Long userId = StpUtil.getLoginIdAsLong();
-        String fileUrl = ossApplicationService.upload(file, bizType, bizId, userId);
+        UploadCommand command = UploadCommand.builder()
+                .file(file)
+                .bizType(bizType)
+                .bizId(bizId)
+                .userId(userId)
+                .build();
+        String fileUrl = ossApplicationService.upload(command);
         return ApiResponse.success(Map.of("url", fileUrl));
     }
 

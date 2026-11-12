@@ -4,7 +4,7 @@ import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
 import cn.haowl.hinovel.user.infrastructure.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -18,10 +18,11 @@ import java.util.Optional;
  * @Date : 2026/3/12 22:30
  */
 @Repository
-@RequiredArgsConstructor
 public class UserRepositoryImpl implements UserRepository {
 
-    private final UserMapper userMapper;
+    /** 用户数据访问。 */
+    @Autowired
+    private UserMapper userMapper;
 
     @Override
     public User save(User user) {

@@ -2,7 +2,7 @@ package cn.haowl.hinovel.infra.oss.service;
 
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
 import cn.haowl.hinovel.infra.oss.constant.OssConstants;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -17,10 +17,11 @@ import java.util.Map;
  * @since 2024
  */
 @Service
-@RequiredArgsConstructor
 public class OssConfigService {
 
-    private final OssProperties ossProperties;
+    /** OSS 配置属性。 */
+    @Autowired
+    private OssProperties ossProperties;
 
     /**
      * 获取 OSS 配置信息。

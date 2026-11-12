@@ -5,7 +5,7 @@ import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
 import cn.haowl.hinovel.infra.oss.domain.mapper.OssUploadLogMapper;
 import cn.haowl.hinovel.infra.oss.domain.repository.OssUploadLogRepository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,10 +20,11 @@ import java.util.Optional;
  * @Date : 2026/3/12 22:30
  */
 @Repository
-@RequiredArgsConstructor
 public class OssUploadLogRepositoryImpl implements OssUploadLogRepository {
 
-    private final OssUploadLogMapper ossUploadLogMapper;
+    /** 上传日志数据访问。 */
+    @Autowired
+    private OssUploadLogMapper ossUploadLogMapper;
 
     @Override
     public OssUploadLog save(OssUploadLog log) {

@@ -9,8 +9,8 @@ import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
 import cn.haowl.hinovel.user.domain.service.AuthDomainService;
 import cn.haowl.hinovel.user.interfaces.dto.TokenResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +28,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthApplicationService {
 
-    private final AuthDomainService authDomainService;
-    private final UserRepository userRepository;
+    /** 认证领域服务。 */
+    @Autowired
+    private AuthDomainService authDomainService;
+
+    /** 用户仓储。 */
+    @Autowired
+    private UserRepository userRepository;
 
     /**
      * 用户注册。

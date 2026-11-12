@@ -2,11 +2,10 @@ package cn.haowl.hinovel.user.infrastructure.config;
 
 import cn.dev33.satoken.oauth2.config.SaOAuth2ServerConfig;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.haowl.hinovel.user.application.service.AuthApplicationService;
 import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -20,13 +19,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * @Date : 2026/3/12 22:30
  */
 @Configuration
-@RequiredArgsConstructor
 public class SaOAuth2Config {
 
-    private final AuthApplicationService authApplicationService;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final SaOAuth2ServerConfig saOAuth2ServerConfig;
+    /** 用户仓储。 */
+    @Autowired
+    private UserRepository userRepository;
+
+    /** 密码编码器。 */
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    /** Sa-Token OAuth2 服务端配置。 */
+    @Autowired
+    private SaOAuth2ServerConfig saOAuth2ServerConfig;
 
     @PostConstruct
     public void configureOAuth2() {

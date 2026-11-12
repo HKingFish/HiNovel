@@ -5,7 +5,7 @@ import cn.haowl.hinovel.infra.oss.constant.OssConstants;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
 import cn.haowl.hinovel.infra.oss.domain.repository.OssUploadLogRepository;
 import cn.haowl.hinovel.infra.oss.provider.OssProvider;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,12 +22,19 @@ import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TYPE
  * @Date : 2026/3/12 22:30
  */
 @Service
-@RequiredArgsConstructor
 public class OssDomainService {
 
-    private final OssProvider ossProvider;
-    private final OssUploadLogRepository ossUploadLogRepository;
-    private final OssProperties ossProperties;
+    /** OSS 存储提供方。 */
+    @Autowired
+    private OssProvider ossProvider;
+
+    /** 上传日志仓储。 */
+    @Autowired
+    private OssUploadLogRepository ossUploadLogRepository;
+
+    /** OSS 配置属性。 */
+    @Autowired
+    private OssProperties ossProperties;
 
     /**
      * 上传文件。

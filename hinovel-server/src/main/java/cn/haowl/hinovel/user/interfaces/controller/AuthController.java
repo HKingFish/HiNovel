@@ -12,7 +12,7 @@ import cn.haowl.hinovel.user.interfaces.dto.TokenResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -26,10 +26,11 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "认证管理", description = "用户注册、登录、登出及当前用户信息查询")
 @RestController
 @RequestMapping("/api/user/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthApplicationService authApplicationService;
+    /** 认证应用服务。 */
+    @Autowired
+    private AuthApplicationService authApplicationService;
 
     /**
      * 用户注册。
