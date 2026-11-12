@@ -192,28 +192,58 @@ public class ChapterPublishService {
     }
 
     /**
-     * 手动同步章节内容到向量数据库（由 Controller 调用）。
+     * 手动同步章节内容到向量数据库。
      *
-     * @param novelId        小说 ID
-     * @param chapterId      章节 ID
-     * @param chapterTitle   章节标题
-     * @param chapterContent 章节正文
-     * @param outlineContent 章节大纲（可为空）
-     * @param userId         用户 ID（用于选择 Embedding 模型）
+     * @param chapterId 章节 ID
+     * @param userId    用户 ID（用于选择 Embedding 模型）
      */
-    public void syncChapterVector(Long novelId, Long chapterId,
-                                  String chapterTitle, String chapterContent,
-                                  String outlineContent, Long userId) {
+    public void syncChapterVector(Long chapterId, Long userId) {
+        NovelChapter chapter = chapterService.getChapter(chapterId);
+        ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
+        String outlineContent = outline != null ? outline.getOutlineContent() : null;
         chapterVectorService.storeChapterVectors(
-                novelId, chapterId, chapterTitle, chapterContent, outlineContent, userId);
+                chapter.getNovelId(), chapterId,
+                chapter.getTitle(), chapter.getContent(), outlineContent, userId);
     }
 
     /**
      * 发布结果。
-     *
-     * @param published 是否发布成功
-     * @param message   结果消息
      */
-    public record PublishResult(boolean published, String message) {
+    public static class PublishResult {
+
+        /** 是否发布成功。 */
+        private final boolean published;
+
+        /** 结果消息。 */
+        private final String message;
+
+        /**
+         * 构造发布结果。
+         *
+         * @param published 是否发布成功
+         * @param message   结果消息
+         */
+        public PublishResult(boolean published, String message) {
+            this.published = published;
+            this.message = message;
+        }
+
+        /**
+         * 是否发布成功。
+         *
+         * @return 是否发布成功
+         */
+        public boolean isPublished() {
+            return published;
+        }
+
+        /**
+         * 获取结果消息。
+         *
+         * @return 结果消息
+         */
+        public String getMessage() {
+            return message;
+        }
     }
 }

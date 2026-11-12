@@ -3,7 +3,6 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterService;
-import cn.haowl.hinovel.novel.application.service.NovelAgentConfigService;
 import cn.haowl.hinovel.novel.application.service.NovelListService;
 import cn.haowl.hinovel.novel.application.service.NovelService;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
@@ -15,7 +14,7 @@ import cn.haowl.hinovel.novel.interfaces.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,13 +30,19 @@ import java.util.List;
 @Tag(name = "小说平台", description = "小说创作平台，支持小说管理、章节编辑、大纲编写")
 @RestController
 @RequestMapping("/api/novel/platform")
-@RequiredArgsConstructor
 public class NovelPlatformController {
 
-    private final NovelService novelService;
-    private final ChapterService chapterService;
-    private final NovelAgentConfigService novelAgentConfigService;
-    private final NovelListService novelListService;
+    /** 小说应用服务。 */
+    @Autowired
+    private NovelService novelService;
+
+    /** 章节应用服务。 */
+    @Autowired
+    private ChapterService chapterService;
+
+    /** 小说列表服务。 */
+    @Autowired
+    private NovelListService novelListService;
 
     // ==================== 小说管理 ====================
 

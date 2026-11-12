@@ -5,11 +5,14 @@ import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
+import cn.haowl.hinovel.novel.interfaces.dto.AiRewriteResultRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.UpdateAnnotationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -28,11 +31,15 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/novel/annotations")
-@RequiredArgsConstructor
 public class NovelChapterAnnotationController {
 
-    private final ChapterAnnotationService annotationService;
-    private final AuthorAgent authorAgent;
+    /** 批注应用服务。 */
+    @Autowired
+    private ChapterAnnotationService annotationService;
+
+    /** 作者 Agent，负责批注改写。 */
+    @Autowired
+    private AuthorAgent authorAgent;
 
     /**
      * 获取章节的所有批注。
@@ -207,102 +214,4 @@ public class NovelChapterAnnotationController {
                 });
     }
 
-    // ==================== 请求 DTO ====================
-
-    /**
-     * 创建批注请求。
-     */
-    @Data
-    public static class CreateAnnotationRequest {
-
-        /**
-         * 章节 ID
-         */
-        private Long chapterId;
-
-        /**
-         * 小说 ID
-         */
-        private Long novelId;
-
-        /**
-         * 批注起始字符偏移量
-         */
-        private Integer startOffset;
-
-        /**
-         * 批注结束字符偏移量
-         */
-        private Integer endOffset;
-
-        /**
-         * 被批注的原文内容
-         */
-        private String originalText;
-
-        /**
-         * 批注内容
-         */
-        private String annotationContent;
-    }
-
-    /**
-     * 更新批注请求。
-     */
-    @Data
-    public static class UpdateAnnotationRequest {
-
-        /**
-         * 批注内容
-         */
-        private String annotationContent;
-    }
-
-    /**
-     * AI 改写结果请求。
-     */
-    @Data
-    public static class AiRewriteResultRequest {
-
-        /**
-         * AI 改写结果文本
-         */
-        private String rewriteResult;
-    }
-
-    /**
-     * 批注 AI 改写请求。
-     */
-    @Data
-    public static class AnnotationRewriteRequest {
-
-        /**
-         * 批注 ID
-         */
-        private Long annotationId;
-
-        /**
-         * 章节 ID
-         */
-        private Long chapterId;
-
-        /**
-         * 整章正文内容（保证改写连贯性）
-         */
-        private String fullChapterContent;
-
-        /**
-         * 被批注的原文片段
-         */
-        private String originalText;
-
-        /**
-         /** 改写要求（用户输入的提示词） */
-        private String annotationContent;
-
-        /**
-         * 小说 ID（快捷改写模式使用，不关联批注时需要传入）
-         */
-        private Long novelId;
-    }
 }

@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.infrastructure.repository;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
 import cn.haowl.hinovel.novel.domain.repository.NovelAgentConfigRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -14,10 +14,11 @@ import java.util.Optional;
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelAgentConfigRepositoryImpl implements NovelAgentConfigRepository {
 
-    private final NovelAgentConfigMapper configMapper;
+    /** 小说 Agent 配置数据访问。 */
+    @Autowired
+    private NovelAgentConfigMapper configMapper;
 
     @Override
     public NovelAgentConfig save(NovelAgentConfig config) {

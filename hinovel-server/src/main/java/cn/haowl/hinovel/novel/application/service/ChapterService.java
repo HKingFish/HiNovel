@@ -10,7 +10,7 @@ import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterAutoSaveRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +26,27 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  * 核心业务逻辑委托给 {@link ChapterDomainService}。</p>
  */
 @Service
-@RequiredArgsConstructor
 public class ChapterService {
 
-    private final ChapterDomainService chapterDomainService;
-    private final NovelChapterRepository chapterRepository;
-    private final NovelChapterVersionRepository versionRepository;
-    private final NovelService novelService;
-    private final NovelSettingsService novelSettingsService;
+    /** 章节领域服务。 */
+    @Autowired
+    private ChapterDomainService chapterDomainService;
+
+    /** 章节仓储。 */
+    @Autowired
+    private NovelChapterRepository chapterRepository;
+
+    /** 章节版本仓储。 */
+    @Autowired
+    private NovelChapterVersionRepository versionRepository;
+
+    /** 小说应用服务。 */
+    @Autowired
+    private NovelService novelService;
+
+    /** 小说配置服务。 */
+    @Autowired
+    private NovelSettingsService novelSettingsService;
 
     /**
      * 创建章节。

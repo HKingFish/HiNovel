@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.infrastructure.repository;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelOutlineMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -14,10 +14,11 @@ import java.util.Optional;
  * <p>基于 MyBatis-Plus 实现小说大纲仓储接口。</p>
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelOutlineRepositoryImpl implements NovelOutlineRepository {
 
-    private final NovelOutlineMapper novelOutlineMapper;
+    /** 小说大纲数据访问。 */
+    @Autowired
+    private NovelOutlineMapper novelOutlineMapper;
 
     @Override
     public NovelOutline save(NovelOutline outline) {

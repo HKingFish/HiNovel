@@ -7,7 +7,7 @@ import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,12 +25,19 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  * @author haowl
  */
 @Service
-@RequiredArgsConstructor
 public class NovelDomainService {
 
-    private final NovelRepository novelRepository;
-    private final NovelChapterRepository novelChapterRepository;
-    private final NovelOutlineRepository novelOutlineRepository;
+    /** 小说仓储。 */
+    @Autowired
+    private NovelRepository novelRepository;
+
+    /** 章节仓储。 */
+    @Autowired
+    private NovelChapterRepository novelChapterRepository;
+
+    /** 小说大纲仓储。 */
+    @Autowired
+    private NovelOutlineRepository novelOutlineRepository;
 
     // ==================== 小说核心操作 ====================
 

@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.infrastructure.repository;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import cn.haowl.hinovel.novel.domain.repository.NovelSettingsRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelSettingsMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -16,10 +16,11 @@ import java.util.Optional;
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelSettingsRepositoryImpl implements NovelSettingsRepository {
 
-    private final NovelSettingsMapper settingsMapper;
+    /** 小说配置数据访问。 */
+    @Autowired
+    private NovelSettingsMapper settingsMapper;
 
     @Override
     public NovelSettings save(NovelSettings settings) {

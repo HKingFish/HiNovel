@@ -6,12 +6,13 @@ import cn.haowl.hinovel.novel.application.service.NovelCharacterService;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacter;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterCreateRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterGraphVO;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterRelationCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,10 +24,11 @@ import java.util.List;
 @Tag(name = "人物图谱", description = "小说人物管理和关系图谱")
 @RestController
 @RequestMapping("/api/novel/character")
-@RequiredArgsConstructor
 public class NovelCharacterController {
 
-    private final NovelCharacterService characterService;
+    /** 人物应用服务。 */
+    @Autowired
+    private NovelCharacterService characterService;
 
     // ==================== 人物管理 ====================
 
@@ -89,13 +91,5 @@ public class NovelCharacterController {
         vo.setCharacters(characters);
         vo.setRelations(relations);
         return ApiResponse.success(vo);
-    }
-
-    // ==================== VO ====================
-
-    @lombok.Data
-    public static class CharacterGraphVO {
-        private List<NovelCharacter> characters;
-        private List<NovelCharacterRelation> relations;
     }
 }

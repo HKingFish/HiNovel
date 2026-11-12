@@ -6,7 +6,7 @@ import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterRelationCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +22,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。</p>
  */
 @Service
-@RequiredArgsConstructor
 public class NovelCharacterService {
 
-    private final NovelCharacterRepository characterRepository;
-    private final NovelService novelService;
+    /** 人物仓储。 */
+    @Autowired
+    private NovelCharacterRepository characterRepository;
+
+    /** 小说应用服务。 */
+    @Autowired
+    private NovelService novelService;
 
     /**
      * 创建人物。

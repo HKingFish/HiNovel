@@ -2,8 +2,8 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelSettingsMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NovelSettingsService {
 
-    private final NovelSettingsMapper novelSettingsMapper;
+    /** 小说配置数据访问。 */
+    @Autowired
+    private NovelSettingsMapper novelSettingsMapper;
 
     /**
      * 获取指定小说的有效配置（小说级别 + 用户默认合并后的结果）

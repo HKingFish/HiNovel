@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.infrastructure.repository;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterVersionMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,10 +17,11 @@ import java.util.Optional;
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelChapterVersionRepositoryImpl implements NovelChapterVersionRepository {
 
-    private final NovelChapterVersionMapper versionMapper;
+    /** 章节版本数据访问。 */
+    @Autowired
+    private NovelChapterVersionMapper versionMapper;
 
     @Override
     public NovelChapterVersion save(NovelChapterVersion version) {

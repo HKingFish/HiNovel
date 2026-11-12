@@ -7,7 +7,7 @@ import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -20,11 +20,12 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "小说配置", description = "管理小说 AI 功能配置")
 @RestController
 @RequestMapping("/api/novel/settings")
-@RequiredArgsConstructor
 @SaCheckLogin
 public class NovelSettingsController {
 
-    private final NovelSettingsService novelSettingsService;
+    /** 小说配置服务。 */
+    @Autowired
+    private NovelSettingsService novelSettingsService;
 
     /**
      * 获取小说的有效配置（合并后）

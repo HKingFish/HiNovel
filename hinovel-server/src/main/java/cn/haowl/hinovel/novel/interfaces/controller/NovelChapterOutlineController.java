@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,10 +13,11 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/novel/chapter-outline")
-@RequiredArgsConstructor
 public class NovelChapterOutlineController {
 
-    private final ChapterOutlineService chapterOutlineService;
+    /** 章节大纲应用服务。 */
+    @Autowired
+    private ChapterOutlineService chapterOutlineService;
 
     /**
      * 获取章节大纲

@@ -6,7 +6,7 @@ import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelUpdateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.OutlineUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +19,15 @@ import java.util.List;
  * 不包含业务逻辑，业务规则由 {@link NovelDomainService} 和领域实体承担。</p>
  */
 @Service
-@RequiredArgsConstructor
 public class NovelService {
 
-    private final NovelDomainService novelDomainService;
-    private final NovelAgentConfigService novelAgentConfigService;
+    /** 小说领域服务。 */
+    @Autowired
+    private NovelDomainService novelDomainService;
+
+    /** 小说 Agent 配置服务。 */
+    @Autowired
+    private NovelAgentConfigService novelAgentConfigService;
 
     /**
      * 创建小说。

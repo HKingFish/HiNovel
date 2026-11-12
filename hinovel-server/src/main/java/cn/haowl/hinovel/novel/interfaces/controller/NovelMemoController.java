@@ -4,10 +4,10 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.domain.entity.NovelMemo;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelMemoMapper;
+import cn.haowl.hinovel.novel.interfaces.dto.SaveMemoRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -20,10 +20,11 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "创作手记", description = "小说创作手记管理")
 @RestController
 @RequestMapping("/api/novel/memo")
-@RequiredArgsConstructor
 public class NovelMemoController {
 
-    private final NovelMemoMapper memoMapper;
+    /** 创作手记数据访问。 */
+    @Autowired
+    private NovelMemoMapper memoMapper;
 
     /**
      * 获取小说的创作手记。
@@ -63,17 +64,5 @@ public class NovelMemoController {
             memoMapper.updateById(memo);
         }
         return ApiResponse.success();
-    }
-
-    /**
-     * 保存手记请求。
-     */
-    @Data
-    public static class SaveMemoRequest {
-
-        /**
-         * 手记内容（Markdown 格式）
-         */
-        private String content;
     }
 }

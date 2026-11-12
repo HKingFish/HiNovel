@@ -3,7 +3,7 @@ package cn.haowl.hinovel.novel.application.service;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigResponse;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelListResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,11 +18,15 @@ import java.util.stream.Collectors;
  * @since 2024
  */
 @Service
-@RequiredArgsConstructor
 public class NovelListService {
 
-    private final NovelService novelService;
-    private final NovelAgentConfigService novelAgentConfigService;
+    /** 小说应用服务。 */
+    @Autowired
+    private NovelService novelService;
+
+    /** 小说 Agent 配置服务。 */
+    @Autowired
+    private NovelAgentConfigService novelAgentConfigService;
 
     /**
      * 获取用户小说列表（含 Agent 配置信息）。

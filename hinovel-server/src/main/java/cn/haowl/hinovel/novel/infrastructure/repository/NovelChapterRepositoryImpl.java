@@ -5,8 +5,8 @@ import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,10 +25,11 @@ import static cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper.wi
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelChapterRepositoryImpl implements NovelChapterRepository {
 
-    private final NovelChapterMapper novelChapterMapper;
+    /** 章节数据访问。 */
+    @Autowired
+    private NovelChapterMapper novelChapterMapper;
 
     @Override
     public NovelChapter save(NovelChapter chapter) {

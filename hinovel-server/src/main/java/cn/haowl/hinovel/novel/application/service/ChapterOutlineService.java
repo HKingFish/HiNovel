@@ -2,8 +2,8 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.repository.ChapterOutlineRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +18,11 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChapterOutlineService {
 
-    private final ChapterOutlineRepository chapterOutlineRepository;
+    /** 章节大纲仓储。 */
+    @Autowired
+    private ChapterOutlineRepository chapterOutlineRepository;
 
     /**
      * 获取章节大纲。

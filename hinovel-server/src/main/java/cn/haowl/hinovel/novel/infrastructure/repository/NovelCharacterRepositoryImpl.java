@@ -5,7 +5,7 @@ import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelCharacterMapper;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelCharacterRelationMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,11 +19,15 @@ import java.util.Optional;
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class NovelCharacterRepositoryImpl implements NovelCharacterRepository {
 
-    private final NovelCharacterMapper characterMapper;
-    private final NovelCharacterRelationMapper relationMapper;
+    /** 人物数据访问。 */
+    @Autowired
+    private NovelCharacterMapper characterMapper;
+
+    /** 人物关系数据访问。 */
+    @Autowired
+    private NovelCharacterRelationMapper relationMapper;
 
     @Override
     public NovelCharacter save(NovelCharacter character) {

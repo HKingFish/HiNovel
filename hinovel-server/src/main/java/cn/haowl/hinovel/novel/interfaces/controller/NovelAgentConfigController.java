@@ -9,7 +9,7 @@ import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -18,11 +18,12 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "小说Agent配置", description = "配置小说的作者和编辑Agent")
 @RestController
 @RequestMapping("/api/novel/agent-config")
-@RequiredArgsConstructor
 @SaCheckLogin
 public class NovelAgentConfigController {
 
-    private final NovelAgentConfigService novelAgentConfigService;
+    /** 小说 Agent 配置服务。 */
+    @Autowired
+    private NovelAgentConfigService novelAgentConfigService;
 
     /**
      * 获取小说的 Agent 配置

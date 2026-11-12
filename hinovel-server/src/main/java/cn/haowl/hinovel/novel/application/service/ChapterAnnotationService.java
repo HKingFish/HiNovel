@@ -2,8 +2,8 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.infrastructure.mapper.ChapterAnnotationMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,10 +17,11 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChapterAnnotationService {
 
-    private final ChapterAnnotationMapper annotationMapper;
+    /** 批注数据访问。 */
+    @Autowired
+    private ChapterAnnotationMapper annotationMapper;
 
     /**
      * 创建批注。

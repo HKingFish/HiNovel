@@ -1,13 +1,17 @@
 package cn.haowl.hinovel.novel.application.service;
 
+import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
+import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
-import lombok.RequiredArgsConstructor;
+import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
+import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageQuery;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +19,7 @@ import java.util.List;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_BELONG_TO_CHAPTER;
 
 /**
@@ -25,13 +30,27 @@ import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_B
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NovelChapterService {
 
-    private final ChapterDomainService chapterDomainService;
-    private final NovelChapterVersionRepository versionRepository;
-    private final NovelOutlineRepository outlineRepository;
-    private final NovelService novelService;
+    /** 章节领域服务。 */
+    @Autowired
+    private ChapterDomainService chapterDomainService;
+
+    /** 章节版本仓储。 */
+    @Autowired
+    private NovelChapterVersionRepository versionRepository;
+
+    /** 小说大纲仓储。 */
+    @Autowired
+    private NovelOutlineRepository outlineRepository;
+
+    /** 小说应用服务。 */
+    @Autowired
+    private NovelService novelService;
+
+    /** 章节大纲应用服务。 */
+    @Autowired
+    private ChapterOutlineService chapterOutlineService;
 
     /**
      * 获取小说的所有章节。
@@ -46,30 +65,23 @@ public class NovelChapterService {
     /**
      * 分页获取小说的章节（按章节号倒序）。
      *
-     * @param novelId      小说 ID
-     * @param pageNum      页码（从1开始）
-     * @param pageSize     每页大小
-     * @param status       发布状态筛选（可选）
-     * @param vectorStored 入库状态筛选（可选）
-     * @param title        标题关键词筛选（可选）
+     * @param query 分页与筛选条件
      * @return 章节列表
      */
-    public List<NovelChapter> getNovelChaptersPage(Long novelId, int pageNum, int pageSize,
-                                                   Integer status, Integer vectorStored, String title) {
-        return chapterDomainService.listChaptersPage(novelId, pageNum, pageSize, status, vectorStored, title);
+    public List<NovelChapter> getNovelChaptersPage(ChapterPageQuery query) {
+        return chapterDomainService.listChaptersPage(query.getNovelId(), query.getPageNum(), query.getPageSize(),
+                query.getStatus(), query.getVectorStored(), query.getTitle());
     }
 
     /**
      * 获取小说的章节总数（支持筛选）。
      *
-     * @param novelId      小说 ID
-     * @param status       发布状态筛选（可选）
-     * @param vectorStored 入库状态筛选（可选）
-     * @param title        标题关键词筛选（可选）
+     * @param query 分页与筛选条件
      * @return 章节总数
      */
-    public int getNovelChapterCount(Long novelId, Integer status, Integer vectorStored, String title) {
-        return chapterDomainService.countChapters(novelId, status, vectorStored, title);
+    public int getNovelChapterCount(ChapterPageQuery query) {
+        return chapterDomainService.countChapters(query.getNovelId(), query.getStatus(),
+                query.getVectorStored(), query.getTitle());
     }
 
     /**
@@ -80,6 +92,41 @@ public class NovelChapterService {
      */
     public NovelChapter getChapter(Long chapterId) {
         return chapterDomainService.getChapter(chapterId);
+    }
+
+    /**
+     * 获取章节的 AI 大纲。
+     *
+     * @param chapterId 章节 ID
+     * @return AI 大纲响应，无 AI 大纲时返回空内容
+     */
+    public AiOutlineResponse getAiOutline(Long chapterId) {
+        ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
+        AiOutlineResponse response = new AiOutlineResponse();
+        if (outline != null && outline.getAiOutlineContent() != null) {
+            response.setAiOutlineContent(outline.getAiOutlineContent());
+            response.setHasAiOutline(true);
+        } else {
+            response.setAiOutlineContent("");
+            response.setHasAiOutline(false);
+        }
+        return response;
+    }
+
+    /**
+     * 用 AI 大纲替换用户大纲。
+     *
+     * @param chapterId 章节 ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void replaceOutlineWithAi(Long chapterId) {
+        ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
+        if (outline == null || outline.getAiOutlineContent() == null
+                || outline.getAiOutlineContent().isBlank()) {
+            throw exception0(GlobalErrorCodeConstants.PARAM_ERROR.getCode(), "暂无 AI 生成的大纲可替换");
+        }
+        outline.setOutlineContent(outline.getAiOutlineContent());
+        chapterOutlineService.saveOrUpdateOutline(outline);
     }
 
     /**

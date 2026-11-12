@@ -5,8 +5,8 @@ import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
@@ -31,11 +31,15 @@ import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_B
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChapterDomainService {
 
-    private final NovelChapterRepository chapterRepository;
-    private final NovelChapterVersionRepository versionRepository;
+    /** 章节仓储。 */
+    @Autowired
+    private NovelChapterRepository chapterRepository;
+
+    /** 章节版本仓储。 */
+    @Autowired
+    private NovelChapterVersionRepository versionRepository;
 
     /**
      * 版本保留上限。

@@ -8,8 +8,8 @@ import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +27,19 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NovelAgentConfigService {
 
-    private final NovelAgentConfigMapper novelAgentConfigMapper;
-    private final AgentMapper agentMapper;
+    /** 小说 Agent 配置数据访问。 */
+    @Autowired
+    private NovelAgentConfigMapper novelAgentConfigMapper;
+
+    /** Agent 数据访问。 */
+    @Autowired
+    private AgentMapper agentMapper;
+
     /** 小说归属校验。 */
-    private final NovelDomainService novelDomainService;
+    @Autowired
+    private NovelDomainService novelDomainService;
 
     /**
      * 获取小说的 Agent 配置
