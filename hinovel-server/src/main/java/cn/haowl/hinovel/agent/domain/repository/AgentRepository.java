@@ -30,6 +30,9 @@ public interface AgentRepository {
      */
     Optional<Agent> findById(Long id);
 
+    /** 在修改事务中锁定 Agent，串行更新配置和挂载。 */
+    Optional<Agent> findByIdForUpdate(Long id);
+
     /**
      * 根据用户 ID 查询 Agent 列表。
      *

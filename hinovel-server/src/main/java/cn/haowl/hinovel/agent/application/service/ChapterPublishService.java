@@ -9,6 +9,7 @@ import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -37,6 +38,8 @@ public class ChapterPublishService {
     private final AiServiceFactory aiServiceFactory;
     private final ChapterVectorService chapterVectorService;
     private final NovelSettingsService novelSettingsService;
+    /** 发布前校验小说归属。 */
+    private final NovelDomainService novelDomainService;
 
     /**
      * 调用场景常量：AI 总结大纲
@@ -56,10 +59,13 @@ public class ChapterPublishService {
      * <p>发布后根据 {@link NovelSettings} 配置决定是否异步触发 AI 大纲和向量存储。</p>
      *
      * @param chapterId 章节 ID
+     * @param userId 当前发布用户 ID
      * @return 发布结果
      */
-    public PublishResult publishChapter(Long chapterId) {
+    public PublishResult publishChapter(Long chapterId, Long userId) {
         NovelChapter chapter = chapterService.getChapter(chapterId);
+        Long novelId = chapter.getNovelId();
+        novelDomainService.validateOwnership(novelId, userId);
 
         // 执行发布（状态变更为 PUBLISHED）
         chapterService.publishChapter(chapterId);
@@ -72,13 +78,11 @@ public class ChapterPublishService {
         }
 
         // 读取小说有效配置，决定发布后的异步行为
-        Long novelId = chapter.getNovelId();
-        Long userId = chapter.getCreator();
         NovelSettings settings = novelSettingsService.getEffectiveSettings(novelId, userId);
 
         // 根据配置决定是否触发 AI 总结大纲
         if (CommonConstants.ENABLED == settings.getAutoOutlineAfterPublish()) {
-            asyncSummarizeOutline(chapter, outline);
+            asyncSummarizeOutline(chapter, outline, userId);
         } else {
             log.info("小说配置关闭了发布后自动生成 AI 大纲，跳过，novelId={}", novelId);
         }
@@ -103,24 +107,24 @@ public class ChapterPublishService {
      *
      * @param chapter 章节信息
      * @param outline 章节大纲实体
+     * @param userId 已验证的发布用户 ID
      */
     @Async
-    public void asyncSummarizeOutline(NovelChapter chapter, ChapterOutline outline) {
+    public void asyncSummarizeOutline(NovelChapter chapter, ChapterOutline outline, Long userId) {
         Long chapterId = chapter.getId();
         Long novelId = chapter.getNovelId();
         log.info("开始 AI 总结章节大纲，章节ID={}", chapterId);
         long startTime = System.currentTimeMillis();
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(novelId, AgentRole.EDITOR, chapter.getCreator());
+        CallContext callContext = null;
 
         try {
-            GenericAiAssistant assistant = aiServiceFactory.buildByNovel(
-                    novelId, AgentRole.EDITOR, GenericAiAssistant.class);
-            String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                    novelId, AgentRole.EDITOR, SUMMARIZE_SYSTEM_PROMPT);
+            callContext = aiServiceFactory.prepareNovelCall(
+                    novelId, AgentRole.EDITOR, userId, SUMMARIZE_SYSTEM_PROMPT);
+            GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
             String userPrompt = buildSummarizePrompt(chapter);
 
-            String aiOutline = assistant.chat(systemPrompt, userPrompt);
+            String aiOutline = assistant.chat(callContext.getSystemPrompt(), userPrompt);
             long processingTimeMs = System.currentTimeMillis() - startTime;
 
             // 将 AI 大纲存入 aiOutlineContent 字段
@@ -134,8 +138,10 @@ public class ChapterPublishService {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("AI 总结大纲失败，章节ID={}，耗时={}ms，异常信息：{}",
                     chapterId, processingTimeMs, e.getMessage(), e);
-            aiServiceFactory.logSyncCallFailed(CALL_SCENE_SUMMARIZE_OUTLINE, callContext,
-                    "总结章节大纲", e.getMessage(), processingTimeMs);
+            if (callContext != null) {
+                aiServiceFactory.logSyncCallFailed(CALL_SCENE_SUMMARIZE_OUTLINE, callContext,
+                        "总结章节大纲", e.getMessage(), processingTimeMs);
+            }
         }
     }
 

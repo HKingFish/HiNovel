@@ -312,6 +312,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     novel_id    BIGINT      NOT NULL COMMENT '小说 ID',
     role        VARCHAR(32) NOT NULL COMMENT '角色：user/assistant',
     content     TEXT                 DEFAULT NULL COMMENT '消息内容',
+    loaded_skill_names JSON         DEFAULT NULL COMMENT '本次成功读取的 Skill 名称',
     revoked     TINYINT     NOT NULL DEFAULT 0 COMMENT '是否已撤回',
     creator     BIGINT               DEFAULT NULL COMMENT '创建人 ID',
     updater     BIGINT               DEFAULT NULL COMMENT '更新人 ID',
@@ -323,6 +324,13 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     KEY idx_session_id (session_id),
     KEY idx_novel_id (novel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 问答消息表';
+
+-- Agent 与内置 Skill 的挂载关系
+CREATE TABLE IF NOT EXISTS agent_skill_binding (
+    agent_id BIGINT NOT NULL COMMENT 'Agent ID',
+    skill_id BIGINT NOT NULL COMMENT '内置 Skill ID',
+    PRIMARY KEY (agent_id, skill_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent 与 Skill 绑定表';
 
 -- --------------------------------------------------------
 -- AI 模块
@@ -358,6 +366,7 @@ CREATE TABLE IF NOT EXISTS ai_llm_call_log (
     model_name          VARCHAR(128)          DEFAULT NULL COMMENT '模型名称',
     request_content     TEXT                  DEFAULT NULL COMMENT '请求摘要',
     response_content    TEXT                  DEFAULT NULL COMMENT '响应摘要',
+    skill_read_calls    JSON                  DEFAULT NULL COMMENT '有序 Skill 读取结果',
     prompt_tokens       INT                   DEFAULT NULL COMMENT '输入 Token',
     completion_tokens   INT                   DEFAULT NULL COMMENT '输出 Token',
     total_tokens        INT                   DEFAULT NULL COMMENT '总 Token',

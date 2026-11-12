@@ -323,6 +323,23 @@
           </div>
         </div>
 
+        <div v-if="skillReadCalls.length" class="content-card">
+          <div class="content-card-header">
+            <div class="header-left">Skill 读取记录</div>
+          </div>
+          <div class="content-card-body">
+            <ol class="skill-read-calls">
+              <li v-for="call in skillReadCalls" :key="call.sequence" :value="call.sequence">
+                <span>{{ call.skillName }}</span>
+                <el-tag :type="call.status === 'SUCCESS' ? 'success' : 'danger'" size="small" effect="plain">
+                  {{ call.status === 'SUCCESS' ? '成功' : '失败' }}
+                </el-tag>
+                <code v-if="call.errorCode">{{ call.errorCode }}</code>
+              </li>
+            </ol>
+          </div>
+        </div>
+
         <!-- 请求内容 -->
         <div v-if="detailLog.requestContent" class="content-card">
           <div class="content-card-header">
@@ -500,6 +517,8 @@ const dateShortcuts = [
 // 详情弹窗
 const showDetail = ref(false)
 const detailLog = ref<LlmCallLog | null>(null)
+const skillReadCalls = computed(() => [...(detailLog.value?.skillReadCalls ?? [])]
+    .sort((first, second) => first.sequence - second.sequence))
 
 // 统计数据（从后端获取）
 const statistics = ref<CallStatistics>({
@@ -1137,6 +1156,20 @@ onMounted(() => {
   padding: 16px 18px;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.skill-read-calls {
+  margin: 0;
+  padding-inline-start: 24px;
+  color: #374151;
+}
+
+.skill-read-calls li + li {
+  margin-top: 8px;
+}
+
+.skill-read-calls li > * {
+  margin-inline-end: 8px;
 }
 
 .content-pre {

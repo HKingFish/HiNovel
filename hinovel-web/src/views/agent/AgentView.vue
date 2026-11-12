@@ -20,7 +20,7 @@
       <el-skeleton :rows="3" animated/>
     </div>
 
-    <div v-else-if="userAgents.length === 0" class="empty-state">
+    <div v-else-if="agents.length === 0" class="empty-state">
       <el-empty description="暂无 Agent 配置">
         <el-button type="primary" @click="openCreateDialog">
           创建第一个 Agent
@@ -30,7 +30,7 @@
 
     <div v-else class="agent-grid">
       <div
-          v-for="agent in userAgents"
+          v-for="agent in agents"
           :key="agent.id"
           class="agent-card"
       >
@@ -43,8 +43,11 @@
           <div class="agent-title">
             <h3>{{ agent.name }}</h3>
           </div>
-          <el-dropdown trigger="click"
-                       @command="(cmd: string) => handleCommand(cmd, agent)">
+          <el-dropdown
+              v-if="canEditAgent(agent)"
+              trigger="click"
+              @command="(cmd: string) => handleCommand(cmd, agent)"
+          >
             <el-button circle size="small" class="more-btn">
               <el-icon>
                 <More/>
@@ -58,7 +61,7 @@
                   </el-icon>
                   <span>编辑</span>
                 </el-dropdown-item>
-                <el-dropdown-item command="delete" divided>
+                <el-dropdown-item v-if="agent.isBuiltin !== 1" command="delete" divided>
                   <el-icon color="#ef4444">
                     <Delete/>
                   </el-icon>
@@ -67,6 +70,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+          <el-tag v-else type="info" size="small">只读</el-tag>
         </div>
 
         <div class="card-body">
@@ -79,6 +83,15 @@
             <div class="model-info">
               <span class="provider-name">{{ getProviderName(agent.llmProviderId) }}</span>
               <el-tag size="small" effect="plain" type="info">{{ agent.modelName || '未配置' }}</el-tag>
+            </div>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Skill</span>
+            <div class="param-tags">
+              <el-tag v-for="id in agent.skillIds" :key="id" size="small" effect="plain">
+                {{ skillNames.get(id) ?? `Skill #${id}` }}
+              </el-tag>
+              <span v-if="!agent.skillIds?.length" class="info-value">未挂载</span>
             </div>
           </div>
           <div class="info-row">
@@ -102,6 +115,9 @@
         v-model="showFormDialog"
         :title="isEditing ? '编辑 Agent' : '新建 Agent'"
         width="650px"
+        :close-on-click-modal="!submitting"
+        :close-on-press-escape="!submitting"
+        :show-close="!submitting"
         destroy-on-close
         align-center
         class="agent-edit-dialog"
@@ -111,11 +127,13 @@
           ref="formRef"
           :model="formData"
           :rules="formRules"
+          :disabled="submitting"
           label-position="top"
           class="compact-form"
       >
         <el-form-item v-if="defaultConfigs.length > 0" label="套用模板" class="apply-template-item">
           <el-select
+              v-model="selectedTemplateId"
               placeholder="选择模板快速填充配置"
               style="width: 100%"
               size="default"
@@ -129,6 +147,37 @@
                 :value="config.id"
             />
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="挂载 Skill">
+          <el-select
+              v-model="skillSelection"
+              multiple
+              :disabled="skillDirectory === null"
+              :placeholder="!isEditing && formData.skillIds === undefined ? '使用默认挂载' : '选择内置 Skill'"
+              style="width: 100%"
+          >
+            <el-option v-for="skill in skillOptions" :key="skill.id" :label="skill.name" :value="skill.id">
+              <span :title="skill.description">{{ skill.name }}</span>
+            </el-option>
+          </el-select>
+          <el-button v-if="skillDirectory === null" link type="primary" @click="loadSkillDirectory">
+            重新加载 Skill 目录
+          </el-button>
+          <template v-if="!isEditing">
+            <el-button
+                v-if="formData.skillIds === undefined"
+                link
+                type="primary"
+                :disabled="skillDirectory === null"
+                @click="formData.skillIds = []"
+            >不挂载 Skill</el-button>
+            <el-button v-else link type="primary" @click="formData.skillIds = undefined">恢复默认挂载</el-button>
+            <span v-if="formData.skillIds?.length === 0">不挂载 Skill</span>
+            <span v-if="selectedTemplate" class="skill-template-summary">
+              模板当前挂载 {{ selectedTemplate.skillIds?.map(id => skillNames.get(id) ?? `Skill #${id}`).join('、') || '无' }}
+            </span>
+          </template>
         </el-form-item>
 
         <el-row :gutter="16">
@@ -152,6 +201,7 @@
                   placeholder="请选择"
                   style="width: 100%"
                   clearable
+                  @change="formData.modelName = ''"
               >
                 <el-option
                     v-for="provider in llmProviders"
@@ -193,7 +243,6 @@
           <el-input
               v-model="formData.customBaseUrl"
               placeholder="可选，覆盖提供方默认地址"
-              size="medium"
           />
         </el-form-item>
 
@@ -264,7 +313,7 @@
       </div>
 
       <template #footer>
-        <el-button @click="showFormDialog = false">取消</el-button>
+        <el-button :disabled="submitting" @click="showFormDialog = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitForm">
           {{ isEditing ? '保存' : '创建' }}
         </el-button>
@@ -274,25 +323,35 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {Cpu, Delete, Edit, InfoFilled, More, Plus} from '@element-plus/icons-vue'
 import {ElMessage, ElMessageBox, type FormInstance, type FormRules} from 'element-plus'
 import {
   type AgentConfig,
   type AgentRequestDto,
+  type AgentSkill,
   createAgent as createAgentApi,
   deleteAgentById,
   getAgentDefaultConfigs,
+  getAgentSkills,
   getAvailableAgentList,
   getLlmProviderList,
   type LlmProviderOption,
   updateAgent as updateAgentApi
 } from '@/api/agent'
+import {getBusinessErrorCode} from '@/api/http'
+import {useAuthStore} from '@/store/auth'
 
+const auth = useAuthStore()
 const loading = ref(false)
 const agents = ref<AgentConfig[]>([])
 const llmProviders = ref<LlmProviderOption[]>([])
 const defaultConfigs = ref<AgentConfig[]>([])
+const skillDirectory = ref<AgentSkill[] | null>(null)
+const skillNames = computed(() => new Map(skillDirectory.value?.map(skill => [skill.id, skill.name])))
+const readOnlyAgentIds = ref(new Set<AgentConfig['id']>())
+const selectedTemplateId = ref<AgentConfig['id']>()
+const selectedTemplate = computed(() => defaultConfigs.value.find(config => config.id === selectedTemplateId.value))
 
 const showFormDialog = ref(false)
 const isEditing = ref(false)
@@ -311,6 +370,21 @@ const formData = ref<AgentRequestDto>({
   maxTokens: 2048,
   topP: 1.0,
   maxIterations: 10
+})
+
+const skillSelection = computed({
+  get: () => formData.value.skillIds ?? editingAgent.value?.skillIds ?? [],
+  set: (ids: number[]) => {
+    const original = editingAgent.value?.skillIds ?? []
+    const unchanged = editingAgent.value && ids.length === original.length && ids.every(id => original.includes(id))
+    formData.value.skillIds = unchanged ? undefined : ids
+  },
+})
+
+const skillOptions = computed(() => {
+  const catalog = skillDirectory.value ?? []
+  const missing = skillSelection.value.filter(id => !skillNames.value.has(id))
+  return [...catalog, ...missing.map(id => ({id, name: `Skill #${id}`, description: '当前目录中没有此 Skill'}))]
 })
 
 const formRules: FormRules = {
@@ -334,24 +408,11 @@ const currentProviderModels = computed(() => {
   return provider?.modelList || []
 })
 
-watch(() => formData.value.llmProviderId, (newVal, oldVal) => {
-  if (oldVal !== undefined && newVal !== oldVal) {
-    formData.value.modelName = ''
-  }
-})
+const canEditAgent = (agent: AgentConfig): boolean =>
+  !readOnlyAgentIds.value.has(agent.id) &&
+  (agent.isBuiltin === 1 || (auth.user != null && String(agent.userId) === String(auth.user.id)))
 
-const isBuiltinAgent = (agent: AgentConfig): boolean => {
-  return agent.isBuiltin === 1
-}
-
-/**
- * 用户自建的 Agent 列表（过滤掉内置模板，内置 Agent 仅作为创建时的配置模板）
- */
-const userAgents = computed(() => {
-  return agents.value.filter(a => !isBuiltinAgent(a))
-})
-
-const getProviderName = (providerId?: number): string => {
+const getProviderName = (providerId?: AgentConfig['llmProviderId']): string => {
   if (!providerId) return '未配置'
   const provider = llmProviders.value.find(p => p.id === providerId)
   return provider ? provider.name : `提供方#${providerId}`
@@ -382,6 +443,14 @@ const loadAgents = async () => {
   }
 }
 
+const loadSkillDirectory = async () => {
+  try {
+    skillDirectory.value = await getAgentSkills()
+  } catch {
+    skillDirectory.value = null
+  }
+}
+
 const openCreateDialog = () => {
   openCreateDialogWithDefaults()
 }
@@ -389,9 +458,11 @@ const openCreateDialog = () => {
 /**
  * 在编辑/新建表单中套用模板（保留当前的 LLM 提供方和模型配置）
  */
-const handleApplyTemplate = (configId: number) => {
-  if (!configId) return
-  const config = defaultConfigs.value.find(c => c.id === configId)
+const handleApplyTemplate = () => {
+  const config = selectedTemplate.value
+  if (!isEditing.value) {
+    formData.value.roleId = config?.id
+  }
   if (!config) return
   // 覆盖名称、描述、提示词和参数，保留模型配置不变
   formData.value.name = config.name
@@ -410,6 +481,7 @@ const handleApplyTemplate = (configId: number) => {
 const openCreateDialogWithDefaults = () => {
   isEditing.value = false
   editingAgent.value = null
+  selectedTemplateId.value = undefined
   formData.value = {
     name: '',
     description: '',
@@ -426,9 +498,12 @@ const openCreateDialogWithDefaults = () => {
 }
 
 const openEditDialog = (agent: AgentConfig) => {
+  if (!canEditAgent(agent)) return
   isEditing.value = true
   editingAgent.value = agent
+  selectedTemplateId.value = undefined
   formData.value = {
+    roleId: agent.roleId,
     name: agent.name,
     description: agent.description || '',
     systemPrompt: agent.systemPrompt || '',
@@ -444,8 +519,9 @@ const openEditDialog = (agent: AgentConfig) => {
 }
 
 const submitForm = async () => {
+  if (submitting.value) return
   const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  if (!valid || submitting.value) return
 
   submitting.value = true
   try {
@@ -459,8 +535,16 @@ const submitForm = async () => {
     showFormDialog.value = false
     await loadAgents()
   } catch (error) {
-    console.error('保存 Agent 失败', error)
-    ElMessage.error(editingAgent.value ? '更新失败' : '创建失败')
+    const code = getBusinessErrorCode(error)
+    if (code === 1003011001) {
+      await loadSkillDirectory()
+      if (skillDirectory.value !== null) {
+        ElMessage.warning('Skill 目录已刷新，请检查挂载后重新保存')
+      }
+    } else if (code === 1003010003 && editingAgent.value) {
+      readOnlyAgentIds.value.add(editingAgent.value.id)
+      showFormDialog.value = false
+    }
   } finally {
     submitting.value = false
   }
@@ -502,6 +586,7 @@ const confirmDelete = async (agent: AgentConfig) => {
 
 onMounted(() => {
   loadAgents()
+  loadSkillDirectory()
 })
 </script>
 
@@ -677,7 +762,13 @@ onMounted(() => {
 
 .param-tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+}
+
+.skill-template-summary {
+  width: 100%;
+  color: #6b7280;
 }
 
 .card-footer {

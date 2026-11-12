@@ -2,8 +2,12 @@ package cn.haowl.hinovel.ai.domain.entity;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.*;
+
+import java.util.List;
 
 /**
  * LLM 调用记录实体。
@@ -18,7 +22,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-@TableName("ai_llm_call_log")
+@TableName(value = "ai_llm_call_log", autoResultMap = true)
 public class LlmCallLog extends BaseEntity {
 
     /**
@@ -110,6 +114,15 @@ public class LlmCallLog extends BaseEntity {
      * 错误信息（调用失败时记录）。
      */
     private String errorMessage;
+
+    /** 当次 Skill 读取的有序记录。 */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<SkillReadCall> skillReadCalls;
+
+    /** 兼容上线前的空记录。 */
+    public List<SkillReadCall> getSkillReadCalls() {
+        return skillReadCalls == null ? List.of() : skillReadCalls;
+    }
 
     /**
      * 是否流式调用。

@@ -16,6 +16,10 @@
 .trae/rules/
 .trae/skills/
 .trae/skill-config.json
+.dhs/
+/.dsh/
+/.agents/
+.cursor
 
 # ===== Maven 构建产物 =====
 target/

@@ -41,11 +41,16 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             await apiLogout()
         } finally {
-            accessToken.value = null
-            user.value = null
-            localStorage.clear()
+            clearSession()
         }
     }
 
-    return {accessToken, user, isLoggedIn, isAdmin, login, register, logout}
+    function clearSession() {
+        accessToken.value = null
+        user.value = null
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('userInfo')
+    }
+
+    return {accessToken, user, isLoggedIn, isAdmin, login, register, logout, clearSession}
 })

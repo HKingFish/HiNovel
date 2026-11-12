@@ -4,6 +4,7 @@ import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigResponse;
@@ -13,6 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
+
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * 小说 Agent 配置服务。
@@ -27,6 +32,8 @@ public class NovelAgentConfigService {
 
     private final NovelAgentConfigMapper novelAgentConfigMapper;
     private final AgentMapper agentMapper;
+    /** 小说归属校验。 */
+    private final NovelDomainService novelDomainService;
 
     /**
      * 获取小说的 Agent 配置
@@ -49,10 +56,19 @@ public class NovelAgentConfigService {
      *
      * @param novelId 小说 ID
      * @param request 配置请求
+     * @param userId 当前用户 ID
      * @return 更新后的配置
      */
     @Transactional(rollbackFor = Exception.class)
-    public NovelAgentConfigResponse saveOrUpdateConfig(Long novelId, NovelAgentConfigRequest request) {
+    public NovelAgentConfigResponse saveOrUpdateConfig(Long novelId, NovelAgentConfigRequest request, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
+        for (Long agentId : Stream.of(request.getAuthorAgentId(), request.getEditorAgentId(), request.getQaAgentId())
+                .filter(java.util.Objects::nonNull).distinct().toList()) {
+            Agent agent = agentMapper.selectById(agentId);
+            if (agent == null || !agent.isAvailableTo(userId)) {
+                throw exception(AGENT_NOT_OWNED);
+            }
+        }
         NovelAgentConfig config = novelAgentConfigMapper.selectByNovelId(novelId);
 
         if (config == null) {

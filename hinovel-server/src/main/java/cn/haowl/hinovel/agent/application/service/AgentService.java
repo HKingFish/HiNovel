@@ -10,10 +10,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.WRITING_TEMPLATE_ID;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -29,6 +33,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 public class AgentService {
 
     private final AgentRepository agentRepository;
+    private final SkillService skillService;
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -58,6 +63,11 @@ public class AgentService {
         }
 
         agent = agentRepository.save(agent);
+        List<Long> skillIds = request.getSkillIds();
+        if (skillIds == null && WRITING_TEMPLATE_ID.equals(request.getRoleId())) {
+            skillIds = List.of(DE_AI_SKILL_ID);
+        }
+        applySkillBindings(agent, skillIds);
         log.info("Agent 创建成功: id={}, userId={}", agent.getId(), userId);
         return agent;
     }
@@ -78,7 +88,9 @@ public class AgentService {
      * @return 内置 Agent 列表
      */
     public List<Agent> listBuiltin() {
-        return agentRepository.findBuiltinAgents();
+        List<Agent> agents = agentRepository.findBuiltinAgents();
+        fillSkillIds(agents);
+        return agents;
     }
 
     /**
@@ -88,7 +100,9 @@ public class AgentService {
      * @return Agent 列表
      */
     public List<Agent> listAvailable(Long userId) {
-        return agentRepository.findAvailableByUserId(userId);
+        List<Agent> agents = agentRepository.findAvailableByUserId(userId);
+        fillSkillIds(agents);
+        return agents;
     }
 
     /**
@@ -106,6 +120,7 @@ public class AgentService {
         if (agent.isUserDefined() && !agent.belongsTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
+        agent.setSkillIds(skillService.listBoundSkillIds(agent.getId()).stream().map(Long::intValue).toList());
         return agent;
     }
 
@@ -119,7 +134,7 @@ public class AgentService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Agent update(Long agentId, Long userId, AgentRequest request) {
-        Agent agent = agentRepository.findById(agentId)
+        Agent agent = agentRepository.findByIdForUpdate(agentId)
             .orElseThrow(() -> exception(NOT_FOUND));
 
         // 内置 Agent 所有用户均可修改；用户自建 Agent 仅限创建者修改
@@ -143,6 +158,9 @@ public class AgentService {
 
         agent = agentRepository.save(agent);
 
+        // 按传入的 skillIds 替换绑定（null 表示不修改）
+        applySkillBindings(agent, request.getSkillIds());
+
         // 主动失效 Redis 缓存
         evictCache(agentId);
         log.info("Agent 更新成功: id={}", agentId);
@@ -157,7 +175,7 @@ public class AgentService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long agentId, Long userId) {
-        Agent agent = agentRepository.findById(agentId)
+        Agent agent = agentRepository.findByIdForUpdate(agentId)
             .orElseThrow(() -> exception(NOT_FOUND));
 
         // 内置 Agent 所有用户均可删除；用户自建 Agent 仅限创建者删除
@@ -166,6 +184,7 @@ public class AgentService {
         }
 
         agentRepository.deleteById(agentId);
+        skillService.replaceAgentBindings(agentId, Collections.emptyList());
         evictCache(agentId);
         log.info("Agent 删除成功: id={}", agentId);
     }
@@ -215,5 +234,34 @@ public class AgentService {
     public Agent getBuiltinInterviewAgent() {
         return agentRepository.findBuiltinByName(AgentConstants.BUILTIN_AGENT_INTERVIEW_ASSISTANT)
             .orElseThrow(() -> exception(NOT_FOUND, "内置面试助手 Agent 未初始化，请联系管理员"));
+    }
+
+    /**
+     * 按请求中的 skillIds 替换 Agent 绑定，并把最终绑定回填到返回体。
+     *
+     * @param agent    Agent 实体
+     * @param skillIds 请求中的 Skill ID 列表，null 表示不修改
+     */
+    private void applySkillBindings(Agent agent, List<Long> skillIds) {
+        if (skillIds != null) {
+            skillService.replaceAgentBindings(agent.getId(), skillIds);
+        }
+        agent.setSkillIds(skillService.listBoundSkillIds(agent.getId()).stream().map(Long::intValue).toList());
+    }
+
+    /**
+     * 批量填充 Agent 列表的 skillIds。
+     *
+     * @param agents Agent 列表
+     */
+    private void fillSkillIds(List<Agent> agents) {
+        if (agents == null || agents.isEmpty()) {
+            return;
+        }
+        List<Long> agentIds = agents.stream().map(Agent::getId).toList();
+        Map<Long, List<Long>> bindings = skillService.listBoundSkillIds(agentIds);
+        for (Agent agent : agents) {
+            agent.setSkillIds(bindings.getOrDefault(agent.getId(), List.of()).stream().map(Long::intValue).toList());
+        }
     }
 }

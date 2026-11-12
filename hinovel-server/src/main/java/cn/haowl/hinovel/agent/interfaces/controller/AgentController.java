@@ -84,6 +84,7 @@ public class AgentController {
     @Operation(summary = "获取默认配置模板", description = "返回所有内置 Agent 作为预设模板，供新建 Agent 时快速填充")
     @GetMapping("/default-configs")
     public ApiResponse<List<Agent>> listDefaultConfigs() {
+        StpUtil.checkLogin();
         return ApiResponse.success(agentService.listBuiltin());
     }
 }

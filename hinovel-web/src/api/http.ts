@@ -1,6 +1,26 @@
 import axios, {type AxiosInstance, type AxiosResponse} from 'axios'
 import {ElMessage} from 'element-plus'
 import router from '@/router'
+import {useAuthStore} from '@/store/auth'
+
+export class HttpBusinessError extends Error {
+    constructor(message: string, readonly code: number) {
+        super(message)
+    }
+}
+
+export const getBusinessErrorCode = (error: unknown): number | undefined => {
+    if (error instanceof HttpBusinessError) return error.code
+    if (axios.isAxiosError(error)) return error.response?.data?.code
+}
+
+const redirectToLogin = (message: string, request: AxiosResponse['config'] | undefined) => {
+    const requestToken = request?.headers.get('satoken') ?? null
+    if (requestToken !== localStorage.getItem('accessToken')) return
+    ElMessage.warning(message)
+    useAuthStore().clearSession()
+    void router.push('/login')
+}
 
 // 创建 axios 实例
 // baseURL 默认为空，走相对路径由 Vite 代理转发到后端，避免开发环境跨域问题
@@ -27,16 +47,14 @@ http.interceptors.response.use(
         const data = response.data
         // 业务错误码（HTTP 200 但 code 非 200）统一处理
         if (data && data.code !== undefined) {
-            if (data.code === 401) {
+            if (data.code === 401 || data.code === 1000010001) {
                 // 未登录或登录过期，提示用户并跳转登录页
-                ElMessage.warning(data.message || '登录已过期，请重新登录')
-                localStorage.clear()
-                router.push('/login')
-                return Promise.reject(new Error(data.message || '未登录'))
+                redirectToLogin(data.message || '登录已过期，请重新登录', response.config)
+                return Promise.reject(new HttpBusinessError(data.message || '未登录', data.code))
             } else if (data.code !== 200) {
                 // 其他业务错误，弹出错误提示
                 ElMessage.error(data.message || '操作失败')
-                return Promise.reject(new Error(data.message || '操作失败'))
+                return Promise.reject(new HttpBusinessError(data.message || '操作失败', data.code))
             }
         }
         return data
@@ -45,9 +63,7 @@ http.interceptors.response.use(
         const status = error.response?.status
         if (status === 401) {
             // Token 无效或过期，提示用户并跳转登录页
-            ElMessage.warning('登录已过期，请重新登录')
-            localStorage.clear()
-            router.push('/login')
+            redirectToLogin('登录已过期，请重新登录', error.config)
         } else if (status === 403) {
             ElMessage.error('权限不足')
         } else {

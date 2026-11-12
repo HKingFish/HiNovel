@@ -44,6 +44,13 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
+    public Optional<Agent> findByIdForUpdate(Long id) {
+        return Optional.ofNullable(agentMapper.selectOne(new LambdaQueryWrapper<Agent>()
+                .eq(Agent::getId, id)
+                .last("FOR UPDATE")));
+    }
+
+    @Override
     public List<Agent> findByUserId(Long userId) {
         LambdaQueryWrapper<Agent> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Agent::getUserId, userId)

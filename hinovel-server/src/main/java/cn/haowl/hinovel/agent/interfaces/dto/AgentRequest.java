@@ -65,4 +65,7 @@ public class AgentRequest {
 
     @Schema(description = "绑定的 MCP Server ID 列表")
     private List<Long> mcpServerIds;
+
+    @Schema(description = "绑定的 Skill ID 列表；更新时 null 表示不修改绑定，空数组表示清空绑定")
+    private List<Long> skillIds;
 }

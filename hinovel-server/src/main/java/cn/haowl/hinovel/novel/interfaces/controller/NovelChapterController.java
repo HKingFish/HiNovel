@@ -158,7 +158,7 @@ public class NovelChapterController {
     @Operation(summary = "发布章节", description = "发布章节，异步触发AI总结大纲和向量存储")
     @PostMapping("/{chapterId}/publish")
     public ApiResponse<PublishChapterResponse> publishChapter(@PathVariable Long chapterId) {
-        ChapterPublishService.PublishResult result = chapterPublishService.publishChapter(chapterId);
+        ChapterPublishService.PublishResult result = chapterPublishService.publishChapter(chapterId, StpUtil.getLoginIdAsLong());
         PublishChapterResponse response = new PublishChapterResponse();
         response.setPublished(result.published());
         response.setMessage(result.message());

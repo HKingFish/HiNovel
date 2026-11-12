@@ -26,6 +26,10 @@ VALUES (
     role = VALUES(role),
     status = VALUES(status);
 
+-- 首次初始化创作模板时挂载去 AI 味，重复执行 seed 时保留用户修改。
+START TRANSACTION;
+SELECT COUNT(*) INTO @writing_template_exists FROM agent_config WHERE id = 101;
+
 -- 内置 Agent 模板（user_id=0，供用户创建小说时选用）
 INSERT INTO agent_config (
     id, user_id, name, description, system_prompt,
@@ -61,6 +65,11 @@ ON DUPLICATE KEY UPDATE
     description = VALUES(description),
     system_prompt = VALUES(system_prompt),
     sort_order = VALUES(sort_order);
+
+INSERT INTO agent_skill_binding (agent_id, skill_id)
+SELECT 101, 3 FROM DUAL WHERE @writing_template_exists = 0
+ON DUPLICATE KEY UPDATE skill_id = 3;
+COMMIT;
 
 -- LLM 提供方参考模板（默认禁用，用户自行配置 API Key 后启用）
 INSERT INTO ai_llm_provider (id, name, provider_type, base_url, models, is_active, deleted, version)

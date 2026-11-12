@@ -1,9 +1,13 @@
 package cn.haowl.hinovel.agent.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.List;
 
 /**
  * AI 问答消息实体。
@@ -14,7 +18,7 @@ import lombok.EqualsAndHashCode;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("agent_chat_message")
+@TableName(value = "agent_chat_message", autoResultMap = true)
 public class ChatMessage extends BaseEntity {
 
     /**
@@ -46,6 +50,15 @@ public class ChatMessage extends BaseEntity {
      * 消息内容。
      */
     private String content;
+
+    /** 本次回复首次成功读取的 Skill 名称。 */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<String> loadedSkillNames;
+
+    /** 用户消息及历史空值返回空列表。 */
+    public List<String> getLoadedSkillNames() {
+        return !isAssistantMessage() || loadedSkillNames == null ? List.of() : loadedSkillNames;
+    }
 
     /**
      * 是否已撤回。

@@ -1,5 +1,12 @@
 import http from './http'
 
+export interface SkillReadCall {
+    sequence: number
+    skillName: string
+    status: 'SUCCESS' | 'FAILED'
+    errorCode?: string | null
+}
+
 /**
  * LLM 调用记录接口类型定义
  */
@@ -21,6 +28,7 @@ export interface LlmCallLog {
     errorMessage: string | null
     isStreaming: number
     createTime: string
+    skillReadCalls?: SkillReadCall[] | null
 }
 
 /**

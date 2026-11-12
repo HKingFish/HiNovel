@@ -180,6 +180,12 @@ public final class ServiceErrorCodeRange {
     public static final int AGENT_CONFIG_ERROR_CODE_MIN = 1_003_010_000;
     public static final int AGENT_CONFIG_ERROR_CODE_MAX = 1_003_011_000;
 
+    /**
+     * Agent - Skill 模块错误码区间 [1-003-011-000 ~ 1-003-012-000)。
+     */
+    public static final int AGENT_SKILL_ERROR_CODE_MIN = 1_003_011_000;
+    public static final int AGENT_SKILL_ERROR_CODE_MAX = 1_003_012_000;
+
     // ==================== AI 系统模块 ====================
 
     /**

@@ -1,16 +1,19 @@
 import http from './http'
+import {stringifyWithLongIds} from './json-long-ids'
+
+const AGENT_REQUEST_LONG_IDS = ['llmProviderId', 'roleId']
 
 /**
  * Agent 配置接口（匹配后端 Agent 实体）
  */
 export interface AgentConfig {
-    id: number
-    userId: number
-    roleId?: number
+    id: number | string
+    userId: number | string
+    roleId?: number | string
     name: string
     description: string
     systemPrompt: string
-    llmProviderId?: number
+    llmProviderId?: number | string
     modelName: string
     customBaseUrl?: string
     temperature: number
@@ -18,6 +21,7 @@ export interface AgentConfig {
     topP: number
     maxIterations: number
     isBuiltin: number
+    skillIds?: number[] | null
     sortOrder?: number
     createTime: string
     updateTime: string
@@ -30,22 +34,34 @@ export interface AgentRequestDto {
     name: string
     description?: string
     systemPrompt: string
-    llmProviderId: number | undefined
+    llmProviderId: number | string | undefined
     modelName: string
     customBaseUrl?: string
     temperature?: number
     maxTokens?: number
     topP?: number
     maxIterations?: number
-    roleId?: number
+    roleId?: number | string
+    skillIds?: number[]
     mcpServerIds?: number[]
+}
+
+export interface AgentSkill {
+    id: number
+    name: string
+    description: string
+}
+
+export const getAgentSkills = async (): Promise<AgentSkill[]> => {
+    const res = await http.get<never, {data: AgentSkill[]}>('/api/agent/skills')
+    return res.data
 }
 
 /**
  * LLM 提供方选项（匹配后端 LlmProvider 实体）
  */
 export interface LlmProviderOption {
-    id: number
+    id: number | string
     name: string
     providerType: string
     baseUrl: string
@@ -68,7 +84,7 @@ export const getAvailableAgentList = async (): Promise<AgentConfig[]> => {
  * @param data 创建请求参数
  */
 export const createAgent = async (data: AgentRequestDto): Promise<AgentConfig> => {
-    const res = await http.post('/api/agent/agents', data)
+    const res = await http.post('/api/agent/agents', stringifyWithLongIds(data, AGENT_REQUEST_LONG_IDS))
     return res.data
 }
 
@@ -78,8 +94,8 @@ export const createAgent = async (data: AgentRequestDto): Promise<AgentConfig> =
  * @param id Agent ID
  * @param data 更新请求参数
  */
-export const updateAgent = async (id: number, data: AgentRequestDto): Promise<AgentConfig> => {
-    const res = await http.put(`/api/agent/agents/${id}`, data)
+export const updateAgent = async (id: AgentConfig['id'], data: AgentRequestDto): Promise<AgentConfig> => {
+    const res = await http.put(`/api/agent/agents/${id}`, stringifyWithLongIds(data, AGENT_REQUEST_LONG_IDS))
     return res.data
 }
 
@@ -88,7 +104,7 @@ export const updateAgent = async (id: number, data: AgentRequestDto): Promise<Ag
  *
  * @param id Agent ID
  */
-export const deleteAgentById = async (id: number): Promise<void> => {
+export const deleteAgentById = async (id: AgentConfig['id']): Promise<void> => {
     await http.delete(`/api/agent/agents/${id}`)
 }
 

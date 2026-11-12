@@ -70,16 +70,13 @@ public class EditorAgent {
         log.info("编辑 Agent 审核章节，chapterId={}，title={}", chapter.getId(), chapter.getTitle());
         long startTime = System.currentTimeMillis();
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(
-                chapter.getNovelId(), AgentRole.EDITOR, userId);
-        GenericAiAssistant assistant = aiServiceFactory.buildByNovel(
-                chapter.getNovelId(), AgentRole.EDITOR, GenericAiAssistant.class);
-        String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                chapter.getNovelId(), AgentRole.EDITOR, DEFAULT_SYSTEM_PROMPT);
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+                chapter.getNovelId(), AgentRole.EDITOR, userId, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildAuditPrompt(chapter, outline, novelOutline);
 
         try {
-            String rawResult = assistant.chat(systemPrompt, userPrompt);
+            String rawResult = assistant.chat(callContext.getSystemPrompt(), userPrompt);
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.debug("编辑 Agent 审核原始结果，chapterId={}，result={}", chapter.getId(), rawResult);
 

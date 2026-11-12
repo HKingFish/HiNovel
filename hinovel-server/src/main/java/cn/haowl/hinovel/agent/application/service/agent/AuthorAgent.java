@@ -60,16 +60,14 @@ public class AuthorAgent {
         log.info("作者 Agent 改写章节，chapterId={}，title={}", chapter.getId(), chapter.getTitle());
         long startTime = System.currentTimeMillis();
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId);
-        GenericAiAssistant assistant = aiServiceFactory.buildByNovel(
-                chapter.getNovelId(), AgentRole.AUTHOR, GenericAiAssistant.class);
-        String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                chapter.getNovelId(), AgentRole.AUTHOR, DEFAULT_SYSTEM_PROMPT);
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildRewritePrompt(chapter, outline);
 
         try {
-            String content = assistant.chat(systemPrompt, userPrompt);
+            String content = assistant.chat(callContext.getSystemPrompt(),
+                    aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms",
                     chapter.getId(), content.length(), processingTimeMs);
@@ -121,18 +119,16 @@ public class AuthorAgent {
                 previousChapters.size(), novelOutlineContent != null,
                 userRequirement != null && !userRequirement.isBlank());
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId);
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         NovelContentRetrievalTool retrievalTool =
                 NovelContentRetrievalTool.create(vectorStoreFactory, chapter.getNovelId(), userId);
-        GenericAiAssistant assistant = aiServiceFactory.buildStreamingByNovelWithTools(
-                chapter.getNovelId(), AgentRole.AUTHOR, GenericAiAssistant.class, retrievalTool);
-        String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                chapter.getNovelId(), AgentRole.AUTHOR, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true, retrievalTool);
         String userPrompt = buildRewritePrompt(chapter, outline,
                 previousChapters, novelOutlineContent, userRequirement);
 
-        TokenStream tokenStream = assistant.streamChat(systemPrompt, userPrompt);
+        TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
+                    aiServiceFactory.writingPrompt(callContext, userPrompt));
         // 使用带日志记录的 tokenStreamToFlux
         return aiServiceFactory.tokenStreamToFlux(tokenStream,
                 "chapterId=" + chapter.getId(),
@@ -153,16 +149,14 @@ public class AuthorAgent {
         log.info("作者 Agent 根据建议重写，chapterId={}，建议数={}", chapter.getId(), suggestions.size());
         long startTime = System.currentTimeMillis();
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId);
-        GenericAiAssistant assistant = aiServiceFactory.buildByNovel(
-                chapter.getNovelId(), AgentRole.AUTHOR, GenericAiAssistant.class);
-        String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                chapter.getNovelId(), AgentRole.AUTHOR, DEFAULT_SYSTEM_PROMPT);
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildSuggestionRewritePrompt(chapter, outline, suggestions);
 
         try {
-            String content = assistant.chat(systemPrompt, userPrompt);
+            String content = assistant.chat(callContext.getSystemPrompt(),
+                    aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 建议重写完成，chapterId={}，生成字数={}，耗时={}ms",
                     chapter.getId(), content.length(), processingTimeMs);
@@ -247,16 +241,14 @@ public class AuthorAgent {
         log.info("作者 Agent 批注改写，novelId={}，原文长度={}，改写要求长度={}",
                 novelId, originalText.length(), rewriteRequirement.length());
 
-        CallContext callContext = aiServiceFactory.resolveCallContext(
-                novelId, AgentRole.AUTHOR, userId);
-        GenericAiAssistant assistant = aiServiceFactory.buildStreamingByNovel(
-                novelId, AgentRole.AUTHOR, GenericAiAssistant.class);
-        String systemPrompt = aiServiceFactory.resolveSystemPrompt(
-                novelId, AgentRole.AUTHOR, DEFAULT_SYSTEM_PROMPT);
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+                novelId, AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true);
         String userPrompt = buildAnnotationRewritePrompt(
                 fullChapterContent, originalText, rewriteRequirement);
 
-        TokenStream tokenStream = assistant.streamChat(systemPrompt, userPrompt);
+        TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
+                    aiServiceFactory.writingPrompt(callContext, userPrompt));
         return aiServiceFactory.tokenStreamToFlux(tokenStream,
                 "annotationRewrite-novelId=" + novelId,
                 CALL_SCENE_ANNOTATION_REWRITE, callContext, userPrompt);

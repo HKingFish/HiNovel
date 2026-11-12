@@ -7,9 +7,13 @@ import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
 import cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants;
+import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -194,16 +198,16 @@ public class AIController {
     }
 
     /**
-     * 保存中断的 AI 回复（用于用户主动停止问答场景）。
+     * 接收旧客户端的中断确认。回复由服务端聊天流保存。
      *
      * @param request 保存请求
      * @return 操作结果
      */
-    @Operation(summary = "保存中断回复", description = "保存流式问答中断时已生成的部分回复")
+    @Operation(summary = "确认中断回复", description = "旧客户端兼容入口，已生成的回复由服务端聊天流保存")
     @PostMapping("/chat/save-partial")
     public ApiResponse<Void> savePartialResponse(@RequestBody SavePartialRequest request) {
-        qaAgentService.savePartialResponse(
-                request.getSessionId(), request.getNovelId(), request.getContent());
+        qaAgentService.confirmPartialResponse(
+                request.getSessionId(), request.getNovelId(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success(null);
     }
 
@@ -214,7 +218,7 @@ public class AIController {
     @GetMapping("/chat/messages/{sessionId}")
     public ApiResponse<List<ChatMessageResponse>> listChatMessages(
             @PathVariable Long sessionId) {
-        List<ChatMessage> messages = qaAgentService.listMessages(sessionId);
+        List<ChatMessage> messages = qaAgentService.listMessages(sessionId, StpUtil.getLoginIdAsLong());
         List<ChatMessageResponse> responseList = messages.stream()
                 .map(ChatMessageResponse::fromEntity)
                 .toList();
@@ -236,7 +240,7 @@ public class AIController {
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "30") int pageSize) {
         List<ChatMessage> messages = qaAgentService.listMessagesByCursor(
-                sessionId, cursorId, pageSize);
+                sessionId, cursorId, pageSize, StpUtil.getLoginIdAsLong());
         List<ChatMessageResponse> responseList = messages.stream()
                 .map(ChatMessageResponse::fromEntity)
                 .toList();
@@ -271,28 +275,21 @@ public class AIController {
      */
     @Operation(summary = "AI 流式问答", description = "基于小说内容的智能问答（SSE 流式）")
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> aiChat(@RequestBody AiChatRequest request) {
+    public Flux<ServerSentEvent<Object>> aiChat(@Valid @RequestBody AiChatRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
         return qaAgentService.streamChat(
                         request.getNovelId(), request.getSessionId(),
                         request.getQuestion(), userId)
-                .map(token -> {
-                    // 识别工具执行事件标记，发送不同类型的 SSE 事件
-                    if (token.startsWith(QaAgent.TOOL_EXECUTED_EVENT_PREFIX)) {
-                        String eventData = token.substring(
-                                QaAgent.TOOL_EXECUTED_EVENT_PREFIX.length());
-                        return ServerSentEvent.<String>builder()
-                                .event("tool-executed")
-                                .data(eventData)
-                                .build();
-                    }
-                    return ServerSentEvent.<String>builder().data(token).build();
-                })
+                .map(event -> ServerSentEvent.builder(event.getData()).event(event.getName()).build())
                 .onErrorResume(e -> {
                     log.error("AI 问答流式异常，异常信息：{}", e.getMessage());
-                    return Flux.just(ServerSentEvent.<String>builder()
+                    String message = e.getMessage() != null ? e.getMessage() : "AI 问答异常";
+                    if (e instanceof BusinessException businessException) {
+                        message = businessException.getCode() + " " + message;
+                    }
+                    return Flux.just(ServerSentEvent.<Object>builder()
                             .event("error")
-                            .data(e.getMessage() != null ? e.getMessage() : "AI 问答异常")
+                            .data(message)
                             .build());
                 });
     }
@@ -395,16 +392,19 @@ public class AIController {
         /**
          * 小说 ID
          */
+        @NotNull
         private Long novelId;
 
         /**
          * 会话 ID
          */
+        @NotNull
         private Long sessionId;
 
         /**
          * 用户问题
          */
+        @NotBlank
         private String question;
     }
 
@@ -479,6 +479,8 @@ public class AIController {
         private Long sessionId;
         private String role;
         private String content;
+        /** 对应回复首次成功加载的 Skill 名称。 */
+        private List<String> loadedSkillNames;
         private Integer revoked;
         private String createTime;
 
@@ -491,6 +493,7 @@ public class AIController {
             response.setSessionId(message.getSessionId());
             response.setRole(message.getRole());
             response.setContent(message.getContent());
+            response.setLoadedSkillNames(message.getLoadedSkillNames());
             response.setRevoked(message.getRevoked());
             response.setCreateTime(message.getCreateTime() != null
                     ? message.getCreateTime().toString() : null);

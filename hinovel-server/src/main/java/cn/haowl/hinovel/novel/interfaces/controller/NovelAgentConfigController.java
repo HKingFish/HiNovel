@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.interfaces.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.NovelAgentConfigService;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigRequest;
@@ -40,6 +41,6 @@ public class NovelAgentConfigController {
     public ApiResponse<NovelAgentConfigResponse> saveOrUpdateConfig(
             @PathVariable Long novelId,
             @Valid @RequestBody NovelAgentConfigRequest request) {
-        return ApiResponse.success(novelAgentConfigService.saveOrUpdateConfig(novelId, request));
+        return ApiResponse.success(novelAgentConfigService.saveOrUpdateConfig(novelId, request, StpUtil.getLoginIdAsLong()));
     }
 }

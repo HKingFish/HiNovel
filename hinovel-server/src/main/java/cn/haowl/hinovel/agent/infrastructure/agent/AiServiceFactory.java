@@ -1,16 +1,22 @@
 package cn.haowl.hinovel.agent.infrastructure.agent;
 
+import cn.haowl.hinovel.agent.application.service.SkillService;
+import cn.haowl.hinovel.agent.constant.AgentConstants;
+import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
+import cn.haowl.hinovel.ai.domain.entity.SkillReadCall;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingHandle;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.TokenStream;
@@ -20,14 +26,18 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
-import java.util.Arrays;
-import java.util.Collections;
+
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.*;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
@@ -53,7 +63,8 @@ public class AiServiceFactory {
     private final NovelAgentConfigMapper novelAgentConfigMapper;
     private final AgentMapper agentMapper;
     private final LlmCallLogService llmCallLogService;
-
+    /** 内置 Skill 挂载和正文。 */
+    private final SkillService skillService;
 
     /**
      * 调用上下文，封装 Agent 和 LLM 提供方的元信息，用于调用记录。
@@ -91,6 +102,92 @@ public class AiServiceFactory {
          * 所属用户 ID（用于调用记录数据隔离）
          */
         private Long userId;
+
+        /** 当次执行使用的模型提供方。 */
+        private LlmProviderPort provider;
+
+        /** 仅含目录元数据的系统提示词。 */
+        private String systemPrompt;
+
+        /** 当次执行的工具调用上限。 */
+        private int maxIterations;
+
+        /** 当次执行的 Read Tool。 */
+        private SkillTool skillTool;
+
+        /** 返回当前执行的读取快照。 */
+        public List<SkillReadCall> skillReadCalls() {
+            return skillTool == null ? List.of() : skillTool.readCalls();
+        }
+    }
+
+    /** 解析一次执行所用的 Agent、模型、提示词及 Skill 挂载。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public CallContext prepareNovelCall(Long novelId, AgentRole role, Long userId, String defaultSystemPrompt) {
+        Agent agent = resolveAgent(novelId, role);
+        if (agent == null) {
+            throw exception(NOVEL_AGENT_NOT_CONFIGURED, getRoleName(role));
+        }
+        if (!agent.isAvailableTo(userId)) {
+            throw exception(AGENT_NOT_OWNED);
+        }
+        if (agent.getLlmProviderId() == null) {
+            throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, getRoleName(role));
+        }
+        List<AgentSkill> skills = skillService.listBoundSkills(agent.getId());
+        LlmProviderPort provider = llmProviderFactory.getByProviderId(agent.getLlmProviderId());
+        String systemPrompt = agent.getSystemPrompt();
+        String modelName = provider.getModelName();
+        if (systemPrompt == null || systemPrompt.isBlank()) {
+            systemPrompt = defaultSystemPrompt;
+        }
+        return CallContext.builder()
+                .agentId(agent.getId())
+                .agentName(agent.getName())
+                .llmProviderId(agent.getLlmProviderId())
+                .llmProviderName(provider.getProviderType())
+                .modelName(modelName == null ? agent.getModelName() : modelName)
+                .userId(userId)
+                .provider(provider)
+                .systemPrompt(systemPrompt + AgentSkillPrompts.buildSkillSection(skills))
+                .maxIterations(agent.getMaxIterations() == null
+                        ? AgentConstants.DEFAULT_MAX_ITERATIONS : agent.getMaxIterations())
+                .skillTool(skills.isEmpty() ? null : new SkillTool(skills, skillService::readContent))
+                .build();
+    }
+
+    /** 按本次执行的模式注册挂载工具及现有场景工具。 */
+    public GenericAiAssistant buildNovelAssistant(CallContext context, boolean streaming, Object... sceneTools) {
+        AiServices<GenericAiAssistant> builder = AiServices.builder(GenericAiAssistant.class)
+                .maxSequentialToolsInvocations(context.getMaxIterations());
+        if (streaming) {
+            builder.streamingChatModel(context.getProvider().getStreamingChatModel());
+        } else {
+            builder.chatModel(context.getProvider().getChatModel());
+        }
+        List<Object> tools = new ArrayList<>();
+        for (Object tool : sceneTools) {
+            if (tool != null) {
+                tools.add(tool);
+            }
+        }
+        if (context.getSkillTool() != null) {
+            tools.add(context.getSkillTool());
+        }
+        if (!tools.isEmpty()) {
+            builder.tools(tools.toArray());
+        }
+        return builder.build();
+    }
+
+    /** 将服务端通过 Read Tool 得到的正文交给当前写作或润色执行。 */
+    public String writingPrompt(CallContext context, String userPrompt) {
+        SkillTool skillTool = context.getSkillTool();
+        if (skillTool == null || !skillTool.hasDefaultSkill()) {
+            return userPrompt;
+        }
+        return "【本次执行的去 AI 味 Skill 读取结果】\n" + skillTool.loadDefaultSkill()
+                + "\n\n【本次请求】\n" + userPrompt;
     }
 
     // ==================== AiService 构建 ====================
@@ -125,139 +222,6 @@ public class AiServiceFactory {
                 .build();
     }
 
-    /**
-     * 根据小说 ID 和 Agent 角色构建同步模式的 AiService 实例。
-     *
-     * @param novelId      小说 ID
-     * @param role         Agent 角色（作者/编辑）
-     * @param serviceClass AiService 接口类型
-     * @param <T>          AiService 接口泛型
-     * @return AiService 实例
-     */
-    public <T> T buildByNovel(Long novelId, AgentRole role, Class<T> serviceClass) {
-        LlmProviderPort providerPort = resolveProviderByNovel(novelId, role);
-        return AiServices.builder(serviceClass)
-                .chatModel(providerPort.getChatModel())
-                .build();
-    }
-
-    /**
-     * 根据小说 ID 和 Agent 角色构建流式模式的 AiService 实例。
-     *
-     * @param novelId      小说 ID
-     * @param role         Agent 角色（作者/编辑）
-     * @param serviceClass AiService 接口类型
-     * @param <T>          AiService 接口泛型
-     * @return AiService 实例（流式）
-     */
-    public <T> T buildStreamingByNovel(Long novelId, AgentRole role, Class<T> serviceClass) {
-        LlmProviderPort providerPort = resolveProviderByNovel(novelId, role);
-        return AiServices.builder(serviceClass)
-                .streamingChatModel(providerPort.getStreamingChatModel())
-                .build();
-    }
-
-    /**
-     * 根据小说 ID 和 Agent 角色构建流式模式的 AiService 实例（带 Tool 支持）。
-     *
-     * <p>用于需要绑定外部工具的场景（如问答 Agent 绑定向量检索工具）。</p>
-     *
-     * @param novelId      小说 ID
-     * @param role         Agent 角色
-     * @param serviceClass AiService 接口类型
-     * @param tools        工具实例列表
-     * @param <T>          AiService 接口泛型
-     * @return AiService 实例（流式，带 Tool）
-     */
-    public <T> T buildStreamingByNovelWithTools(Long novelId, AgentRole role,
-                                                Class<T> serviceClass, Object... tools) {
-        LlmProviderPort providerPort = resolveProviderByNovel(novelId, role);
-        // 过滤掉 null 工具（如用户未配置 Embedding 时 retrievalTool 为 null）
-        List<Object> validTools = tools == null ? Collections.emptyList()
-            : Arrays.stream(tools)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
-        if (validTools.isEmpty()) {
-            // 无有效工具，构建不带 Tool 的 AiService
-            return AiServices.builder(serviceClass)
-                .streamingChatModel(providerPort.getStreamingChatModel())
-                .build();
-        }
-        return AiServices.builder(serviceClass)
-            .streamingChatModel(providerPort.getStreamingChatModel())
-            .tools(validTools.toArray())
-                .build();
-    }
-
-    // ==================== 调用上下文解析 ====================
-
-    /**
-     * 根据小说 ID 和 Agent 角色解析调用上下文。
-     *
-     * <p>返回包含 Agent 和 LLM 提供方元信息的上下文对象，
-     * 供调用方在记录调用日志时使用。</p>
-     *
-     * @param novelId 小说 ID
-     * @param role    Agent 角色
-     * @return 调用上下文
-     */
-    public CallContext resolveCallContext(Long novelId, AgentRole role) {
-        Agent agent = resolveAgent(novelId, role);
-        if (agent == null) {
-            return CallContext.builder().build();
-        }
-        LlmProviderPort providerPort = null;
-        if (agent.getLlmProviderId() != null) {
-            try {
-                providerPort = llmProviderFactory.getByProviderId(agent.getLlmProviderId());
-            } catch (Exception e) {
-                log.warn("解析调用上下文时获取 LLM 提供方失败，agentId={}，异常信息：{}",
-                        agent.getId(), e.getMessage());
-            }
-        }
-        return CallContext.builder()
-                .agentId(agent.getId())
-                .agentName(agent.getName())
-                .llmProviderId(agent.getLlmProviderId())
-                .llmProviderName(providerPort != null ? providerPort.getProviderType() : null)
-                .modelName(providerPort != null ? providerPort.getModelName() : agent.getModelName())
-                .build();
-    }
-
-    /**
-     * 根据小说 ID、Agent 角色和用户 ID 解析调用上下文（含用户隔离）。
-     *
-     * @param novelId Agent 所属小说 ID
-     * @param role    Agent 角色
-     * @param userId  当前用户 ID
-     * @return 调用上下文
-     */
-    public CallContext resolveCallContext(Long novelId, AgentRole role, Long userId) {
-        CallContext ctx = resolveCallContext(novelId, role);
-        ctx.setUserId(userId);
-        return ctx;
-    }
-
-    // ==================== 系统提示词解析 ====================
-
-    /**
-     * 根据小说 ID 和 Agent 角色获取系统提示词。
-     *
-     * <p>优先使用 Agent 自定义的系统提示词，未配置时返回调用方提供的默认值。</p>
-     *
-     * @param novelId             小说 ID
-     * @param role                Agent 角色
-     * @param defaultSystemPrompt 默认系统提示词
-     * @return 系统提示词
-     */
-    public String resolveSystemPrompt(Long novelId, AgentRole role, String defaultSystemPrompt) {
-        Agent agent = resolveAgent(novelId, role);
-        if (agent != null && agent.getSystemPrompt() != null && !agent.getSystemPrompt().isBlank()) {
-            return agent.getSystemPrompt();
-        }
-        return defaultSystemPrompt;
-    }
-
     // ==================== TokenStream 转 Flux ====================
 
     /**
@@ -274,117 +238,98 @@ public class AiServiceFactory {
         return tokenStreamToFlux(tokenStream, logContext, null, null, null);
     }
 
-    /**
-     * 将 LangChain4J {@link TokenStream} 转换为 Reactor {@link Flux}，并记录调用日志。
-     *
-     * @param tokenStream    LangChain4J Token 流
-     * @param logContext     日志上下文描述
-     * @param callScene      调用场景（如 REWRITE、AUDIT）
-     * @param callContext    调用上下文（Agent 和提供方信息）
-     * @param requestContent 请求内容摘要
-     * @return Flux 流
-     */
+    /** 将流式文本映射到调用方的协议，并记录调用结果。 */
     public Flux<String> tokenStreamToFlux(TokenStream tokenStream, String logContext,
                                           String callScene, CallContext callContext,
                                           String requestContent) {
-        Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
-        long startTime = System.currentTimeMillis();
-        // 收集完整响应内容
-        StringBuilder responseBuffer = new StringBuilder();
-
-        tokenStream
-                .onPartialResponse(token -> {
-                    responseBuffer.append(token);
-                    sink.tryEmitNext(token);
-                })
-                .onCompleteResponse(response -> {
-                    long processingTimeMs = System.currentTimeMillis() - startTime;
-                    log.info("流式调用完成，{}，耗时={}ms", logContext, processingTimeMs);
-                    // 异步记录调用日志
-                    if (callScene != null && callContext != null) {
-                        saveCallLog(callScene, callContext, requestContent,
-                                responseBuffer.toString(), response, processingTimeMs, true);
-                    }
-                    sink.tryEmitComplete();
-                })
-                .onError(error -> {
-                    long processingTimeMs = System.currentTimeMillis() - startTime;
-                    log.error("流式调用异常，{}，耗时={}ms，异常信息：{}",
-                            logContext, processingTimeMs, error.getMessage());
-                    // 记录失败日志
-                    if (callScene != null && callContext != null) {
-                        saveFailedCallLog(callScene, callContext, requestContent,
-                                error.getMessage(), processingTimeMs, true);
-                    }
-                    sink.tryEmitError(error);
-                })
-                .start();
-
-        return sink.asFlux();
+        return tokenStreamToFlux(tokenStream, logContext, callScene, callContext, requestContent,
+                Function.identity(), null, null);
     }
 
-    /**
-     * 将 LangChain4J {@link TokenStream} 转换为 Reactor {@link Flux}，
-     * 支持工具执行事件注入和调用日志记录。
-     *
-     * <p>在工具执行完成后，通过 {@code toolExecutedEventBuilder} 构建事件标记字符串，
-     * 注入到 SSE 流中，前端据此识别工具执行事件并触发 UI 更新。
-     * 事件标记不会计入 AI 回复内容（不影响消息保存）。</p>
-     *
-     * @param tokenStream              LangChain4J Token 流
-     * @param logContext               日志上下文描述
-     * @param callScene                调用场景
-     * @param callContext              调用上下文
-     * @param requestContent           请求内容摘要
-     * @param toolExecutedEventBuilder 工具执行事件构建器，接收 {@link ToolExecution}，返回注入到 SSE 流的事件标记字符串
-     * @return Flux 流
-     */
-    public Flux<String> tokenStreamToFlux(TokenStream tokenStream, String logContext,
-                                          String callScene, CallContext callContext,
-                                          String requestContent,
-                                          java.util.function.Function<ToolExecution, String> toolExecutedEventBuilder) {
-        Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
-        long startTime = System.currentTimeMillis();
-        StringBuilder responseBuffer = new StringBuilder();
+    /** 将文本与 Tool 结果以独立事件发给同一个订阅者。 */
+    public <T> Flux<T> tokenStreamToFlux(TokenStream tokenStream, String logContext,
+                                        String callScene, CallContext callContext, String requestContent,
+                                        Function<String, T> textEvent, Function<ToolExecution, T> toolEvent, T firstEvent) {
+        return Flux.create(sink -> {
+            long startTime = System.currentTimeMillis();
+            StringBuffer responseBuffer = new StringBuffer();
+            AtomicBoolean logged = new AtomicBoolean();
+            AtomicReference<StreamingHandle> upstream = new AtomicReference<>();
+            Consumer<StreamingHandle> observeHandle = handle -> {
+                upstream.set(handle);
+                if (sink.isCancelled()) {
+                    cancelStreamingHandle(handle);
+                }
+            };
+            sink.onCancel(() -> {
+                if (callContext != null && callContext.getSkillTool() != null) {
+                    callContext.getSkillTool().cancel();
+                }
+                cancelStreamingHandle(upstream.get());
+                if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
+                    saveFailedCallLog(callScene, callContext, requestContent, "调用已取消",
+                            System.currentTimeMillis() - startTime, true);
+                }
+            });
+            if (firstEvent != null) {
+                sink.next(firstEvent);
+            }
+            if (sink.isCancelled()) {
+                return;
+            }
 
-        tokenStream
-                .onPartialResponse(token -> {
-                    responseBuffer.append(token);
-                    sink.tryEmitNext(token);
-                })
-                .onToolExecuted(toolExecution -> {
-                    log.info("工具执行完成，{}，工具名={}",
-                            logContext, toolExecution.request().name());
-                    if (toolExecutedEventBuilder != null) {
-                        // 构建事件标记并注入 SSE 流（不计入 responseBuffer）
-                        String eventMarker = toolExecutedEventBuilder.apply(toolExecution);
-                        if (eventMarker != null) {
-                            sink.tryEmitNext(eventMarker);
+            TokenStream stream = tokenStream.onPartialResponseWithContext((partial, context) -> {
+                        observeHandle.accept(context.streamingHandle());
+                        if (!sink.isCancelled()) {
+                            responseBuffer.append(partial.text());
+                            sink.next(textEvent.apply(partial.text()));
                         }
+                    })
+                    .onPartialToolCallWithContext((partial, context) -> observeHandle.accept(context.streamingHandle()))
+                    .beforeToolExecution(execution -> {
+                        if (sink.isCancelled()) {
+                            throw new CancellationException("调用已取消");
+                        }
+                    });
+            if (toolEvent != null) {
+                stream = stream.onToolExecuted(execution -> {
+                    T event = toolEvent.apply(execution);
+                    if (event != null) {
+                        sink.next(event);
                     }
-                })
-                .onCompleteResponse(response -> {
-                    long processingTimeMs = System.currentTimeMillis() - startTime;
-                    log.info("流式调用完成，{}，耗时={}ms", logContext, processingTimeMs);
-                    if (callScene != null && callContext != null) {
-                        saveCallLog(callScene, callContext, requestContent,
-                                responseBuffer.toString(), response, processingTimeMs, true);
-                    }
-                    sink.tryEmitComplete();
-                })
-                .onError(error -> {
-                    long processingTimeMs = System.currentTimeMillis() - startTime;
-                    log.error("流式调用异常，{}，耗时={}ms，异常信息：{}",
-                            logContext, processingTimeMs, error.getMessage());
-                    if (callScene != null && callContext != null) {
-                        saveFailedCallLog(callScene, callContext, requestContent,
-                                error.getMessage(), processingTimeMs, true);
-                    }
-                    sink.tryEmitError(error);
-                })
-                .start();
+                });
+            }
+            stream.onCompleteResponse(response -> {
+                        if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
+                            saveCallLog(callScene, callContext, requestContent, responseBuffer.toString(),
+                                    response, System.currentTimeMillis() - startTime, true);
+                        }
+                        sink.complete();
+                    })
+                    .onError(error -> {
+                        if (sink.isCancelled()) {
+                            return;
+                        }
+                        log.error("[tokenStreamToFlux][流式调用异常，{}]", logContext, error);
+                        if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
+                            saveFailedCallLog(callScene, callContext, requestContent, error.getMessage(),
+                                    System.currentTimeMillis() - startTime, true);
+                        }
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
 
-        return sink.asFlux();
+    /** 将客户端取消传给支持取消的模型流。 */
+    private void cancelStreamingHandle(StreamingHandle handle) {
+        if (handle != null) {
+            try {
+                handle.cancel();
+            } catch (UnsupportedOperationException e) {
+                log.debug("[cancelStreamingHandle][提供方未暴露取消能力]");
+            }
+        }
     }
 
     // ==================== 同步调用日志记录 ====================
@@ -406,6 +351,13 @@ public class AiServiceFactory {
                             long processingTimeMs) {
         saveCallLog(callScene, callContext, requestContent, responseContent,
                 null, processingTimeMs, false);
+    }
+
+    /** 记录带 Token 用量的同步模型调用。 */
+    public void logSyncResponse(String callScene, CallContext callContext, String requestContent,
+                                ChatResponse response, long processingTimeMs) {
+        saveCallLog(callScene, callContext, requestContent, response.aiMessage().text(),
+                response, processingTimeMs, false);
     }
 
     /**
@@ -453,6 +405,7 @@ public class AiServiceFactory {
                 .processingTimeMs(processingTimeMs)
                 .status(LlmCallLog.STATUS_SUCCESS)
                 .isStreaming(isStreaming ? CommonConstants.ENABLED : CommonConstants.DISABLED)
+                .skillReadCalls(callContext.skillReadCalls())
                 .userId(callContext.getUserId())
                 .build();
 
@@ -492,6 +445,7 @@ public class AiServiceFactory {
                 .errorMessage(errorMessage)
                 .processingTimeMs(processingTimeMs)
                 .isStreaming(isStreaming ? CommonConstants.ENABLED : CommonConstants.DISABLED)
+                .skillReadCalls(callContext.skillReadCalls())
                 .userId(callContext.getUserId())
                 .build();
 
@@ -513,24 +467,6 @@ public class AiServiceFactory {
         }
         if (agent.getLlmProviderId() == null) {
             throw exception(AGENT_LLM_PROVIDER_NOT_CONFIGURED, agentId);
-        }
-        return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
-    }
-
-    /**
-     * 根据小说 ID 和 Agent 角色解析 LLM 提供方。
-     *
-     * @param novelId 小说 ID
-     * @param role    Agent 角色
-     * @return LLM 提供方端口
-     */
-    private LlmProviderPort resolveProviderByNovel(Long novelId, AgentRole role) {
-        Agent agent = resolveAgent(novelId, role);
-        if (agent == null) {
-            throw exception(NOVEL_AGENT_NOT_CONFIGURED, getRoleName(role));
-        }
-        if (agent.getLlmProviderId() == null) {
-            throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, getRoleName(role));
         }
         return llmProviderFactory.getByProviderId(agent.getLlmProviderId());
     }

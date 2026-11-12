@@ -6,9 +6,15 @@ import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.common.constant.CommonConstants;
+import cn.haowl.hinovel.common.response.ApiResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpHeaders;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.UNAUTHORIZED;
 
 /**
  * Sa-Token 路由鉴权配置
@@ -23,7 +29,11 @@ public class SaTokenConfig {
      */
     @Bean
     @Order(-90)
-    public SaServletFilter saServletFilter() {
+    public SaServletFilter saServletFilter(ObjectMapper objectMapper) throws JsonProcessingException {
+        String unauthorized = objectMapper.writeValueAsString(
+                ApiResponse.error(UNAUTHORIZED.getCode(), UNAUTHORIZED.getMsg()));
+        String authError = objectMapper.writeValueAsString(
+                ApiResponse.error(CommonConstants.HTTP_STATUS_UNAUTHORIZED, "鉴权失败"));
         return new SaServletFilter()
                 .addInclude("/**")
                 .addExclude(
@@ -41,8 +51,12 @@ public class SaTokenConfig {
                     SaRouter.match("/**").check(r -> StpUtil.checkLogin());
                 })
                 .setError(e -> {
-                    String message = e instanceof NotLoginException ? "未登录或登录已过期" : e.getMessage();
-                    return "{\"code\":" + CommonConstants.HTTP_STATUS_UNAUTHORIZED + ",\"message\":\"" + message + "\"}";
+                    SaHolder.getResponse().setHeader(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8");
+                    if (e instanceof NotLoginException) {
+                        SaHolder.getResponse().setStatus(CommonConstants.HTTP_STATUS_UNAUTHORIZED);
+                        return unauthorized;
+                    }
+                    return authError;
                 });
     }
 }

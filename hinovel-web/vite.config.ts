@@ -5,15 +5,15 @@ import Components from 'unplugin-vue-components/vite'
 import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
 import {resolve} from 'path'
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
     plugins: [
         vue(),
         AutoImport({
-            resolvers: [ElementPlusResolver()],
+            resolvers: [ElementPlusResolver({importStyle: mode !== 'test' && 'css'})],
             imports: ['vue', 'vue-router', 'pinia'],
         }),
         Components({
-            resolvers: [ElementPlusResolver()],
+            resolvers: [ElementPlusResolver({importStyle: mode !== 'test' && 'css'})],
         }),
     ],
     resolve: {
@@ -34,4 +34,4 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
     },
-})
+}))

@@ -842,6 +842,15 @@
                                                     class="message-text ai-markdown-content"
                                                     v-html="renderMarkdown(msg.content)"
                                                 ></div>
+                                                <div
+                                                    v-if="msg.role === 'assistant' && msg.loadedSkillNames?.length"
+                                                    class="message-skills"
+                                                >
+                                                    <span>已加载 Skill</span>
+                                                    <el-tag v-for="name in msg.loadedSkillNames" :key="name" size="small" effect="plain">
+                                                        {{ name }}
+                                                    </el-tag>
+                                                </div>
                                                 <!-- 消息操作按钮 -->
                                                 <div v-if="msg.content" class="message-actions">
                                                     <el-tooltip
@@ -906,7 +915,7 @@
                                 :rows="10"
                                 placeholder="询问关于小说的问题... (Enter发送, Shift+Enter换行)"
                                 class="chat-input"
-                                :disabled="isChatLoading"
+                                :disabled="isChatLoading || chatHistoryLoading"
                                 @keydown.enter.prevent="handleChatInputEnter"
                             />
                             <div class="chat-action-buttons">
@@ -925,7 +934,7 @@
                                     type="primary"
                                     :icon="Promotion"
                                     size="default"
-                                    :disabled="!chatInput.trim()"
+                                    :disabled="chatHistoryLoading || !chatInput.trim()"
                                     class="send-btn"
                                     @click="sendChatMessage"
                                 >
@@ -1502,7 +1511,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, reactive, ref, toRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
     ArrowDown,
@@ -2129,9 +2138,19 @@ const handleChatInputEnter = (e: KeyboardEvent) => {
 }
 
 // 问答会话管理
-const chatSessionId = ref<number>(0)
+// KeepAlive 中仍在接收回复的实例继续使用打开时的小说 ID。
+const chatNovelId = typeof route.params.id === 'string' ? route.params.id : novelId.value
+const chatSessionId = ref<ChatSessionItem['id']>(0)
 const chatSessions = ref<ChatSessionItem[]>([])
-let chatAbortController: AbortController | null = null
+const chatHistoryLoading = ref(false)
+let chatHistoryVersion = 0
+let activeChatStream: {
+    controller: AbortController
+    sessionId: ChatSessionItem['id']
+    reply: ChatMessageLocal
+    messages: ChatMessageLocal[]
+    hasMore: boolean
+} | null = null
 
 // 人物图谱
 const miniGraphRef = ref<HTMLDivElement>()
@@ -3398,10 +3417,10 @@ const _openAIChat = () => {
  * 初始化或加载问答会话（切换到问答 Tab 时调用）
  */
 const initChatSession = async () => {
-    if (!novelId.value) return
+    if (!chatNovelId || chatHistoryLoading.value || chatSessionId.value) return
 
     // 优先从 store 恢复缓存的问答状态（避免切换页面后断开）
-    const cachedState = chatStore.getChatState(novelId.value)
+    const cachedState = chatStore.getChatState(chatNovelId)
     if (cachedState && cachedState.sessions.length > 0) {
         chatSessions.value = cachedState.sessions
         chatSessionId.value = cachedState.sessionId
@@ -3416,9 +3435,12 @@ const initChatSession = async () => {
         return
     }
 
+    const version = ++chatHistoryVersion
+    chatHistoryLoading.value = true
     try {
         // 加载该小说的会话列表
-        const res = await listChatSessions(novelId.value)
+        const res = await listChatSessions(chatNovelId)
+        if (chatHistoryVersion !== version) return
         chatSessions.value = res.data || []
 
         if (chatSessions.value.length > 0) {
@@ -3427,9 +3449,11 @@ const initChatSession = async () => {
             await loadChatHistory(chatSessionId.value)
         } else {
             // 创建新会话
-            const sessionRes = await createChatSession(novelId.value, '默认对话')
+            const sessionRes = await createChatSession(chatNovelId, '默认对话')
+            if (chatHistoryVersion !== version) return
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
+            chatHasMore.value = false
             // 新会话添加欢迎消息
             chatMessages.value = [
                 {
@@ -3442,11 +3466,14 @@ const initChatSession = async () => {
         // 保存到 store
         persistChatState()
     } catch (error) {
+        if (chatHistoryVersion !== version) return
         console.error('初始化问答会话失败:', error)
         // 降级为本地模式，不阻塞用户使用
         chatMessages.value = [
             { role: 'assistant', content: '问答服务暂时不可用，请稍后重试。', time: new Date().toLocaleTimeString() },
         ]
+    } finally {
+        if (chatHistoryVersion === version) chatHistoryLoading.value = false
     }
 }
 
@@ -3454,16 +3481,30 @@ const initChatSession = async () => {
  * 将当前问答状态持久化到 store（切换页面时不丢失）
  */
 const persistChatState = () => {
-    if (!novelId.value) return
-    chatStore.saveChatState(novelId.value, chatSessionId.value, chatSessions.value, chatMessages.value)
+    if (!chatNovelId) return
+    chatStore.saveChatState(chatNovelId, chatSessionId.value, chatSessions.value, chatMessages.value)
 }
 
 /**
  * 加载会话的历史消息（分页，首次加载最近的消息）
  */
-const loadChatHistory = async (sessionId: number) => {
+const loadChatHistory = async (sessionId: ChatSessionItem['id']) => {
+    const version = ++chatHistoryVersion
+    chatLoadingMore.value = false
+    if (activeChatStream?.sessionId === sessionId) {
+        chatMessages.value = activeChatStream.messages
+        chatHasMore.value = activeChatStream.hasMore
+        chatHistoryLoading.value = false
+        persistChatState()
+        scrollToBottom(false)
+        return
+    }
+    chatHistoryLoading.value = true
+    chatMessages.value = []
+    chatHasMore.value = false
     try {
         const res = await listChatMessagesPage(sessionId, undefined, CHAT_PAGE_SIZE)
+        if (chatHistoryVersion !== version) return
         const pageResult = res.data
         const messages = pageResult?.messages || []
         chatHasMore.value = pageResult?.hasMore ?? false
@@ -3474,6 +3515,7 @@ const loadChatHistory = async (sessionId: number) => {
                 content: msg.content,
                 time: new Date(msg.createTime).toLocaleTimeString(),
                 revoked: msg.revoked,
+                loadedSkillNames: msg.loadedSkillNames,
             }))
         } else {
             chatMessages.value = [
@@ -3491,7 +3533,9 @@ const loadChatHistory = async (sessionId: number) => {
         }
         scrollToBottom(false)
     } catch (error) {
-        console.error('加载聊天历史失败:', error)
+        if (chatHistoryVersion === version) console.error('加载聊天历史失败:', error)
+    } finally {
+        if (chatHistoryVersion === version) chatHistoryLoading.value = false
     }
 }
 
@@ -3499,7 +3543,7 @@ const loadChatHistory = async (sessionId: number) => {
  * 加载更早的历史消息（用户向上滚动时触发）
  */
 const loadMoreChatMessages = async () => {
-    if (chatLoadingMore.value || !chatHasMore.value || !chatSessionId.value) return
+    if (chatHistoryLoading.value || chatLoadingMore.value || !chatHasMore.value || !chatSessionId.value) return
     if (chatMessages.value.length === 0) return
 
     // 获取当前最早消息的 ID 作为游标
@@ -3507,11 +3551,15 @@ const loadMoreChatMessages = async () => {
     if (!firstMsg.id) return
 
     chatLoadingMore.value = true
+    const sessionId = chatSessionId.value
+    const version = chatHistoryVersion
     try {
-        const res = await listChatMessagesPage(chatSessionId.value, firstMsg.id, CHAT_PAGE_SIZE)
+        const res = await listChatMessagesPage(sessionId, firstMsg.id, CHAT_PAGE_SIZE)
+        if (chatHistoryVersion !== version) return
         const pageResult = res.data
         const olderMessages = pageResult?.messages || []
         chatHasMore.value = pageResult?.hasMore ?? false
+        if (activeChatStream?.sessionId === sessionId) activeChatStream.hasMore = chatHasMore.value
 
         if (olderMessages.length > 0) {
             // 记录当前滚动位置，加载后恢复（避免跳动）
@@ -3520,16 +3568,17 @@ const loadMoreChatMessages = async () => {
 
             const mapped = olderMessages.map((msg) => ({
                 id: msg.id,
-                role: msg.role as 'user' | 'assistant',
+                role: msg.role,
                 content: msg.content,
                 time: new Date(msg.createTime).toLocaleTimeString(),
                 revoked: msg.revoked,
+                loadedSkillNames: msg.loadedSkillNames,
             }))
             chatMessages.value.unshift(...mapped)
 
             // 恢复滚动位置（新消息插入到顶部后，保持用户视角不变）
             nextTick(() => {
-                if (el) {
+                if (el && chatHistoryVersion === version) {
                     el.scrollTop = el.scrollHeight - prevScrollHeight
                 }
             })
@@ -3538,14 +3587,14 @@ const loadMoreChatMessages = async () => {
     } catch (error) {
         console.error('加载更多消息失败:', error)
     } finally {
-        chatLoadingMore.value = false
+        if (chatHistoryVersion === version) chatLoadingMore.value = false
     }
 }
 
 /**
  * 切换会话（下拉选择器触发）
  */
-const handleSwitchSession = async (sessionId: number) => {
+const handleSwitchSession = async (sessionId: ChatSessionItem['id']) => {
     if (!sessionId) return
     chatSessionId.value = sessionId
     await loadChatHistory(sessionId)
@@ -3555,10 +3604,14 @@ const handleSwitchSession = async (sessionId: number) => {
  * 新建会话
  */
 const handleCreateSession = async () => {
-    if (!novelId.value) return
+    if (!chatNovelId) return
     try {
-        const sessionRes = await createChatSession(novelId.value, '新对话')
+        const sessionRes = await createChatSession(chatNovelId, '新对话')
         chatSessionId.value = sessionRes.data.id
+        chatHistoryVersion++
+        chatHistoryLoading.value = false
+        chatLoadingMore.value = false
+        chatHasMore.value = false
         chatSessions.value.unshift(sessionRes.data)
         chatMessages.value = [
             {
@@ -3667,21 +3720,19 @@ const sortedChatSessions = computed(() => {
  * 中断 SSE 流并保存已生成的部分回复
  */
 const handleStopChat = async () => {
-    if (!chatAbortController) return
-
-    // 获取当前 AI 消息的已生成内容
-    const lastMessage = chatMessages.value[chatMessages.value.length - 1]
-    const partialContent = lastMessage?.role === 'assistant' ? lastMessage.content : ''
+    if (!activeChatStream) return
+    const {controller, sessionId, reply} = activeChatStream
+    const partialContent = reply.content
 
     // 中断 SSE 流
-    chatAbortController.abort()
-    chatAbortController = null
+    controller.abort()
+    activeChatStream = null
     isChatLoading.value = false
 
     // 如果有已生成的内容，调用后端保存接口
     if (partialContent && partialContent.trim()) {
         try {
-            await savePartialChatResponse(chatSessionId.value, novelId.value, partialContent)
+            await savePartialChatResponse(sessionId, chatNovelId, partialContent)
         } catch {
             console.error('保存中断回复失败')
         }
@@ -3692,12 +3743,12 @@ const handleStopChat = async () => {
 }
 
 const sendChatMessage = async () => {
-    if (!chatInput.value.trim() || isChatLoading.value) return
+    if (!chatInput.value.trim() || isChatLoading.value || chatHistoryLoading.value) return
 
     // 确保有会话
     if (!chatSessionId.value) {
         try {
-            const sessionRes = await createChatSession(novelId.value, '默认对话')
+            const sessionRes = await createChatSession(chatNovelId, '默认对话')
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
         } catch (error) {
@@ -3719,58 +3770,75 @@ const sendChatMessage = async () => {
     scrollToBottom()
 
     // 预先添加一条空的 AI 消息，用于流式追加内容
-    const aiMessageIndex = chatMessages.value.length
-    chatMessages.value.push({
+    const reply = reactive<ChatMessageLocal>({
         role: 'assistant',
         content: '',
         time: new Date().toLocaleTimeString(),
+        loadedSkillNames: [],
     })
+    chatMessages.value.push(reply)
+    const sessionId = chatSessionId.value
+    const isActiveReply = () => activeChatStream?.reply === reply
+    const isVisibleReply = () => chatSessionId.value === sessionId && chatMessages.value.includes(reply)
 
-    chatAbortController = aiChatStream(
+    const controller = aiChatStream(
         {
-            novelId: novelId.value,
-            sessionId: chatSessionId.value,
+            novelId: chatNovelId,
+            sessionId,
             question: userMessage,
         },
         {
             onToken: (token: string) => {
-                chatMessages.value[aiMessageIndex].content += token
+                if (!isActiveReply()) return
+                reply.content += token
                 // 收到第一个 token 时更新状态提示
-                if (chatMessages.value[aiMessageIndex].content.length === token.length) {
+                if (reply.content.length === token.length) {
                     chatThinkingText.value = '正在生成回答...'
                 }
                 // 智能滚动：如果用户在底部附近则自动滚动
-                ensureScrollToBottom()
+                if (isVisibleReply()) ensureScrollToBottom()
+            },
+            onSkillLoaded: (name: string) => {
+                if (!isActiveReply()) return
+                const names = reply.loadedSkillNames ?? []
+                if (!names.includes(name)) reply.loadedSkillNames = [...names, name]
+                if (isVisibleReply()) ensureScrollToBottom()
             },
             onComplete: () => {
+                if (!isActiveReply()) return
                 isChatLoading.value = false
-                chatAbortController = null
+                activeChatStream = null
                 chatThinkingText.value = 'AI 正在思考...'
+                if (!isVisibleReply()) return
                 // 兜底：如果 AI 消息为空，说明后端异常但未正确传递错误事件
-                if (!chatMessages.value[aiMessageIndex].content) {
-                    chatMessages.value[aiMessageIndex].content = '抱歉，回答生成失败，请稍后重试。'
+                if (!reply.content) {
+                    reply.content = '抱歉，回答生成失败，请稍后重试。'
                     ElMessage.error('AI 问答异常，请检查模型配置或稍后重试')
                 }
                 scrollToBottom()
                 persistChatState()
             },
             onError: (error: Error) => {
+                if (!isActiveReply()) return
                 isChatLoading.value = false
-                chatAbortController = null
+                activeChatStream = null
                 chatThinkingText.value = 'AI 正在思考...'
+                if (!isVisibleReply()) return
                 // 如果 AI 消息为空，显示错误提示
-                if (!chatMessages.value[aiMessageIndex].content) {
-                    chatMessages.value[aiMessageIndex].content = '抱歉，回答生成失败，请稍后重试。'
+                if (!reply.content) {
+                    reply.content = '抱歉，回答生成失败，请稍后重试。'
                 }
                 ElMessage.error('AI 问答失败：' + error.message)
                 scrollToBottom()
             },
             onToolExecuted: (event: ToolExecutedEvent) => {
+                if (!isActiveReply()) return
                 chatThinkingText.value = '正在执行工具：' + event.toolName + '...'
                 handleToolExecutedEvent(event)
             },
         },
     )
+    activeChatStream = {controller, sessionId, reply, messages: chatMessages.value, hasMore: chatHasMore.value}
 }
 
 // ==================== 工具执行事件相关常量 ====================
@@ -4694,9 +4762,9 @@ watch(selectedCharacters, handleOutlineChange, { deep: true })
  * 如果正在流式输出，中断请求（后端 doOnCancel 会自动保存已生成内容）
  */
 const handleBeforeUnload = () => {
-    if (chatAbortController) {
-        chatAbortController.abort()
-        chatAbortController = null
+    if (activeChatStream) {
+        activeChatStream.controller.abort()
+        activeChatStream = null
     }
 }
 
@@ -4734,9 +4802,9 @@ onUnmounted(() => {
     clearTimeout(outlineBackendSaveTimer)
     window.removeEventListener('beforeunload', handleBeforeUnload)
     // 组件卸载时也中断正在进行的流式请求
-    if (chatAbortController) {
-        chatAbortController.abort()
-        chatAbortController = null
+    if (activeChatStream) {
+        activeChatStream.controller.abort()
+        activeChatStream = null
     }
 })
 
@@ -6385,6 +6453,15 @@ const handleEditorBlur = () => {
     flex-direction: column;
     gap: 4px;
     max-width: 80%;
+}
+
+.message-skills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    color: #606266;
+    font-size: 12px;
 }
 
 .message-text {
