@@ -25,7 +25,9 @@ import java.util.List;
 @RequestMapping("/api/ai/embedding-configs")
 public class EmbeddingConfigController {
 
-    /** 嵌入式模型配置应用服务。 */
+    /**
+     * 嵌入式模型配置应用服务。
+     */
     @Autowired
     private EmbeddingConfigService embeddingConfigService;
 

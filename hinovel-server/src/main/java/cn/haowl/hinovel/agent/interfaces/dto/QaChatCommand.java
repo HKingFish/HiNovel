@@ -10,15 +10,23 @@ import lombok.Data;
 @Data
 public class QaChatCommand {
 
-    /** 小说 ID。 */
+    /**
+     * 小说 ID。
+     */
     private Long novelId;
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long sessionId;
 
-    /** 用户问题。 */
+    /**
+     * 用户问题。
+     */
     private String question;
 
-    /** 当前用户 ID。 */
+    /**
+     * 当前用户 ID。
+     */
     private Long userId;
 }

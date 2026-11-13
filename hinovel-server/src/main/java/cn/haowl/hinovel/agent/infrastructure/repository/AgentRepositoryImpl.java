@@ -1,9 +1,9 @@
 package cn.haowl.hinovel.agent.infrastructure.repository;
 
-import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -21,7 +21,9 @@ import java.util.Optional;
 @Repository
 public class AgentRepositoryImpl implements AgentRepository {
 
-    /** Agent 表访问。 */
+    /**
+     * Agent 表访问。
+     */
     @Autowired
     private AgentMapper agentMapper;
 

@@ -12,27 +12,43 @@ import java.util.List;
 @Data
 public class AIAuthorRequest {
 
-    /** 章节 ID。 */
+    /**
+     * 章节 ID。
+     */
     private Long chapterId;
 
-    /** 章节正文。 */
+    /**
+     * 章节正文。
+     */
     private String content;
 
-    /** 章节大纲。 */
+    /**
+     * 章节大纲。
+     */
     private String outline;
 
-    /** 剧情要点。 */
+    /**
+     * 剧情要点。
+     */
     private String plotPoints;
 
-    /** 关联人物 ID 列表。 */
+    /**
+     * 关联人物 ID 列表。
+     */
     private List<Long> characters;
 
-    /** 情感基调。 */
+    /**
+     * 情感基调。
+     */
     private String emotionTone;
 
-    /** 场景设置。 */
+    /**
+     * 场景设置。
+     */
     private String sceneSetting;
 
-    /** 用户临时需求（用户对改写结果不满意时，可补充具体要求）。 */
+    /**
+     * 用户临时需求（用户对改写结果不满意时，可补充具体要求）。
+     */
     private String userRequirement;
 }

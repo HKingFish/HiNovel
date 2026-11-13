@@ -27,7 +27,9 @@ import static cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper.wi
 @Repository
 public class NovelChapterRepositoryImpl implements NovelChapterRepository {
 
-    /** 章节数据访问。 */
+    /**
+     * 章节数据访问。
+     */
     @Autowired
     private NovelChapterMapper novelChapterMapper;
 

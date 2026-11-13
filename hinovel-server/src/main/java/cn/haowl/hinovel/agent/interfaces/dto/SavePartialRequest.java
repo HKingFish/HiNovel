@@ -10,12 +10,18 @@ import lombok.Data;
 @Data
 public class SavePartialRequest {
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long sessionId;
 
-    /** 小说 ID。 */
+    /**
+     * 小说 ID。
+     */
     private Long novelId;
 
-    /** 已生成的部分回复内容。 */
+    /**
+     * 已生成的部分回复内容。
+     */
     private String content;
 }

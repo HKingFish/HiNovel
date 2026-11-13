@@ -28,7 +28,9 @@ import java.util.List;
 @RequestMapping("/api/ai/llm-providers")
 public class LlmProviderController {
 
-    /** LLM 提供方应用服务。 */
+    /**
+     * LLM 提供方应用服务。
+     */
     @Autowired
     private LlmProviderService llmProviderService;
 
@@ -56,7 +58,7 @@ public class LlmProviderController {
     @Operation(summary = "获取提供方详情", description = "根据 ID 查询 LLM 提供方详情")
     @GetMapping("/{id}")
     public ApiResponse<LlmProvider> getById(@PathVariable Long id) {
-        return ApiResponse.success(llmProviderService.getByIdForView(id));
+        return ApiResponse.success(llmProviderService.getByIdForView(id, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -85,7 +87,7 @@ public class LlmProviderController {
     @PutMapping("/{id}")
     public ApiResponse<LlmProvider> update(@PathVariable Long id,
                                            @RequestBody LlmProviderRequest request) {
-        return ApiResponse.success(llmProviderService.update(id, request));
+        return ApiResponse.success(llmProviderService.update(id, StpUtil.getLoginIdAsLong(), request));
     }
 
     /**
@@ -97,7 +99,7 @@ public class LlmProviderController {
     @Operation(summary = "删除提供方", description = "删除指定的 LLM 提供方")
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
-        llmProviderService.delete(id);
+        llmProviderService.delete(id, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -110,7 +112,7 @@ public class LlmProviderController {
     @Operation(summary = "激活提供方", description = "激活指定的 LLM 提供方")
     @PutMapping("/{id}/activate")
     public ApiResponse<Void> activate(@PathVariable Long id) {
-        llmProviderService.activate(id);
+        llmProviderService.activate(id, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -123,7 +125,7 @@ public class LlmProviderController {
     @Operation(summary = "停用提供方", description = "停用指定的 LLM 提供方")
     @PutMapping("/{id}/deactivate")
     public ApiResponse<Void> deactivate(@PathVariable Long id) {
-        llmProviderService.deactivate(id);
+        llmProviderService.deactivate(id, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 

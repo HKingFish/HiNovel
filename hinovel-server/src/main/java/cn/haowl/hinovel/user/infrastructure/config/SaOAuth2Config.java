@@ -21,15 +21,21 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class SaOAuth2Config {
 
-    /** 用户仓储。 */
+    /**
+     * 用户仓储。
+     */
     @Autowired
     private UserRepository userRepository;
 
-    /** 密码编码器。 */
+    /**
+     * 密码编码器。
+     */
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    /** Sa-Token OAuth2 服务端配置。 */
+    /**
+     * Sa-Token OAuth2 服务端配置。
+     */
     @Autowired
     private SaOAuth2ServerConfig saOAuth2ServerConfig;
 

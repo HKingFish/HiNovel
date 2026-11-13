@@ -15,11 +15,13 @@ import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
 import dev.langchain4j.service.TokenStream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
 
 /**
  * 作者 Agent 服务。
@@ -33,15 +35,21 @@ import java.util.List;
 @Service
 public class AuthorAgent {
 
-    /** 构建作者 Agent 并记录调用。 */
+    /**
+     * 构建作者 Agent 并记录调用。
+     */
     @Autowired
     private AiServiceFactory aiServiceFactory;
 
-    /** 按用户配置获取小说向量库。 */
+    /**
+     * 按用户配置获取小说向量库。
+     */
     @Autowired
     private VectorStoreFactory vectorStoreFactory;
 
-    /** 章节批注应用服务。 */
+    /**
+     * 章节批注应用服务。
+     */
     @Autowired
     private ChapterAnnotationService chapterAnnotationService;
     /**
@@ -72,26 +80,26 @@ public class AuthorAgent {
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildRewritePrompt(chapter, outline);
 
         try {
             String content = assistant.chat(callContext.getSystemPrompt(),
-                    aiServiceFactory.writingPrompt(callContext, userPrompt));
+                aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms",
-                    chapter.getId(), content.length(), processingTimeMs);
+                chapter.getId(), content.length(), processingTimeMs);
             // 记录成功调用日志
             aiServiceFactory.logSyncCall(CALL_SCENE_REWRITE, callContext,
-                    userPrompt, content, processingTimeMs);
+                userPrompt, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("作者 Agent 改写失败，chapterId={}，耗时={}ms，异常信息：{}",
-                    chapter.getId(), processingTimeMs, e.getMessage());
+                chapter.getId(), processingTimeMs, e.getMessage());
             aiServiceFactory.logSyncCallFailed(CALL_SCENE_REWRITE, callContext,
-                    userPrompt, e.getMessage(), processingTimeMs);
+                userPrompt, e.getMessage(), processingTimeMs);
             throw e;
         }
     }
@@ -126,24 +134,24 @@ public class AuthorAgent {
                                                       String userRequirement,
                                                       Long userId) {
         log.info("作者 Agent 流式改写章节，chapterId={}，title={}，前情章数={}，携带全文大纲={}，携带用户需求={}",
-                chapter.getId(), chapter.getTitle(),
-                previousChapters.size(), novelOutlineContent != null,
-                userRequirement != null && !userRequirement.isBlank());
+            chapter.getId(), chapter.getTitle(),
+            previousChapters.size(), novelOutlineContent != null,
+            userRequirement != null && !userRequirement.isBlank());
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         NovelContentRetrievalTool retrievalTool =
-                NovelContentRetrievalTool.create(vectorStoreFactory, chapter.getNovelId(), userId);
+            NovelContentRetrievalTool.create(vectorStoreFactory, chapter.getNovelId(), userId);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true, retrievalTool);
         String userPrompt = buildRewritePrompt(chapter, outline,
-                previousChapters, novelOutlineContent, userRequirement);
+            previousChapters, novelOutlineContent, userRequirement);
 
         TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
-                    aiServiceFactory.writingPrompt(callContext, userPrompt));
+            aiServiceFactory.writingPrompt(callContext, userPrompt));
         // 使用带日志记录的 tokenStreamToFlux
         return aiServiceFactory.tokenStreamToFlux(tokenStream,
-                "chapterId=" + chapter.getId(),
-                CALL_SCENE_REWRITE, callContext, userPrompt);
+            "chapterId=" + chapter.getId(),
+            CALL_SCENE_REWRITE, callContext, userPrompt);
     }
 
     /**
@@ -161,25 +169,25 @@ public class AuthorAgent {
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-                chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildSuggestionRewritePrompt(chapter, outline, suggestions);
 
         try {
             String content = assistant.chat(callContext.getSystemPrompt(),
-                    aiServiceFactory.writingPrompt(callContext, userPrompt));
+                aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 建议重写完成，chapterId={}，生成字数={}，耗时={}ms",
-                    chapter.getId(), content.length(), processingTimeMs);
+                chapter.getId(), content.length(), processingTimeMs);
             aiServiceFactory.logSyncCall(CALL_SCENE_REGENERATE, callContext,
-                    userPrompt, content, processingTimeMs);
+                userPrompt, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("作者 Agent 建议重写失败，chapterId={}，耗时={}ms，异常信息：{}",
-                    chapter.getId(), processingTimeMs, e.getMessage());
+                chapter.getId(), processingTimeMs, e.getMessage());
             aiServiceFactory.logSyncCallFailed(CALL_SCENE_REGENERATE, callContext,
-                    userPrompt, e.getMessage(), processingTimeMs);
+                userPrompt, e.getMessage(), processingTimeMs);
             throw e;
         }
     }
@@ -210,7 +218,7 @@ public class AuthorAgent {
                                       String novelOutlineContent,
                                       String userRequirement) {
         return AgentPromptTemplates.buildRewritePrompt(
-                chapter, outline, previousChapters, novelOutlineContent, userRequirement);
+            chapter, outline, previousChapters, novelOutlineContent, userRequirement);
     }
 
     /**
@@ -246,67 +254,49 @@ public class AuthorAgent {
      * @param userId             当前用户 ID
      * @return 逐 Token 推送的 Flux 流
      */
-    public Flux<String> streamAnnotationRewrite(Long novelId, String fullChapterContent,
-                                                String originalText, String rewriteRequirement,
-                                                Long userId) {
-        log.info("作者 Agent 批注改写，novelId={}，原文长度={}，改写要求长度={}",
-                novelId, originalText.length(), rewriteRequirement.length());
+    private Flux<String> streamAnnotationRewrite(Long novelId, String fullChapterContent,
+                                                 String originalText, String rewriteRequirement,
+                                                 Long userId) {
+        log.info("[streamAnnotationRewrite][批注改写，novelId={}，原文长度={}，改写要求长度={}]",
+            novelId, originalText.length(), rewriteRequirement.length());
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-                novelId, AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            novelId, AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true);
         String userPrompt = buildAnnotationRewritePrompt(
-                fullChapterContent, originalText, rewriteRequirement);
+            fullChapterContent, originalText, rewriteRequirement);
 
         TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
-                    aiServiceFactory.writingPrompt(callContext, userPrompt));
+            aiServiceFactory.writingPrompt(callContext, userPrompt));
         return aiServiceFactory.tokenStreamToFlux(tokenStream,
-                "annotationRewrite-novelId=" + novelId,
-                CALL_SCENE_ANNOTATION_REWRITE, callContext, userPrompt);
+            "annotationRewrite-novelId=" + novelId,
+            CALL_SCENE_ANNOTATION_REWRITE, callContext, userPrompt);
     }
 
     /**
-     * 流式批注改写（SSE 帧组装）。
-     *
-     * <p>解析批注归属的小说，完成流式改写后组装 SSE 帧，并统一处理异常事件。</p>
+     * 按批注归属或指定小说执行流式改写。
      *
      * @param request 批注改写请求
      * @param userId  当前用户 ID
-     * @return SSE 事件流
+     * @return 改写文本流
      */
-    public Flux<ServerSentEvent<String>> streamAnnotationRewriteSse(AnnotationRewriteRequest request, Long userId) {
-        Long novelId;
-        if (request.getAnnotationId() != null && request.getAnnotationId() > 0) {
-            ChapterAnnotation annotation = chapterAnnotationService.getAnnotationById(request.getAnnotationId());
+    public Flux<String> streamAnnotationRewrite(AnnotationRewriteRequest request, Long userId) {
+        Long novelId = request.getNovelId();
+        Long annotationId = request.getAnnotationId();
+        if (annotationId != null && 0L < annotationId) {
+            ChapterAnnotation annotation = chapterAnnotationService.getAnnotationById(annotationId);
             if (annotation == null) {
-                log.warn("批注不存在，annotationId={}", request.getAnnotationId());
-                return Flux.just(ServerSentEvent.<String>builder()
-                        .event("error")
-                        .data("批注不存在")
-                        .build());
+                return Flux.error(exception0(NOT_FOUND.getCode(), "批注不存在"));
             }
             novelId = annotation.getNovelId();
-        } else {
-            // 快捷改写：直接使用请求中的小说 ID
-            novelId = request.getNovelId();
         }
 
         return streamAnnotationRewrite(
-                        novelId,
-                        request.getFullChapterContent(),
-                        request.getOriginalText(),
-                        request.getAnnotationContent(),
-                        userId)
-                .map(token -> ServerSentEvent.<String>builder().data(token).build())
-                .concatWith(Flux.just(ServerSentEvent.<String>builder().data("[DONE]").build()))
-                .onErrorResume(e -> {
-                    log.error("批注 AI 改写流式异常，annotationId={}，异常信息：{}",
-                            request.getAnnotationId(), e.getMessage());
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
-                            .build());
-                });
+            novelId,
+            request.getFullChapterContent(),
+            request.getOriginalText(),
+            request.getAnnotationContent(),
+            userId);
     }
 
     /**

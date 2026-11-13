@@ -5,26 +5,13 @@ import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AiChatRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageQuery;
-import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageQuery;
-import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.ChatSessionResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.CreateSessionRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
-import cn.haowl.hinovel.agent.interfaces.dto.RenameSessionRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.SavePartialRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.*;
+import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -42,15 +29,30 @@ import java.util.List;
  * @since 2024
  */
 @Tag(name = "AI 功能", description = "AI 改写、审核、大纲生成等功能")
+@Slf4j
 @RestController
 @RequestMapping("/api/agent/ai")
 public class AIController {
 
-    /** AI 改写、审核应用服务。 */
+    /**
+     * 流式问答失败时的兜底文案。
+     */
+    private static final String QA_STREAM_ERROR_MESSAGE = "AI 问答异常";
+
+    /**
+     * SSE 异常事件名。
+     */
+    private static final String SSE_EVENT_ERROR = "error";
+
+    /**
+     * AI 改写、审核应用服务。
+     */
     @Autowired
     private AIService aiService;
 
-    /** 问答 Agent。 */
+    /**
+     * 问答 Agent。
+     */
     @Autowired
     private QaAgent qaAgentService;
 
@@ -272,6 +274,18 @@ public class AIController {
         command.setSessionId(request.getSessionId());
         command.setQuestion(request.getQuestion());
         command.setUserId(StpUtil.getLoginIdAsLong());
-        return qaAgentService.streamChatSse(command);
+        return qaAgentService.streamChat(command)
+            .map(event -> ServerSentEvent.builder(event.getData()).event(event.getName()).build())
+            .onErrorResume(e -> {
+                log.error("[aiChat][问答流式异常，sessionId={}]", command.getSessionId(), e);
+                String message = e.getMessage() != null ? e.getMessage() : QA_STREAM_ERROR_MESSAGE;
+                if (e instanceof BusinessException businessException) {
+                    message = businessException.getCode() + " " + message;
+                }
+                return Flux.just(ServerSentEvent.<Object>builder()
+                    .event(SSE_EVENT_ERROR)
+                    .data(message)
+                    .build());
+            });
     }
 }

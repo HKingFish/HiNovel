@@ -15,7 +15,9 @@ import java.util.List;
 @RequestMapping("/api/novel/chapter-outline")
 public class NovelChapterOutlineController {
 
-    /** 章节大纲应用服务。 */
+    /**
+     * 章节大纲应用服务。
+     */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 

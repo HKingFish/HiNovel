@@ -29,11 +29,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Component
 public class DefaultLlmProviderFactory implements LlmProviderFactory {
 
-    /** LLM 提供方配置查询端口。 */
+    /**
+     * LLM 提供方配置查询端口。
+     */
     @Autowired
     private LlmProviderQueryPort llmProviderQueryPort;
 
-    /** 提供方健康状态追踪器。 */
+    /**
+     * 提供方健康状态追踪器。
+     */
     @Autowired
     private ProviderHealthTracker healthTracker;
 

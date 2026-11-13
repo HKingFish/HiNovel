@@ -31,11 +31,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class QdrantVectorStoreFactory implements VectorStoreFactory {
 
-    /** Qdrant 客户端。 */
+    /**
+     * Qdrant 客户端。
+     */
     @Autowired
     private QdrantClient qdrantClient;
 
-    /** 嵌入式模型配置应用服务。 */
+    /**
+     * 嵌入式模型配置应用服务。
+     */
     @Autowired
     @Lazy
     private EmbeddingConfigService embeddingConfigService;

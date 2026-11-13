@@ -14,9 +14,13 @@ import java.util.List;
 @AllArgsConstructor
 public class ChatMessagePageResponse {
 
-    /** 消息列表（按时间正序）。 */
+    /**
+     * 消息列表（按时间正序）。
+     */
     private List<ChatMessageResponse> messages;
 
-    /** 是否还有更早的消息。 */
+    /**
+     * 是否还有更早的消息。
+     */
     private boolean hasMore;
 }

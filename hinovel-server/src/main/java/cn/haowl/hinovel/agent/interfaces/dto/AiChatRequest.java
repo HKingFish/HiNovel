@@ -12,15 +12,21 @@ import lombok.Data;
 @Data
 public class AiChatRequest {
 
-    /** 小说 ID。 */
+    /**
+     * 小说 ID。
+     */
     @NotNull
     private Long novelId;
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     @NotNull
     private Long sessionId;
 
-    /** 用户问题。 */
+    /**
+     * 用户问题。
+     */
     @NotBlank
     private String question;
 }

@@ -20,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class NovelSettingsService {
 
-    /** 小说配置数据访问。 */
+    /**
+     * 小说配置数据访问。
+     */
     @Autowired
     private NovelSettingsMapper novelSettingsMapper;
 

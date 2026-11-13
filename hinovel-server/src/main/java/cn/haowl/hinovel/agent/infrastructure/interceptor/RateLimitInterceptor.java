@@ -26,16 +26,20 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @EnableConfigurationProperties(RateLimitProperties.class)
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    /** 频率计数存储。 */
+    /**
+     * 频率计数键前缀。
+     */
+    private static final String RATE_LIMIT_KEY_PREFIX = "rate:limit:";
+    /**
+     * 频率计数存储。
+     */
     @Autowired
     private StringRedisTemplate redisTemplate;
-
-    /** 频率限制配置。 */
+    /**
+     * 频率限制配置。
+     */
     @Autowired
     private RateLimitProperties rateLimitProperties;
-
-    /** 频率计数键前缀。 */
-    private static final String RATE_LIMIT_KEY_PREFIX = "rate:limit:";
 
     @Override
     public boolean preHandle(HttpServletRequest request,

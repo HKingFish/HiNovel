@@ -20,7 +20,9 @@ import java.util.Optional;
 @Service
 public class ChapterOutlineService {
 
-    /** 章节大纲仓储。 */
+    /**
+     * 章节大纲仓储。
+     */
     @Autowired
     private ChapterOutlineRepository chapterOutlineRepository;
 

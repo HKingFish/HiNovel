@@ -24,11 +24,15 @@ import java.util.List;
 @Service
 public class OssApplicationService {
 
-    /** OSS 领域服务。 */
+    /**
+     * OSS 领域服务。
+     */
     @Autowired
     private OssDomainService ossDomainService;
 
-    /** 上传日志仓储。 */
+    /**
+     * 上传日志仓储。
+     */
     @Autowired
     private OssUploadLogRepository ossUploadLogRepository;
 

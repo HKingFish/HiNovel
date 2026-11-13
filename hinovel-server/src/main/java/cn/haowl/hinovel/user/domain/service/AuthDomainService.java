@@ -21,11 +21,15 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
 @Service
 public class AuthDomainService {
 
-    /** 用户仓储。 */
+    /**
+     * 用户仓储。
+     */
     @Autowired
     private UserRepository userRepository;
 
-    /** 密码编码器。 */
+    /**
+     * 密码编码器。
+     */
     @Autowired
     private PasswordEncoder passwordEncoder;
 

@@ -4,12 +4,7 @@ import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
 import cn.haowl.hinovel.agent.application.service.agent.EditorAgent;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.*;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.ChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
@@ -44,30 +39,44 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class AIServiceImpl implements AIService {
 
-    /** 章节不存在的统一提示。 */
+    /**
+     * 章节不存在的统一提示。
+     */
     private static final String CHAPTER_NOT_EXISTS_MESSAGE = "章节不存在";
 
-    /** 作者 Agent。 */
+    /**
+     * 作者 Agent。
+     */
     @Autowired
     private AuthorAgent authorAgentService;
 
-    /** 编辑 Agent。 */
+    /**
+     * 编辑 Agent。
+     */
     @Autowired
     private EditorAgent editorAgentService;
 
-    /** 章节查询。 */
+    /**
+     * 章节查询。
+     */
     @Autowired
     private ChapterService chapterService;
 
-    /** 章节大纲查询。 */
+    /**
+     * 章节大纲查询。
+     */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 
-    /** 小说有效配置。 */
+    /**
+     * 小说有效配置。
+     */
     @Autowired
     private NovelSettingsService novelSettingsService;
 
-    /** 相邻章节查询。 */
+    /**
+     * 相邻章节查询。
+     */
     @Autowired
     private NovelChapterService novelChapterService;
 

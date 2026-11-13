@@ -21,7 +21,9 @@ import org.springframework.web.bind.annotation.*;
 @SaCheckLogin
 public class NovelAgentConfigController {
 
-    /** 小说 Agent 配置服务。 */
+    /**
+     * 小说 Agent 配置服务。
+     */
     @Autowired
     private NovelAgentConfigService novelAgentConfigService;
 

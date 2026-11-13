@@ -33,23 +33,33 @@ import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_B
 @Service
 public class NovelChapterService {
 
-    /** 章节领域服务。 */
+    /**
+     * 章节领域服务。
+     */
     @Autowired
     private ChapterDomainService chapterDomainService;
 
-    /** 章节版本仓储。 */
+    /**
+     * 章节版本仓储。
+     */
     @Autowired
     private NovelChapterVersionRepository versionRepository;
 
-    /** 小说大纲仓储。 */
+    /**
+     * 小说大纲仓储。
+     */
     @Autowired
     private NovelOutlineRepository outlineRepository;
 
-    /** 小说应用服务。 */
+    /**
+     * 小说应用服务。
+     */
     @Autowired
     private NovelService novelService;
 
-    /** 章节大纲应用服务。 */
+    /**
+     * 章节大纲应用服务。
+     */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 

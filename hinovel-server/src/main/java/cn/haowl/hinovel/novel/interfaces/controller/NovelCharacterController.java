@@ -26,7 +26,9 @@ import java.util.List;
 @RequestMapping("/api/novel/character")
 public class NovelCharacterController {
 
-    /** 人物应用服务。 */
+    /**
+     * 人物应用服务。
+     */
     @Autowired
     private NovelCharacterService characterService;
 

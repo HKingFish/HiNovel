@@ -23,7 +23,9 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class ChapterAnnotationService {
 
-    /** 批注数据访问。 */
+    /**
+     * 批注数据访问。
+     */
     @Autowired
     private ChapterAnnotationMapper annotationMapper;
 

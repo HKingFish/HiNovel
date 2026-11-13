@@ -27,15 +27,21 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class NovelDomainService {
 
-    /** 小说仓储。 */
+    /**
+     * 小说仓储。
+     */
     @Autowired
     private NovelRepository novelRepository;
 
-    /** 章节仓储。 */
+    /**
+     * 章节仓储。
+     */
     @Autowired
     private NovelChapterRepository novelChapterRepository;
 
-    /** 小说大纲仓储。 */
+    /**
+     * 小说大纲仓储。
+     */
     @Autowired
     private NovelOutlineRepository novelOutlineRepository;
 

@@ -19,7 +19,9 @@ import java.util.Optional;
 @Repository
 public class ChapterOutlineRepositoryImpl implements ChapterOutlineRepository {
 
-    /** 章节大纲数据访问。 */
+    /**
+     * 章节大纲数据访问。
+     */
     @Autowired
     private ChapterOutlineMapper outlineMapper;
 

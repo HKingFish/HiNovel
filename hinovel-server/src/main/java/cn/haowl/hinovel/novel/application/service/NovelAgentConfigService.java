@@ -29,11 +29,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class NovelAgentConfigService {
 
-    /** 小说 Agent 配置数据访问。 */
+    /**
+     * 小说 Agent 配置数据访问。
+     */
     @Autowired
     private NovelAgentConfigMapper novelAgentConfigMapper;
 
-    /** Agent 数据访问。 */
+    /**
+     * Agent 数据访问。
+     */
     @Autowired
     private AgentMapper agentMapper;
 

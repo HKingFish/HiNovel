@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
 import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
 import static cn.haowl.hinovel.agent.constant.SkillConstants.WRITING_TEMPLATE_ID;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
@@ -31,15 +31,21 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class AgentService {
 
-    /** Agent 持久化。 */
+    /**
+     * Agent 持久化。
+     */
     @Autowired
     private AgentRepository agentRepository;
 
-    /** 内置 Skill 挂载。 */
+    /**
+     * 内置 Skill 挂载。
+     */
     @Autowired
     private SkillService skillService;
 
-    /** Agent 缓存。 */
+    /**
+     * Agent 缓存。
+     */
     @Autowired
     private StringRedisTemplate redisTemplate;
 

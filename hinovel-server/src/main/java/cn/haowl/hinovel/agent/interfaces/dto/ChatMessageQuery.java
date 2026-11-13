@@ -10,9 +10,13 @@ import lombok.Data;
 @Data
 public class ChatMessageQuery {
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long sessionId;
 
-    /** 当前用户 ID。 */
+    /**
+     * 当前用户 ID。
+     */
     private Long userId;
 }

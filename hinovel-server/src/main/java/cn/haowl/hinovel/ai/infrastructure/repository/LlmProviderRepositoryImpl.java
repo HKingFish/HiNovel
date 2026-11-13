@@ -22,7 +22,9 @@ import java.util.Optional;
 @Repository
 public class LlmProviderRepositoryImpl implements LlmProviderRepository {
 
-    /** LLM 提供方数据访问映射器。 */
+    /**
+     * LLM 提供方数据访问映射器。
+     */
     @Autowired
     private LlmProviderMapper llmProviderMapper;
 
@@ -39,6 +41,13 @@ public class LlmProviderRepositoryImpl implements LlmProviderRepository {
     @Override
     public Optional<LlmProvider> findById(Long id) {
         return Optional.ofNullable(llmProviderMapper.selectById(id));
+    }
+
+    @Override
+    public Optional<LlmProvider> findByIdAndUserId(Long id, Long userId) {
+        return Optional.ofNullable(llmProviderMapper.selectOne(new LambdaQueryWrapper<LlmProvider>()
+            .eq(LlmProvider::getId, id)
+            .eq(LlmProvider::getUserId, userId)));
     }
 
     @Override
@@ -80,8 +89,10 @@ public class LlmProviderRepositoryImpl implements LlmProviderRepository {
     }
 
     @Override
-    public void deleteById(Long id) {
-        llmProviderMapper.deleteById(id);
+    public boolean deleteByIdAndUserId(Long id, Long userId) {
+        return llmProviderMapper.delete(new LambdaQueryWrapper<LlmProvider>()
+            .eq(LlmProvider::getId, id)
+            .eq(LlmProvider::getUserId, userId)) > 0;
     }
 
     @Override

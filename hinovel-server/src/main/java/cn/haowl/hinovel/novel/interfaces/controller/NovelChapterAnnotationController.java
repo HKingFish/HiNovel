@@ -11,6 +11,7 @@ import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.UpdateAnnotationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -27,15 +28,35 @@ import java.util.List;
  * @author haowl
  */
 @Tag(name = "章节批注管理", description = "批注 CRUD、状态流转、AI 改写结果管理")
+@Slf4j
 @RestController
 @RequestMapping("/api/novel/annotations")
 public class NovelChapterAnnotationController {
 
-    /** 批注应用服务。 */
+    /**
+     * SSE 异常事件名。
+     */
+    private static final String SSE_EVENT_ERROR = "error";
+
+    /**
+     * 改写完成时发送的数据。
+     */
+    private static final String SSE_DONE = "[DONE]";
+
+    /**
+     * 改写失败时的兜底文案。
+     */
+    private static final String REWRITE_STREAM_ERROR_MESSAGE = "AI 改写异常";
+
+    /**
+     * 批注应用服务。
+     */
     @Autowired
     private ChapterAnnotationService annotationService;
 
-    /** 作者 Agent，负责批注改写。 */
+    /**
+     * 作者 Agent，负责批注改写。
+     */
     @Autowired
     private AuthorAgent authorAgent;
 
@@ -161,7 +182,16 @@ public class NovelChapterAnnotationController {
     @PostMapping(value = "/ai-rewrite-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> annotationAiRewriteStream(
             @RequestBody AnnotationRewriteRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return authorAgent.streamAnnotationRewriteSse(request, userId);
+        return authorAgent.streamAnnotationRewrite(request, StpUtil.getLoginIdAsLong())
+            .map(token -> ServerSentEvent.builder(token).build())
+            .concatWithValues(ServerSentEvent.builder(SSE_DONE).build())
+            .onErrorResume(e -> {
+                log.error("[annotationAiRewriteStream][批注改写流式异常，annotationId={}]",
+                    request.getAnnotationId(), e);
+                return Flux.just(ServerSentEvent.<String>builder()
+                    .event(SSE_EVENT_ERROR)
+                    .data(e.getMessage() != null ? e.getMessage() : REWRITE_STREAM_ERROR_MESSAGE)
+                    .build());
+            });
     }
 }

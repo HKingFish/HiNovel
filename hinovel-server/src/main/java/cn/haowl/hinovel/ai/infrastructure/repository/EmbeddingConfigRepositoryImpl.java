@@ -20,7 +20,9 @@ import java.util.Optional;
 @Repository
 public class EmbeddingConfigRepositoryImpl implements EmbeddingConfigRepository {
 
-    /** 嵌入式模型配置数据访问映射器。 */
+    /**
+     * 嵌入式模型配置数据访问映射器。
+     */
     @Autowired
     private EmbeddingConfigMapper embeddingConfigMapper;
 

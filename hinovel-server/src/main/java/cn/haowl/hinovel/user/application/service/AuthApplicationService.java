@@ -30,11 +30,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class AuthApplicationService {
 
-    /** 认证领域服务。 */
+    /**
+     * 认证领域服务。
+     */
     @Autowired
     private AuthDomainService authDomainService;
 
-    /** 用户仓储。 */
+    /**
+     * 用户仓储。
+     */
     @Autowired
     private UserRepository userRepository;
 

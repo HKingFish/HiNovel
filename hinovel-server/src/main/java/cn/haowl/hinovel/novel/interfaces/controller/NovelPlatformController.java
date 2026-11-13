@@ -32,15 +32,21 @@ import java.util.List;
 @RequestMapping("/api/novel/platform")
 public class NovelPlatformController {
 
-    /** 小说应用服务。 */
+    /**
+     * 小说应用服务。
+     */
     @Autowired
     private NovelService novelService;
 
-    /** 章节应用服务。 */
+    /**
+     * 章节应用服务。
+     */
     @Autowired
     private ChapterService chapterService;
 
-    /** 小说列表服务。 */
+    /**
+     * 小说列表服务。
+     */
     @Autowired
     private NovelListService novelListService;
 

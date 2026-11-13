@@ -19,7 +19,9 @@ import java.util.Map;
 @Service
 public class OssConfigService {
 
-    /** OSS 配置属性。 */
+    /**
+     * OSS 配置属性。
+     */
     @Autowired
     private OssProperties ossProperties;
 

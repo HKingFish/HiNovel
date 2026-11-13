@@ -27,11 +27,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class EmbeddingConfigService {
 
-    /** 嵌入式模型配置仓储。 */
+    /**
+     * 嵌入式模型配置仓储。
+     */
     @Autowired
     private EmbeddingConfigRepository embeddingConfigRepository;
 
-    /** API 密钥加解密服务。 */
+    /**
+     * API 密钥加解密服务。
+     */
     @Autowired
     private ApiKeyService apiKeyService;
 

@@ -21,11 +21,15 @@ import java.util.List;
 @Service
 public class NovelService {
 
-    /** 小说领域服务。 */
+    /**
+     * 小说领域服务。
+     */
     @Autowired
     private NovelDomainService novelDomainService;
 
-    /** 小说 Agent 配置服务。 */
+    /**
+     * 小说 Agent 配置服务。
+     */
     @Autowired
     private NovelAgentConfigService novelAgentConfigService;
 

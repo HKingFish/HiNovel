@@ -13,25 +13,39 @@ import java.util.List;
 @Data
 public class ChatMessageResponse {
 
-    /** 消息 ID。 */
+    /**
+     * 消息 ID。
+     */
     private Long id;
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long sessionId;
 
-    /** 消息角色。 */
+    /**
+     * 消息角色。
+     */
     private String role;
 
-    /** 消息正文。 */
+    /**
+     * 消息正文。
+     */
     private String content;
 
-    /** 对应回复首次成功加载的 Skill 名称。 */
+    /**
+     * 对应回复首次成功加载的 Skill 名称。
+     */
     private List<String> loadedSkillNames;
 
-    /** 撤回状态。 */
+    /**
+     * 撤回状态。
+     */
     private Integer revoked;
 
-    /** 创建时间。 */
+    /**
+     * 创建时间。
+     */
     private String createTime;
 
     /**

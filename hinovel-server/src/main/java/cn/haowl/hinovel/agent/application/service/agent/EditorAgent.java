@@ -40,15 +40,21 @@ import java.util.UUID;
 @Service
 public class EditorAgent {
 
-    /** 构建编辑 Agent 并记录调用。 */
+    /**
+     * 构建编辑 Agent 并记录调用。
+     */
     @Autowired
     private AiServiceFactory aiServiceFactory;
 
-    /** 章节大纲查询。 */
+    /**
+     * 章节大纲查询。
+     */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 
-    /** 解析审核结果 JSON。 */
+    /**
+     * 解析审核结果 JSON。
+     */
     @Autowired
     private ObjectMapper objectMapper;
 

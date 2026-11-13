@@ -10,9 +10,13 @@ import lombok.Data;
 @Data
 public class AIAuditIssuePosition {
 
-    /** 起始偏移。 */
+    /**
+     * 起始偏移。
+     */
     private int start;
 
-    /** 结束偏移。 */
+    /**
+     * 结束偏移。
+     */
     private int end;
 }

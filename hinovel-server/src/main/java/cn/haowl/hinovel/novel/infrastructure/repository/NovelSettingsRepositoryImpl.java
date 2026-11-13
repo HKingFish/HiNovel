@@ -18,7 +18,9 @@ import java.util.Optional;
 @Repository
 public class NovelSettingsRepositoryImpl implements NovelSettingsRepository {
 
-    /** 小说配置数据访问。 */
+    /**
+     * 小说配置数据访问。
+     */
     @Autowired
     private NovelSettingsMapper settingsMapper;
 

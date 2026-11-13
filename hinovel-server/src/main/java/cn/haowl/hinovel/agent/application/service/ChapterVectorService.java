@@ -25,11 +25,15 @@ import java.util.List;
 @Service
 public class ChapterVectorService {
 
-    /** 按用户配置获取向量库。 */
+    /**
+     * 按用户配置获取向量库。
+     */
     @Autowired
     private VectorStoreFactory vectorStoreFactory;
 
-    /** 章节持久化。 */
+    /**
+     * 章节持久化。
+     */
     @Autowired
     private NovelChapterRepository chapterRepository;
 

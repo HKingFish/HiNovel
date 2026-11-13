@@ -28,7 +28,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/user/auth")
 public class AuthController {
 
-    /** 认证应用服务。 */
+    /**
+     * 认证应用服务。
+     */
     @Autowired
     private AuthApplicationService authApplicationService;
 

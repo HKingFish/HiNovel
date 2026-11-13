@@ -10,15 +10,23 @@ import lombok.Data;
 @Data
 public class ChatMessagePageQuery {
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long sessionId;
 
-    /** 游标消息 ID（null 表示从最新开始）。 */
+    /**
+     * 游标消息 ID（null 表示从最新开始）。
+     */
     private Long cursorId;
 
-    /** 每页条数。 */
+    /**
+     * 每页条数。
+     */
     private int pageSize;
 
-    /** 当前用户 ID。 */
+    /**
+     * 当前用户 ID。
+     */
     private Long userId;
 }

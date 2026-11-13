@@ -10,9 +10,13 @@ import lombok.Data;
 @Data
 public class CreateSessionRequest {
 
-    /** 小说 ID。 */
+    /**
+     * 小说 ID。
+     */
     private Long novelId;
 
-    /** 会话标题（可选）。 */
+    /**
+     * 会话标题（可选）。
+     */
     private String title;
 }

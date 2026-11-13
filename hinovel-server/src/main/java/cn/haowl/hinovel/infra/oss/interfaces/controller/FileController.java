@@ -29,7 +29,9 @@ import java.util.Map;
 @RequestMapping("/api/infra/oss")
 public class FileController {
 
-    /** OSS 应用服务。 */
+    /**
+     * OSS 应用服务。
+     */
     @Autowired
     private OssApplicationService ossApplicationService;
 

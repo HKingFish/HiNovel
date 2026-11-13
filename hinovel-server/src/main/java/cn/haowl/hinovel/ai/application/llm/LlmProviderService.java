@@ -1,6 +1,5 @@
 package cn.haowl.hinovel.ai.application.llm;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
 import cn.haowl.hinovel.ai.domain.repository.LlmProviderRepository;
 import cn.haowl.hinovel.ai.interfaces.dto.LlmProviderRequest;
@@ -27,11 +26,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class LlmProviderService {
 
-    /** LLM 提供方仓储。 */
+    /**
+     * LLM 提供方仓储。
+     */
     @Autowired
     private LlmProviderRepository llmProviderRepository;
 
-    /** API 密钥加解密服务。 */
+    /**
+     * API 密钥加解密服务。
+     */
     @Autowired
     private ApiKeyService apiKeyService;
 
@@ -68,24 +71,26 @@ public class LlmProviderService {
     }
 
     /**
-     * 获取 LLM 提供方。
+     * 查询当前用户的提供方。
      *
-     * @param id 提供方ID
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
      * @return LLM 提供方实体
      */
-    public LlmProvider getById(Long id) {
-        return llmProviderRepository.findById(id)
+    private LlmProvider getOwnedProvider(Long id, Long userId) {
+        return llmProviderRepository.findByIdAndUserId(id, userId)
             .orElseThrow(() -> exception(NOT_FOUND));
     }
 
     /**
      * 获取 LLM 提供方详情（apiKey 已脱敏，用于前端展示）。
      *
-     * @param id 提供方ID
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
      * @return 提供方实体
      */
-    public LlmProvider getByIdForView(Long id) {
-        return maskApiKey(getById(id));
+    public LlmProvider getByIdForView(Long id, Long userId) {
+        return maskApiKey(getOwnedProvider(id, userId));
     }
 
     /**
@@ -94,12 +99,13 @@ public class LlmProviderService {
      * <p>前端未修改 apiKey（传入空值或脱敏值）时保留原有加密密钥不变。</p>
      *
      * @param id      提供方 ID
+     * @param userId  当前用户 ID
      * @param request 更新请求
      * @return 更新后的提供方实体（apiKey 已脱敏）
      */
-    public LlmProvider update(Long id, LlmProviderRequest request) {
+    public LlmProvider update(Long id, Long userId, LlmProviderRequest request) {
         log.info("[update][更新 LLM 提供方，id={}，名称：{}]", id, request.getName());
-        LlmProvider provider = getById(id);
+        LlmProvider provider = getOwnedProvider(id, userId);
         provider.setName(request.getName());
         provider.setProviderType(request.getProviderType());
         provider.updateBaseUrl(request.getBaseUrl());
@@ -114,20 +120,22 @@ public class LlmProviderService {
     /**
      * 获取激活的 LLM 提供方列表。
      *
+     * @param userId 当前用户 ID
      * @return 激活的提供方列表
      */
-    public List<LlmProvider> getActiveProviders() {
-        return llmProviderRepository.findActiveProvidersByUserId(StpUtil.getLoginIdAsLong());
+    public List<LlmProvider> getActiveProviders(Long userId) {
+        return llmProviderRepository.findActiveProvidersByUserId(userId);
     }
 
     /**
      * 激活提供方。
      *
-     * @param id 提供方ID
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
      */
-    public void activate(Long id) {
+    public void activate(Long id, Long userId) {
         log.info("[activate][激活 LLM 提供方，id={}]", id);
-        LlmProvider provider = getById(id);
+        LlmProvider provider = getOwnedProvider(id, userId);
         provider.activate();
         llmProviderRepository.save(provider);
     }
@@ -135,36 +143,27 @@ public class LlmProviderService {
     /**
      * 停用提供方。
      *
-     * @param id 提供方ID
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
      */
-    public void deactivate(Long id) {
+    public void deactivate(Long id, Long userId) {
         log.info("[deactivate][停用 LLM 提供方，id={}]", id);
-        LlmProvider provider = getById(id);
+        LlmProvider provider = getOwnedProvider(id, userId);
         provider.deactivate();
-        llmProviderRepository.save(provider);
-    }
-
-    /**
-     * 更新 API 密钥。
-     *
-     * @param id     提供方ID
-     * @param apiKey 新的API密钥（明文，将自动加密存储）
-     */
-    public void updateApiKey(Long id, String apiKey) {
-        LlmProvider provider = getById(id);
-        // 加密后存储
-        provider.updateApiKey(apiKeyService.encrypt(apiKey));
         llmProviderRepository.save(provider);
     }
 
     /**
      * 删除提供方。
      *
-     * @param id 提供方ID
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
      */
-    public void delete(Long id) {
-        log.info("[delete][删除 LLM 提供方，id={}]", id);
-        llmProviderRepository.deleteById(id);
+    public void delete(Long id, Long userId) {
+        if (!llmProviderRepository.deleteByIdAndUserId(id, userId)) {
+            throw exception(NOT_FOUND);
+        }
+        log.info("[delete][已删除 LLM 提供方，id={}，userId={}]", id, userId);
     }
 
     /**

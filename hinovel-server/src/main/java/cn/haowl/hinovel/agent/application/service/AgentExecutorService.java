@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class AgentExecutorService {
 
-    /** 按 Agent 配置获取缓存的模型实例。 */
+    /**
+     * 按 Agent 配置获取缓存的模型实例。
+     */
     @Autowired
     private LlmProviderFactory llmProviderFactory;
 

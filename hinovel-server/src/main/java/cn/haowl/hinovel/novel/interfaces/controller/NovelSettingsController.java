@@ -23,7 +23,9 @@ import org.springframework.web.bind.annotation.*;
 @SaCheckLogin
 public class NovelSettingsController {
 
-    /** 小说配置服务。 */
+    /**
+     * 小说配置服务。
+     */
     @Autowired
     private NovelSettingsService novelSettingsService;
 

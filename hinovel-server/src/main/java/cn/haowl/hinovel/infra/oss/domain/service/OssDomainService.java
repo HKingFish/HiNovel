@@ -24,15 +24,21 @@ import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TYPE
 @Service
 public class OssDomainService {
 
-    /** OSS 存储提供方。 */
+    /**
+     * OSS 存储提供方。
+     */
     @Autowired
     private OssProvider ossProvider;
 
-    /** 上传日志仓储。 */
+    /**
+     * 上传日志仓储。
+     */
     @Autowired
     private OssUploadLogRepository ossUploadLogRepository;
 
-    /** OSS 配置属性。 */
+    /**
+     * OSS 配置属性。
+     */
     @Autowired
     private OssProperties ossProperties;
 

@@ -21,7 +21,9 @@ import java.util.Optional;
 @Repository
 public class NovelRepositoryImpl implements NovelRepository {
 
-    /** 小说数据访问。 */
+    /**
+     * 小说数据访问。
+     */
     @Autowired
     private NovelMapper novelMapper;
 

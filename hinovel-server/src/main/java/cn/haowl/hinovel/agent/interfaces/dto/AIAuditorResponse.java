@@ -12,24 +12,38 @@ import java.util.List;
 @Data
 public class AIAuditorResponse {
 
-    /** 审核结果 ID。 */
+    /**
+     * 审核结果 ID。
+     */
     private String id;
 
-    /** 总体评估结论。 */
+    /**
+     * 总体评估结论。
+     */
     private String overallAssessment;
 
-    /** 问题列表。 */
+    /**
+     * 问题列表。
+     */
     private List<AIAuditIssue> issues;
 
-    /** 审核总结。 */
+    /**
+     * 审核总结。
+     */
     private String summary;
 
-    /** 处理耗时（毫秒）。 */
+    /**
+     * 处理耗时（毫秒）。
+     */
     private long processingTime;
 
-    /** 审核 Agent ID。 */
+    /**
+     * 审核 Agent ID。
+     */
     private String auditorId;
 
-    /** 已覆盖的章节序号。 */
+    /**
+     * 已覆盖的章节序号。
+     */
     private List<Integer> coveredChapters;
 }

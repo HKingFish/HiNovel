@@ -22,7 +22,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/novel/memo")
 public class NovelMemoController {
 
-    /** 创作手记应用服务。 */
+    /**
+     * 创作手记应用服务。
+     */
     @Autowired
     private NovelMemoService novelMemoService;
 

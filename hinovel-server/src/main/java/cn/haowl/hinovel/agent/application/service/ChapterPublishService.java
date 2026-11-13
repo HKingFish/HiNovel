@@ -9,11 +9,11 @@ import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
-import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.PublishChapterResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,23 +33,33 @@ import org.springframework.stereotype.Service;
 @Service
 public class ChapterPublishService {
 
-    /** 章节查询与发布。 */
+    /**
+     * 章节查询与发布。
+     */
     @Autowired
     private NovelChapterService chapterService;
 
-    /** 章节大纲查询。 */
+    /**
+     * 章节大纲查询。
+     */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 
-    /** 构建总结大纲所用 Agent。 */
+    /**
+     * 构建总结大纲所用 Agent。
+     */
     @Autowired
     private AiServiceFactory aiServiceFactory;
 
-    /** 章节向量存储。 */
+    /**
+     * 章节向量存储。
+     */
     @Autowired
     private ChapterVectorService chapterVectorService;
 
-    /** 小说有效配置。 */
+    /**
+     * 小说有效配置。
+     */
     @Autowired
     private NovelSettingsService novelSettingsService;
 

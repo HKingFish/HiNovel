@@ -7,13 +7,7 @@ import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
-import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
-import cn.haowl.hinovel.novel.interfaces.dto.BatchSortRequest;
-import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageQuery;
-import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageResponse;
-import cn.haowl.hinovel.novel.interfaces.dto.PublishChapterResponse;
-import cn.haowl.hinovel.novel.interfaces.dto.UpdateChapterNumberRequest;
-import cn.haowl.hinovel.novel.interfaces.dto.UpdateRemarkRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,11 +28,15 @@ import java.util.List;
 @RequestMapping("/api/novel/chapters")
 public class NovelChapterController {
 
-    /** 章节应用服务。 */
+    /**
+     * 章节应用服务。
+     */
     @Autowired
     private NovelChapterService chapterService;
 
-    /** 章节发布服务。 */
+    /**
+     * 章节发布服务。
+     */
     @Autowired
     private ChapterPublishService chapterPublishService;
 

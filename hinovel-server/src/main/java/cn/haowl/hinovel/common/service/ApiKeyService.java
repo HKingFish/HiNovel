@@ -18,10 +18,14 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(SecurityProperties.class)
 public class ApiKeyService {
 
-    /** 脱敏值中的掩码标记，前端回传该标记表示未修改密钥。 */
+    /**
+     * 脱敏值中的掩码标记，前端回传该标记表示未修改密钥。
+     */
     private static final String MASK_MARKER = "****";
 
-    /** 安全配置。 */
+    /**
+     * 安全配置。
+     */
     @Autowired
     private SecurityProperties securityProperties;
 

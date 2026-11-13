@@ -10,6 +10,8 @@ import lombok.Data;
 @Data
 public class RenameSessionRequest {
 
-    /** 新标题。 */
+    /**
+     * 新标题。
+     */
     private String title;
 }

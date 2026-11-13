@@ -10,9 +10,13 @@ import lombok.Data;
 @Data
 public class AIAuditChapterRange {
 
-    /** 起始章节序号。 */
+    /**
+     * 起始章节序号。
+     */
     private int startChapter;
 
-    /** 结束章节序号。 */
+    /**
+     * 结束章节序号。
+     */
     private int endChapter;
 }

@@ -16,7 +16,9 @@ import java.util.Optional;
 @Repository
 public class NovelOutlineRepositoryImpl implements NovelOutlineRepository {
 
-    /** 小说大纲数据访问。 */
+    /**
+     * 小说大纲数据访问。
+     */
     @Autowired
     private NovelOutlineMapper novelOutlineMapper;
 

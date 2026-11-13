@@ -12,18 +12,28 @@ import java.util.List;
 @Data
 public class AIAuthorResponse {
 
-    /** 结果 ID。 */
+    /**
+     * 结果 ID。
+     */
     private String id;
 
-    /** 生成的章节内容。 */
+    /**
+     * 生成的章节内容。
+     */
     private String content;
 
-    /** 改进建议列表。 */
+    /**
+     * 改进建议列表。
+     */
     private List<String> suggestions;
 
-    /** 内容字数。 */
+    /**
+     * 内容字数。
+     */
     private int wordCount;
 
-    /** 处理耗时（毫秒）。 */
+    /**
+     * 处理耗时（毫秒）。
+     */
     private long processingTime;
 }

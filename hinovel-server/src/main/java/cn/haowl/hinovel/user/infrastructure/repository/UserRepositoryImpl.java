@@ -20,7 +20,9 @@ import java.util.Optional;
 @Repository
 public class UserRepositoryImpl implements UserRepository {
 
-    /** 用户数据访问。 */
+    /**
+     * 用户数据访问。
+     */
     @Autowired
     private UserMapper userMapper;
 

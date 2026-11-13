@@ -28,7 +28,9 @@ import java.util.Map;
 @Service
 public class LlmCallLogService {
 
-    /** LLM 调用记录数据访问映射器。 */
+    /**
+     * LLM 调用记录数据访问映射器。
+     */
     @Autowired
     private LlmCallLogMapper llmCallLogMapper;
 

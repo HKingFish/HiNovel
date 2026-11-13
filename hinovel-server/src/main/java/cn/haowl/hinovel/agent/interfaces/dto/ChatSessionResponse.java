@@ -11,22 +11,34 @@ import lombok.Data;
 @Data
 public class ChatSessionResponse {
 
-    /** 会话 ID。 */
+    /**
+     * 会话 ID。
+     */
     private Long id;
 
-    /** 小说 ID。 */
+    /**
+     * 小说 ID。
+     */
     private Long novelId;
 
-    /** 会话标题。 */
+    /**
+     * 会话标题。
+     */
     private String title;
 
-    /** 收藏状态。 */
+    /**
+     * 收藏状态。
+     */
     private Integer favorite;
 
-    /** 创建时间。 */
+    /**
+     * 创建时间。
+     */
     private String createTime;
 
-    /** 更新时间。 */
+    /**
+     * 更新时间。
+     */
     private String updateTime;
 
     /**

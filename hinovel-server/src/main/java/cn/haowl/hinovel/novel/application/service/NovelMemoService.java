@@ -18,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class NovelMemoService {
 
-    /** 创作手记数据访问。 */
+    /**
+     * 创作手记数据访问。
+     */
     @Autowired
     private NovelMemoMapper novelMemoMapper;
 

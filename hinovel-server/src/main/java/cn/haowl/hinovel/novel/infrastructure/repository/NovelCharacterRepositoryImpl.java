@@ -21,11 +21,15 @@ import java.util.Optional;
 @Repository
 public class NovelCharacterRepositoryImpl implements NovelCharacterRepository {
 
-    /** 人物数据访问。 */
+    /**
+     * 人物数据访问。
+     */
     @Autowired
     private NovelCharacterMapper characterMapper;
 
-    /** 人物关系数据访问。 */
+    /**
+     * 人物关系数据访问。
+     */
     @Autowired
     private NovelCharacterRelationMapper relationMapper;
 

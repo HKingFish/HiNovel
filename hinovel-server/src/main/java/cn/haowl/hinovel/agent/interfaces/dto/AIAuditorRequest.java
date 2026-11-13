@@ -12,15 +12,23 @@ import java.util.List;
 @Data
 public class AIAuditorRequest {
 
-    /** 章节 ID。 */
+    /**
+     * 章节 ID。
+     */
     private Long chapterId;
 
-    /** 章节正文。 */
+    /**
+     * 章节正文。
+     */
     private String content;
 
-    /** 全文大纲。 */
+    /**
+     * 全文大纲。
+     */
     private String novelOutline;
 
-    /** 前几章内容。 */
+    /**
+     * 前几章内容。
+     */
     private List<AIAuditorPreviousChapter> previousChapters;
 }

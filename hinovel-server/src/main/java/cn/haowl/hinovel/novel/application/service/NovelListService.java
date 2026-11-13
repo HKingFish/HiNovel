@@ -20,11 +20,15 @@ import java.util.stream.Collectors;
 @Service
 public class NovelListService {
 
-    /** 小说应用服务。 */
+    /**
+     * 小说应用服务。
+     */
     @Autowired
     private NovelService novelService;
 
-    /** 小说 Agent 配置服务。 */
+    /**
+     * 小说 Agent 配置服务。
+     */
     @Autowired
     private NovelAgentConfigService novelAgentConfigService;
 

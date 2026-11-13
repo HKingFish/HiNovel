@@ -29,7 +29,9 @@ import java.util.Map;
 @RequestMapping("/api/ai/llm-call-logs")
 public class LlmCallLogController {
 
-    /** LLM 调用记录服务。 */
+    /**
+     * LLM 调用记录服务。
+     */
     @Autowired
     private LlmCallLogService llmCallLogService;
 

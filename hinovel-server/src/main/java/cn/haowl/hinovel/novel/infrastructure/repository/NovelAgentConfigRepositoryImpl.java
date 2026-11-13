@@ -16,7 +16,9 @@ import java.util.Optional;
 @Repository
 public class NovelAgentConfigRepositoryImpl implements NovelAgentConfigRepository {
 
-    /** 小说 Agent 配置数据访问。 */
+    /**
+     * 小说 Agent 配置数据访问。
+     */
     @Autowired
     private NovelAgentConfigMapper configMapper;
 

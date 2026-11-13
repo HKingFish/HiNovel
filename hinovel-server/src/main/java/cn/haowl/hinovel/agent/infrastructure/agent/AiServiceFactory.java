@@ -3,8 +3,8 @@ package cn.haowl.hinovel.agent.infrastructure.agent;
 import cn.haowl.hinovel.agent.application.service.SkillService;
 import cn.haowl.hinovel.agent.application.service.agent.WritingIntentAssistant;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
-import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
+import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
-
+import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,19 +60,27 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Component
 public class AiServiceFactory {
 
-    /** 按用户配置解析模型提供方。 */
+    /**
+     * 按用户配置解析模型提供方。
+     */
     @Autowired
     private LlmProviderFactory llmProviderFactory;
 
-    /** 小说绑定的 Agent 配置。 */
+    /**
+     * 小说绑定的 Agent 配置。
+     */
     @Autowired
     private NovelAgentConfigMapper novelAgentConfigMapper;
 
-    /** Agent 元数据。 */
+    /**
+     * Agent 元数据。
+     */
     @Autowired
     private AgentMapper agentMapper;
 
-    /** LLM 调用记录。 */
+    /**
+     * LLM 调用记录。
+     */
     @Autowired
     private LlmCallLogService llmCallLogService;
 

@@ -12,15 +12,23 @@ import java.util.List;
 @Data
 public class AIAuditBatchResponse {
 
-    /** 批量审核结果 ID。 */
+    /**
+     * 批量审核结果 ID。
+     */
     private String id;
 
-    /** 各章节审核结果。 */
+    /**
+     * 各章节审核结果。
+     */
     private List<AIAuditorResponse> audits;
 
-    /** 总体评估结论。 */
+    /**
+     * 总体评估结论。
+     */
     private String overallAssessment;
 
-    /** 批量审核总结。 */
+    /**
+     * 批量审核总结。
+     */
     private String summary;
 }

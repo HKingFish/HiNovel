@@ -22,7 +22,9 @@ import java.util.Optional;
 @Repository
 public class OssUploadLogRepositoryImpl implements OssUploadLogRepository {
 
-    /** 上传日志数据访问。 */
+    /**
+     * 上传日志数据访问。
+     */
     @Autowired
     private OssUploadLogMapper ossUploadLogMapper;
 

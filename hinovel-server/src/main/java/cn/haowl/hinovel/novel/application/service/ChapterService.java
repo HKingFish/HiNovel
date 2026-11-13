@@ -28,23 +28,33 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class ChapterService {
 
-    /** 章节领域服务。 */
+    /**
+     * 章节领域服务。
+     */
     @Autowired
     private ChapterDomainService chapterDomainService;
 
-    /** 章节仓储。 */
+    /**
+     * 章节仓储。
+     */
     @Autowired
     private NovelChapterRepository chapterRepository;
 
-    /** 章节版本仓储。 */
+    /**
+     * 章节版本仓储。
+     */
     @Autowired
     private NovelChapterVersionRepository versionRepository;
 
-    /** 小说应用服务。 */
+    /**
+     * 小说应用服务。
+     */
     @Autowired
     private NovelService novelService;
 
-    /** 小说配置服务。 */
+    /**
+     * 小说配置服务。
+     */
     @Autowired
     private NovelSettingsService novelSettingsService;
 

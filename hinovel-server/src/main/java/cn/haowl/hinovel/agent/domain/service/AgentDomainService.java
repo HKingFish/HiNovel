@@ -20,7 +20,9 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class AgentDomainService {
 
-    /** Agent 持久化。 */
+    /**
+     * Agent 持久化。
+     */
     @Autowired
     private AgentRepository agentRepository;
 

@@ -10,12 +10,18 @@ import lombok.Data;
 @Data
 public class AIAuditorPreviousChapter {
 
-    /** 章节 ID。 */
+    /**
+     * 章节 ID。
+     */
     private Long chapterId;
 
-    /** 章节序号。 */
+    /**
+     * 章节序号。
+     */
     private int chapterNumber;
 
-    /** 章节正文。 */
+    /**
+     * 章节正文。
+     */
     private String content;
 }

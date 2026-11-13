@@ -19,7 +19,9 @@ import java.util.Optional;
 @Repository
 public class NovelChapterVersionRepositoryImpl implements NovelChapterVersionRepository {
 
-    /** 章节版本数据访问。 */
+    /**
+     * 章节版本数据访问。
+     */
     @Autowired
     private NovelChapterVersionMapper versionMapper;
 
