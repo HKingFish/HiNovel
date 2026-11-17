@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.agent.interfaces.dto;
 
+import cn.haowl.hinovel.agent.constant.AuditAssessmentEnum;
 import lombok.Data;
 
 import java.util.List;
@@ -24,8 +25,10 @@ public class AIAuditBatchResponse {
 
     /**
      * 总体评估结论。
+     *
+     * @see AuditAssessmentEnum
      */
-    private String overallAssessment;
+    private AuditAssessmentEnum overallAssessment;
 
     /**
      * 批量审核总结。

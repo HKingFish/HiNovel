@@ -4,6 +4,7 @@ import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
 import cn.haowl.hinovel.agent.application.service.agent.EditorAgent;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
+import cn.haowl.hinovel.agent.constant.AuditAssessmentEnum;
 import cn.haowl.hinovel.agent.interfaces.dto.*;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.ChapterService;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -82,67 +84,42 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public Flux<ServerSentEvent<String>> aiRewrite(AIAuthorRequest request, Long userId) {
-        NovelChapter chapter = chapterService.getById(request.getChapterId());
+        Long chapterId = request.getChapterId();
+        NovelChapter chapter = chapterService.getById(chapterId);
         if (chapter == null) {
-            log.warn("AI 改写失败，章节不存在，chapterId={}", request.getChapterId());
+            log.warn("[aiRewrite][章节不存在，chapterId={}]", chapterId);
             throw exception(REWRITE_CHAPTER_NOT_EXISTS);
         }
 
-        // 获取章节大纲（优先使用请求中的大纲内容）
-        ChapterOutline outline = chapterOutlineService.getByChapterId(request.getChapterId());
-        if (outline == null) {
-            outline = new ChapterOutline();
-            outline.setChapterId(request.getChapterId());
-            outline.setNovelId(chapter.getNovelId());
-        }
-        // 请求中携带了大纲内容时，覆盖数据库中的大纲
-        if (request.getOutline() != null && !request.getOutline().isBlank()) {
-            outline.setOutlineContent(request.getOutline());
-        }
-        if (request.getPlotPoints() != null && !request.getPlotPoints().isBlank()) {
-            outline.setPlotPoints(request.getPlotPoints());
-        }
-        if (request.getEmotionTone() != null && !request.getEmotionTone().isBlank()) {
-            outline.setEmotionTone(request.getEmotionTone());
-        }
-        if (request.getSceneSetting() != null && !request.getSceneSetting().isBlank()) {
-            outline.setSceneSetting(request.getSceneSetting());
-        }
-        // 章节内容以前端传过来的为准
-        if (request.getContent() != null) {
-            outline.setChapterContent(request.getContent());
-        }
+        Long novelId = chapter.getNovelId();
+        ChapterOutline outline = buildRewriteOutline(request, chapterId, novelId);
 
-        // 读取小说有效配置，决定改写时携带的上下文
-        NovelSettings settings = novelSettingsService.getEffectiveSettings(
-            chapter.getNovelId(), chapter.getCreator());
+        // 改写的上下文范围使用章节创建者的小说配置。
+        NovelSettings settings =
+            novelSettingsService.getEffectiveSettings(
+                novelId, chapter.getCreator());
 
-        // 根据配置加载前几章内容作为前情提要
+        Integer contextChapters = settings.getRewriteContextChapters();
         List<NovelChapter> previousChapters = List.of();
-        int contextChapters = settings.getRewriteContextChapters() != null
-            ? settings.getRewriteContextChapters() : 0;
-        if (contextChapters > 0) {
-            previousChapters = novelChapterService.getPreviousChapters(
-                chapter.getNovelId(), chapter.getChapterNumber(), contextChapters);
+        if (contextChapters != null && contextChapters > 0) {
+            previousChapters =
+                novelChapterService.getPreviousChapters(
+                    novelId, chapter.getChapterNumber(), contextChapters);
         }
 
-        // 根据配置决定是否携带全文大纲
-        String novelOutlineContent = null;
-        if (ENABLED == settings.getRewriteIncludeOutline()) {
-            novelOutlineContent = loadNovelOutlineContent(chapter.getNovelId());
-        }
+        String novelOutline =
+            Integer.valueOf(ENABLED).equals(settings.getRewriteIncludeOutline())
+                ? loadNovelOutlineContent(novelId) : null;
 
-        // 将 Flux<String> 包装为 Flux<ServerSentEvent>，避免 String 被 JSON 序列化加引号
+        // 把正文片段写入 SSE 数据帧，避免 JSON 序列化给文本加引号。
         return authorAgentService.streamRewriteChapterByOutline(
-                chapter, outline, previousChapters,
-                novelOutlineContent, request.getUserRequirement(), userId)
+                chapter, outline, previousChapters, novelOutline,
+                request.getUserRequirement(), userId)
             .map(token -> ServerSentEvent.<String>builder().data(token).build())
-            .onErrorResume(e -> {
-                log.error("AI 改写流式异常，异常信息：{}", e.getMessage());
-                return Flux.just(ServerSentEvent.<String>builder()
-                    .event("error")
-                    .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
-                    .build());
+            .onErrorResume(error -> {
+                log.error("[aiRewrite][流式改写失败，chapterId={}，原因={}]",
+                    chapterId, error.getMessage());
+                return Flux.just(rewriteErrorEvent(error));
             });
     }
 
@@ -153,29 +130,30 @@ public class AIServiceImpl implements AIService {
             throw exception(AUDIT_CHAPTER_NOT_EXISTS);
         }
 
-        // 使用请求中的内容覆盖数据库中的章节内容（前端可能传入编辑中的最新内容）
-        if (request.getContent() != null && !request.getContent().isBlank()) {
+        // 编辑器传来非空白正文时，审核这份尚未保存的版本。
+        if (StringUtils.hasText(request.getContent())) {
             chapter.setContent(request.getContent());
         }
 
-        // 获取章节大纲
         ChapterOutline outline = chapterOutlineService.getByChapterId(request.getChapterId());
+        NovelSettings settings =
+            novelSettingsService.getEffectiveSettings(
+                chapter.getNovelId(), chapter.getCreator());
 
-        // 根据配置决定审核时是否携带全文大纲
-        NovelSettings settings = novelSettingsService.getEffectiveSettings(
-            chapter.getNovelId(), chapter.getCreator());
+        // 开启全文大纲后，优先审核编辑器传来的版本，缺省时读取小说已保存的大纲。
         String novelOutline = null;
-        if (ENABLED == settings.getAuditIncludeOutline()) {
-            // 优先使用前端传入的全文大纲，其次从数据库加载
-            if (request.getNovelOutline() != null && !request.getNovelOutline().isBlank()) {
-                novelOutline = request.getNovelOutline();
-            } else {
-                novelOutline = loadNovelOutlineContent(chapter.getNovelId());
-            }
+        if (Integer.valueOf(ENABLED).equals(settings.getAuditIncludeOutline())) {
+            novelOutline = StringUtils.hasText(request.getNovelOutline())
+                ? request.getNovelOutline() : loadNovelOutlineContent(chapter.getNovelId());
         }
 
-        // 调用编辑 Agent 审核
-        return editorAgentService.auditChapter(chapter, outline, novelOutline, userId);
+        return editorAgentService.auditChapter(
+            ChapterAuditCommand.builder()
+                .chapter(chapter)
+                .outline(outline)
+                .novelOutline(novelOutline)
+                .userId(userId)
+                .build());
     }
 
     @Override
@@ -186,7 +164,7 @@ public class AIServiceImpl implements AIService {
 
         AIAuditBatchResponse response = new AIAuditBatchResponse();
         response.setId(AgentConstants.MOCK_BATCH_AUDIT_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
-        response.setOverallAssessment(AgentConstants.AUDIT_PASS);
+        response.setOverallAssessment(AuditAssessmentEnum.PASS);
         response.setSummary(AgentConstants.MOCK_BATCH_AUDIT_SUMMARY);
         response.setAudits(List.of());
         return response;
@@ -204,6 +182,49 @@ public class AIServiceImpl implements AIService {
         response.setWordCount(response.getContent().length());
         response.setProcessingTime(AgentConstants.MOCK_REGENERATE_PROCESSING_TIME_MS);
         return response;
+    }
+
+    /**
+     * 合并本次改写使用的章节大纲。
+     */
+    private ChapterOutline buildRewriteOutline(AIAuthorRequest request, Long chapterId, Long novelId) {
+        ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
+        if (outline == null) {
+            outline = new ChapterOutline();
+            outline.setChapterId(chapterId);
+            outline.setNovelId(novelId);
+        }
+
+        // 请求中的非空白大纲字段覆盖已保存的值，省略的字段沿用原值。
+        if (StringUtils.hasText(request.getOutline())) {
+            outline.setOutlineContent(request.getOutline());
+        }
+        if (StringUtils.hasText(request.getPlotPoints())) {
+            outline.setPlotPoints(request.getPlotPoints());
+        }
+        if (StringUtils.hasText(request.getEmotionTone())) {
+            outline.setEmotionTone(request.getEmotionTone());
+        }
+        if (StringUtils.hasText(request.getSceneSetting())) {
+            outline.setSceneSetting(request.getSceneSetting());
+        }
+
+        // 正文允许显式传入空串，只有 null 才沿用原值。
+        if (request.getContent() != null) {
+            outline.setChapterContent(request.getContent());
+        }
+        return outline;
+    }
+
+    /**
+     * 将流式改写异常转换为客户端识别的错误事件。
+     */
+    private ServerSentEvent<String> rewriteErrorEvent(Throwable error) {
+        String message = error.getMessage();
+        return ServerSentEvent.<String>builder()
+            .event("error")
+            .data(message == null ? "AI 改写异常" : message)
+            .build();
     }
 
     /**

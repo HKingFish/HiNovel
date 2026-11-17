@@ -113,16 +113,6 @@ public final class AgentConstants {
      */
     public static final int PLOT_POINT_PREVIEW_LENGTH = 50;
 
-    /**
-     * 审核通过状态。
-     */
-    public static final String AUDIT_PASS = "pass";
-
-    /**
-     * 审核失败状态。
-     */
-    public static final String AUDIT_FAIL = "fail";
-
     // ==================== 小说配置默认值 ====================
 
     /**

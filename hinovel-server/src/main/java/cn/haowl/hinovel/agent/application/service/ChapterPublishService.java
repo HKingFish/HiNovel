@@ -4,6 +4,7 @@ import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.SyncCallLogContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
@@ -161,15 +162,25 @@ public class ChapterPublishService {
             chapterOutlineService.saveOrUpdateOutline(outline);
 
             log.info("AI 总结大纲完成，章节ID={}，耗时={}ms", chapterId, processingTimeMs);
-            aiServiceFactory.logSyncCall(CALL_SCENE_SUMMARIZE_OUTLINE, callContext,
-                    userPrompt, aiOutline, processingTimeMs);
+            SyncCallLogContext logContext =
+                SyncCallLogContext.builder()
+                    .callScene(CALL_SCENE_SUMMARIZE_OUTLINE)
+                    .callContext(callContext)
+                    .requestContent(userPrompt)
+                    .build();
+            aiServiceFactory.logSyncCall(logContext, aiOutline, processingTimeMs);
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("AI 总结大纲失败，章节ID={}，耗时={}ms，异常信息：{}",
                     chapterId, processingTimeMs, e.getMessage(), e);
             if (callContext != null) {
-                aiServiceFactory.logSyncCallFailed(CALL_SCENE_SUMMARIZE_OUTLINE, callContext,
-                        "总结章节大纲", e.getMessage(), processingTimeMs);
+                SyncCallLogContext logContext =
+                    SyncCallLogContext.builder()
+                        .callScene(CALL_SCENE_SUMMARIZE_OUTLINE)
+                        .callContext(callContext)
+                        .requestContent("总结章节大纲")
+                        .build();
+                aiServiceFactory.logSyncCallFailed(logContext, e.getMessage(), processingTimeMs);
             }
         }
     }

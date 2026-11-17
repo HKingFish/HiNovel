@@ -2,6 +2,7 @@ package cn.haowl.hinovel.agent.infrastructure.agent;
 
 import cn.haowl.hinovel.agent.application.service.SkillService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
+import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
@@ -42,10 +43,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -115,14 +114,17 @@ class AgentSkillExecutionTest {
         QaAgent qa = qaAgent(factory(skills, provider, logs), mock(VectorStoreFactory.class),
                 sessions, messages, settings, mock(NovelService.class));
 
-        List<QaAgent.ChatEvent> events = qa.streamChat(command("用冷峻悬疑风格写一段夜间重逢"))
+        List<QaAgent.ChatEvent<?>> events = qa.streamChat(command("用冷峻悬疑风格写一段夜间重逢"))
                 .collectList().block(Duration.ofSeconds(5));
 
         List<String> expectedNames = styleSucceeds ? List.of(DEFAULT_SKILL, STYLE) : List.of(DEFAULT_SKILL);
-        assertEquals(expectedNames.stream().map(name -> Map.of("skillName", name)).toList(),
-                events.stream().filter(event -> "skill-loaded".equals(event.getName())).map(QaAgent.ChatEvent::getData).toList());
+        assertEquals(expectedNames.stream().map(QaAgent.SkillLoadedData::new).toList(),
+            events.stream()
+                .filter(event -> ChatEventEnum.SKILL_LOADED == event.getType())
+                .map(QaAgent.ChatEvent::getData)
+                .toList());
         String expectedText = styleSucceeds ? text : text + "\n\n本次未加载「冷峻悬疑」风格 Skill。";
-        assertEquals(expectedText, events.stream().filter(event -> event.getName() == null)
+        assertEquals(expectedText, events.stream().filter(event -> ChatEventEnum.TEXT == event.getType())
                 .map(event -> event.getData().toString()).collect(java.util.stream.Collectors.joining()));
         ArgumentCaptor<ChatMessage> saved = ArgumentCaptor.forClass(ChatMessage.class);
         verify(messages, times(2)).insert(saved.capture());
@@ -191,7 +193,7 @@ class AgentSkillExecutionTest {
         LlmCallLogService logs = mock(LlmCallLogService.class);
         QaAgent qa = qa(factory(skills, provider, logs));
 
-        assertEquals(Map.of("skillName", DEFAULT_SKILL),
+        assertEquals(new QaAgent.SkillLoadedData(DEFAULT_SKILL),
                 qa.streamChat(command("写一段重逢"))
                         .take(1).blockLast(Duration.ofSeconds(5)).getData());
 
@@ -217,7 +219,7 @@ class AgentSkillExecutionTest {
         });
         QaAgent qa = qa(factory(skills, provider, mock(LlmCallLogService.class)));
 
-        List<QaAgent.ChatEvent> events = qa.streamChat(command("以温暖细腻风格写一段重逢"))
+        List<QaAgent.ChatEvent<?>> events = qa.streamChat(command("以温暖细腻风格写一段重逢"))
                 .collectList().block(Duration.ofSeconds(5));
 
         assertEquals(List.of("她推开了门。", "\n\n本次未加载「温暖细腻」风格 Skill。"),

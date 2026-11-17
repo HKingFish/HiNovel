@@ -4,6 +4,8 @@ import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.SyncCallLogContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.TokenStreamOptions;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelContentRetrievalTool;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.function.Function;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
@@ -84,22 +87,26 @@ public class AuthorAgent {
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildRewritePrompt(chapter, outline);
 
+        SyncCallLogContext logContext =
+            SyncCallLogContext.builder()
+                .callScene(CALL_SCENE_REWRITE)
+                .callContext(callContext)
+                .requestContent(userPrompt)
+                .build();
+
         try {
             String content = assistant.chat(callContext.getSystemPrompt(),
                 aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms",
                 chapter.getId(), content.length(), processingTimeMs);
-            // 记录成功调用日志
-            aiServiceFactory.logSyncCall(CALL_SCENE_REWRITE, callContext,
-                userPrompt, content, processingTimeMs);
+            aiServiceFactory.logSyncCall(logContext, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("作者 Agent 改写失败，chapterId={}，耗时={}ms，异常信息：{}",
                 chapter.getId(), processingTimeMs, e.getMessage());
-            aiServiceFactory.logSyncCallFailed(CALL_SCENE_REWRITE, callContext,
-                userPrompt, e.getMessage(), processingTimeMs);
+            aiServiceFactory.logSyncCallFailed(logContext, e.getMessage(), processingTimeMs);
             throw e;
         }
     }
@@ -148,10 +155,15 @@ public class AuthorAgent {
 
         TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
             aiServiceFactory.writingPrompt(callContext, userPrompt));
-        // 使用带日志记录的 tokenStreamToFlux
-        return aiServiceFactory.tokenStreamToFlux(tokenStream,
-            "chapterId=" + chapter.getId(),
-            CALL_SCENE_REWRITE, callContext, userPrompt);
+        TokenStreamOptions<String> streamOptions =
+            TokenStreamOptions.<String>builder()
+                .logContext("chapterId=" + chapter.getId())
+                .callScene(CALL_SCENE_REWRITE)
+                .callContext(callContext)
+                .requestContent(userPrompt)
+                .textEvent(Function.identity())
+                .build();
+        return aiServiceFactory.tokenStreamToFlux(tokenStream, streamOptions);
     }
 
     /**
@@ -173,21 +185,26 @@ public class AuthorAgent {
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt = buildSuggestionRewritePrompt(chapter, outline, suggestions);
 
+        SyncCallLogContext logContext =
+            SyncCallLogContext.builder()
+                .callScene(CALL_SCENE_REGENERATE)
+                .callContext(callContext)
+                .requestContent(userPrompt)
+                .build();
+
         try {
             String content = assistant.chat(callContext.getSystemPrompt(),
                 aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("作者 Agent 建议重写完成，chapterId={}，生成字数={}，耗时={}ms",
                 chapter.getId(), content.length(), processingTimeMs);
-            aiServiceFactory.logSyncCall(CALL_SCENE_REGENERATE, callContext,
-                userPrompt, content, processingTimeMs);
+            aiServiceFactory.logSyncCall(logContext, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.error("作者 Agent 建议重写失败，chapterId={}，耗时={}ms，异常信息：{}",
                 chapter.getId(), processingTimeMs, e.getMessage());
-            aiServiceFactory.logSyncCallFailed(CALL_SCENE_REGENERATE, callContext,
-                userPrompt, e.getMessage(), processingTimeMs);
+            aiServiceFactory.logSyncCallFailed(logContext, e.getMessage(), processingTimeMs);
             throw e;
         }
     }
@@ -268,9 +285,15 @@ public class AuthorAgent {
 
         TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
             aiServiceFactory.writingPrompt(callContext, userPrompt));
-        return aiServiceFactory.tokenStreamToFlux(tokenStream,
-            "annotationRewrite-novelId=" + novelId,
-            CALL_SCENE_ANNOTATION_REWRITE, callContext, userPrompt);
+        TokenStreamOptions<String> streamOptions =
+            TokenStreamOptions.<String>builder()
+                .logContext("annotationRewrite-novelId=" + novelId)
+                .callScene(CALL_SCENE_ANNOTATION_REWRITE)
+                .callContext(callContext)
+                .requestContent(userPrompt)
+                .textEvent(Function.identity())
+                .build();
+        return aiServiceFactory.tokenStreamToFlux(tokenStream, streamOptions);
     }
 
     /**

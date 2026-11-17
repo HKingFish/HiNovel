@@ -25,13 +25,13 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
 import lombok.Builder;
 import lombok.Data;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -227,14 +227,18 @@ public class AiServiceFactory {
                 .chatModel(context.getProvider().getChatModel())
                 .build();
         long startTime = System.currentTimeMillis();
+        SyncCallLogContext logContext =
+            SyncCallLogContext.builder()
+                .callScene(callScene)
+                .callContext(context)
+                .requestContent(requestContent)
+                .build();
         try {
             Result<String> result = assistant.judgeWritingIntent(userPrompt);
-            logSyncResponse(callScene, context, requestContent,
-                    result.finalResponse(), System.currentTimeMillis() - startTime);
+            logSyncResponse(logContext, result.finalResponse(), System.currentTimeMillis() - startTime);
             return result.content();
         } catch (RuntimeException e) {
-            logSyncCallFailed(callScene, context, requestContent,
-                    e.getClass().getSimpleName(), System.currentTimeMillis() - startTime);
+            logSyncCallFailed(logContext, e.getClass().getSimpleName(), System.currentTimeMillis() - startTime);
             throw e;
         }
     }
@@ -244,29 +248,16 @@ public class AiServiceFactory {
     /**
      * 将 LangChain4J {@link TokenStream} 转换为 Reactor {@link Flux}。
      *
-     * <p>使用 {@link Sinks.Many} 作为桥接，将 TokenStream 的回调事件推送到 Flux 流中。
-     * 适用于 SSE 流式推送场景。</p>
-     *
      * @param tokenStream LangChain4J Token 流
-     * @param logContext  日志上下文描述（如 "chapterId=123"），用于异常日志
-     * @return Flux 流
+     * @param options 流式事件和调用日志配置
+     * @return 文本和工具执行结果组成的事件流
      */
-    public Flux<String> tokenStreamToFlux(TokenStream tokenStream, String logContext) {
-        return tokenStreamToFlux(tokenStream, logContext, null, null, null);
-    }
+    public <T> Flux<T> tokenStreamToFlux(TokenStream tokenStream, TokenStreamOptions<T> options) {
+        String callScene = options.getCallScene();
+        CallContext callContext = options.getCallContext();
+        String requestContent = options.getRequestContent();
+        Function<ToolExecution, T> toolEvent = options.getToolEvent();
 
-    /** 将流式文本映射到调用方的协议，并记录调用结果。 */
-    public Flux<String> tokenStreamToFlux(TokenStream tokenStream, String logContext,
-                                          String callScene, CallContext callContext,
-                                          String requestContent) {
-        return tokenStreamToFlux(tokenStream, logContext, callScene, callContext, requestContent,
-                Function.identity(), null, null);
-    }
-
-    /** 将文本与 Tool 结果以独立事件发给同一个订阅者。 */
-    public <T> Flux<T> tokenStreamToFlux(TokenStream tokenStream, String logContext,
-                                        String callScene, CallContext callContext, String requestContent,
-                                        Function<String, T> textEvent, Function<ToolExecution, T> toolEvent, T firstEvent) {
         return Flux.create(sink -> {
             long startTime = System.currentTimeMillis();
             StringBuffer responseBuffer = new StringBuffer();
@@ -288,8 +279,8 @@ public class AiServiceFactory {
                             System.currentTimeMillis() - startTime, true);
                 }
             });
-            if (firstEvent != null) {
-                sink.next(firstEvent);
+            if (options.getFirstEvent() != null) {
+                sink.next(options.getFirstEvent());
             }
             if (sink.isCancelled()) {
                 return;
@@ -299,7 +290,7 @@ public class AiServiceFactory {
                         observeHandle.accept(context.streamingHandle());
                         if (!sink.isCancelled()) {
                             responseBuffer.append(partial.text());
-                            sink.next(textEvent.apply(partial.text()));
+                            sink.next(options.getTextEvent().apply(partial.text()));
                         }
                     })
                     .onPartialToolCallWithContext((partial, context) -> observeHandle.accept(context.streamingHandle()))
@@ -327,7 +318,7 @@ public class AiServiceFactory {
                         if (sink.isCancelled()) {
                             return;
                         }
-                        log.error("[tokenStreamToFlux][流式调用异常，{}]", logContext, error);
+                        log.error("[tokenStreamToFlux][流式调用异常，{}]", options.getLogContext(), error);
                         if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
                             saveFailedCallLog(callScene, callContext, requestContent, error.getMessage(),
                                     System.currentTimeMillis() - startTime, true);
@@ -336,6 +327,15 @@ public class AiServiceFactory {
                     })
                     .start();
         });
+    }
+
+    /**
+     * 记录同步调用的成功日志。
+     */
+    public void logSyncCall(SyncCallLogContext logContext, String responseContent, long processingTimeMs) {
+        saveCallLog(
+            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
+            responseContent, null, processingTimeMs, false);
     }
 
     /** 将客户端取消传给支持取消的模型流。 */
@@ -352,45 +352,85 @@ public class AiServiceFactory {
     // ==================== 同步调用日志记录 ====================
 
     /**
-     * 记录同步调用的成功日志。
-     *
-     * <p>供 {@code AuthorAgentService}、{@code EditorAgentService} 等业务服务在
-     * 同步调用完成后调用。</p>
-     *
-     * @param callScene        调用场景
-     * @param callContext      调用上下文
-     * @param requestContent   请求内容摘要
-     * @param responseContent  响应内容
-     * @param processingTimeMs 处理耗时（毫秒）
+     * 记录带 Token 用量的同步模型调用。
      */
-    public void logSyncCall(String callScene, CallContext callContext,
-                            String requestContent, String responseContent,
-                            long processingTimeMs) {
-        saveCallLog(callScene, callContext, requestContent, responseContent,
-                null, processingTimeMs, false);
-    }
-
-    /** 记录带 Token 用量的同步模型调用。 */
-    public void logSyncResponse(String callScene, CallContext callContext, String requestContent,
-                                ChatResponse response, long processingTimeMs) {
-        saveCallLog(callScene, callContext, requestContent, response.aiMessage().text(),
-                response, processingTimeMs, false);
+    private void logSyncResponse(SyncCallLogContext logContext, ChatResponse response, long processingTimeMs) {
+        saveCallLog(
+            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
+            response.aiMessage().text(), response, processingTimeMs, false);
     }
 
     /**
      * 记录同步调用的失败日志。
-     *
-     * @param callScene        调用场景
-     * @param callContext      调用上下文
-     * @param requestContent   请求内容摘要
-     * @param errorMessage     错误信息
-     * @param processingTimeMs 处理耗时（毫秒）
      */
-    public void logSyncCallFailed(String callScene, CallContext callContext,
-                                  String requestContent, String errorMessage,
-                                  long processingTimeMs) {
-        saveFailedCallLog(callScene, callContext, requestContent,
-                errorMessage, processingTimeMs, false);
+    public void logSyncCallFailed(SyncCallLogContext logContext, String errorMessage, long processingTimeMs) {
+        saveFailedCallLog(
+            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
+            errorMessage, processingTimeMs, false);
+    }
+
+    /**
+     * 流式转换使用的日志信息和事件配置。
+     */
+    @Value
+    @Builder
+    public static class TokenStreamOptions<T> {
+        /**
+         * 流式异常日志的上下文。
+         */
+        String logContext;
+
+        /**
+         * 调用日志所属场景。
+         */
+        String callScene;
+
+        /**
+         * 记录调用日志所用的上下文。
+         */
+        CallContext callContext;
+
+        /**
+         * 记录到调用日志的请求正文。
+         */
+        String requestContent;
+
+        /**
+         * 将文本片段转换为下游事件。
+         */
+        Function<String, T> textEvent;
+
+        /**
+         * 将工具执行结果转换为下游事件，空值表示跳过该事件。
+         */
+        Function<ToolExecution, T> toolEvent;
+
+        /**
+         * 模型流启动前推送的可选事件。
+         */
+        T firstEvent;
+    }
+
+    /**
+     * 同步调用成功和失败共用的日志字段。
+     */
+    @Value
+    @Builder
+    public static class SyncCallLogContext {
+        /**
+         * 调用日志所属场景。
+         */
+        String callScene;
+
+        /**
+         * 调用使用的模型、Agent 和用户信息。
+         */
+        CallContext callContext;
+
+        /**
+         * 记录到日志的请求内容。
+         */
+        String requestContent;
     }
 
     // ==================== 内部方法：调用日志 ====================

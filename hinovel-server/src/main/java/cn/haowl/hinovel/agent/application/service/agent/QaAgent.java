@@ -1,11 +1,13 @@
 package cn.haowl.hinovel.agent.application.service.agent;
 
+import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
 import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.TokenStreamOptions;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatMessageMapper;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatSessionMapper;
@@ -22,7 +24,7 @@ import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.langchain4j.service.TokenStream;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +36,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -230,8 +231,10 @@ public class QaAgent {
      * @return 消息列表（按时间正序）
      */
     public List<ChatMessage> listMessages(ChatMessageQuery query) {
-        requireSession(query.getSessionId(), null, query.getUserId());
-        return chatMessageMapper.selectBySessionId(query.getSessionId());
+        Long sessionId = query.getSessionId();
+        // 从会话找到所属小说，并在读取消息前校验用户的访问权限。
+        requireSession(sessionId, null, query.getUserId());
+        return chatMessageMapper.selectBySessionId(sessionId);
     }
 
     /**
@@ -241,14 +244,20 @@ public class QaAgent {
      * @return 分页结果（按时间正序）
      */
     public ChatMessagePageResponse listMessagesPage(ChatMessagePageQuery query) {
-        requireSession(query.getSessionId(), null, query.getUserId());
+        Long sessionId = query.getSessionId();
+
+        // 消息分页沿用会话所属小说的访问权限。
+        requireSession(sessionId, null, query.getUserId());
+
+        int pageSize = query.getPageSize();
         List<ChatMessage> messages = chatMessageMapper.selectPageByCursor(
-            query.getSessionId(), query.getCursorId(), query.getPageSize());
+            sessionId, query.getCursorId(), pageSize);
         List<ChatMessageResponse> responseList = messages.stream()
             .map(ChatMessageResponse::fromEntity)
             .toList();
-        // 返回条数达到每页条数时认为还有更早的消息
-        boolean hasMore = messages.size() >= query.getPageSize();
+
+        // 取满一页时，允许客户端继续请求更早的消息。
+        boolean hasMore = messages.size() >= pageSize;
         return new ChatMessagePageResponse(responseList, hasMore);
     }
 
@@ -282,65 +291,94 @@ public class QaAgent {
      * @param command 问答命令
      * @return 逐 Token 推送的 Flux 流
      */
-    public Flux<ChatEvent> streamChat(QaChatCommand command) {
+    public Flux<ChatEvent<?>> streamChat(QaChatCommand command) {
         return Flux.defer(() -> {
             Long novelId = command.getNovelId();
             Long sessionId = command.getSessionId();
             String question = command.getQuestion();
             Long userId = command.getUserId();
+
+            // 校验会话属于当前小说，且用户有权访问该小说。
             requireSession(sessionId, novelId, userId);
+
+            // 只按配置带入历史消息和小说大纲。
             NovelSettings settings = novelSettingsService.getEffectiveSettings(novelId, userId);
-            int contextLength = settings.getQaContextLength() == null ? 0 : settings.getQaContextLength();
+            int contextLength = settings.getQaContextLength() == null
+                ? 0 : settings.getQaContextLength();
             List<String> chatHistory = buildChatHistory(sessionId, contextLength);
             String outline = Integer.valueOf(ENABLED).equals(settings.getQaIncludeOutline())
                 ? loadNovelOutlineContent(novelId) : null;
             String userPrompt = AgentPromptTemplates.buildQaPrompt(question, chatHistory, outline);
-            CallContext callContext = aiServiceFactory.prepareNovelCall(novelId, AgentRole.QA, userId, DEFAULT_SYSTEM_PROMPT);
-            SkillTool skillTool = callContext.getSkillTool();
-            GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true,
-                NovelContentRetrievalTool.create(vectorStoreFactory, novelId, userId),
-                NovelCreationTool.create(novelId, novelChapterService, chapterOutlineService),
-                NovelCharacterTool.create(novelId, novelCharacterRepository));
 
+            CallContext callContext =
+                aiServiceFactory.prepareNovelCall(
+                    novelId, AgentRole.QA, userId, DEFAULT_SYSTEM_PROMPT);
+            SkillTool skillTool = callContext.getSkillTool();
+            GenericAiAssistant assistant =
+                aiServiceFactory.buildNovelAssistant(
+                    callContext,
+                    true,
+                    NovelContentRetrievalTool.create(vectorStoreFactory, novelId, userId),
+                    NovelCreationTool.create(novelId, novelChapterService, chapterOutlineService),
+                    NovelCharacterTool.create(novelId, novelCharacterRepository));
+
+            // 先保存用户消息，回复流中途中断时也能在会话中看到原问题。
             saveMessage(ChatMessage.createUserMessage(sessionId, novelId, question), userId, null);
             String modelPrompt = needsDefaultSkill(callContext, question, chatHistory)
                 ? aiServiceFactory.writingPrompt(callContext, userPrompt) : userPrompt;
-            ChatEvent defaultLoad = skillLoadedEvent(skillTool);
+            ChatEvent<SkillLoadedData> defaultLoad = skillLoadedEvent(skillTool);
             TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(), modelPrompt);
-            StringBuffer response = new StringBuffer();
-            AtomicBoolean saved = new AtomicBoolean();
 
-            Flux<ChatEvent> events = aiServiceFactory.tokenStreamToFlux(
-                    tokenStream, "novelId=" + novelId + ",sessionId=" + sessionId,
-                    CALL_SCENE_QA, callContext, userPrompt,
-                    token -> new ChatEvent(null, token),
-                    execution -> {
+            TokenStreamOptions<ChatEvent<?>> streamOptions =
+                TokenStreamOptions.<ChatEvent<?>>builder()
+                    .logContext("novelId=" + novelId + ",sessionId=" + sessionId)
+                    .callScene(CALL_SCENE_QA)
+                    .callContext(callContext)
+                    .requestContent(userPrompt)
+                    .textEvent(token -> new ChatEvent<>(ChatEventEnum.TEXT, token))
+                    .toolEvent(execution -> {
                         String toolName = execution.request().name();
                         if (SkillTool.TOOL_NAME_LOAD.equals(toolName)) {
                             return skillLoadedEvent(skillTool);
                         }
-                        return new ChatEvent("tool-executed", Map.of(
-                            "toolName", toolName, "novelId", JsonNodeFactory.instance.numberNode(novelId)));
-                    }, defaultLoad)
-                .concatWith(Flux.defer(() -> styleNotice(question, skillTool, response.toString())))
-                .doOnNext(event -> {
-                    if (event.getName() == null) {
-                        response.append(event.getData());
-                    }
-                });
+                        return new ChatEvent<>(
+                            ChatEventEnum.TOOL_EXECUTED, new ToolExecutedData(toolName, novelId));
+                    })
+                    .firstEvent(defaultLoad)
+                    .build();
+
+            StringBuffer response = new StringBuffer();
+            AtomicBoolean saved = new AtomicBoolean();
+
+            // 等正文生成完再补风格提示。正文和提示一同保存，工具事件单独推送。
+            Flux<ChatEvent<?>> events =
+                aiServiceFactory.tokenStreamToFlux(tokenStream, streamOptions)
+                    .concatWith(Flux.defer(() -> styleNotice(question, skillTool, response.toString())))
+                    .doOnNext(event -> {
+                        if (ChatEventEnum.TEXT == event.getType()) {
+                            response.append(event.getData());
+                        }
+                    });
+
+            // 正常完成和取消都保留已生成的回复，最多尝试保存一次。
             Runnable saveReply = () -> {
                 String content = response.toString();
                 if (!content.isBlank() && saved.compareAndSet(false, true)) {
-                    saveMessage(ChatMessage.createAssistantMessage(sessionId, novelId, content), userId,
+                    saveMessage(
+                        ChatMessage.createAssistantMessage(sessionId, novelId, content),
+                        userId,
                         skillTool == null ? List.of() : skillTool.loadedNames());
                 }
             };
-            return events.doOnComplete(saveReply).doOnCancel(() -> {
-                if (skillTool != null) {
-                    skillTool.cancel();
-                }
-                saveReply.run();
-            });
+
+            return events
+                .doOnComplete(saveReply)
+                .doOnCancel(() -> {
+                    if (skillTool != null) {
+                        skillTool.cancel();
+                    }
+                    saveReply.run();
+                });
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -351,13 +389,16 @@ public class QaAgent {
         if (context.getSkillTool() == null || !context.getSkillTool().hasDefaultSkill()) {
             return false;
         }
+
         try {
-            String result = aiServiceFactory.judgeWritingIntent(context,
-                AgentPromptTemplates.buildQaPrompt(question, chatHistory, null),
-                CALL_SCENE_QA_WRITING_INTENT, WRITING_INTENT_REQUEST);
+            String result =
+                aiServiceFactory.judgeWritingIntent(
+                    context, AgentPromptTemplates.buildQaPrompt(question, chatHistory, null),
+                    CALL_SCENE_QA_WRITING_INTENT, WRITING_INTENT_REQUEST);
             return result == null || !WRITING_INTENT_OTHER.equalsIgnoreCase(
                 result.strip().replaceFirst("[。.!！]+$", ""));
         } catch (RuntimeException e) {
+            // 分类失败时仍加载默认技能，避免写作请求丢失默认风格。
             return true;
         }
     }
@@ -365,25 +406,27 @@ public class QaAgent {
     /**
      * 明确指定的风格未成功读取时补充聊天提示。
      */
-    private Flux<ChatEvent> styleNotice(String question, SkillTool tool, String answer) {
+    private Flux<ChatEvent<?>> styleNotice(String question, SkillTool tool, String answer) {
         Matcher matcher = EXPLICIT_STYLE.matcher(question);
         if (!matcher.find()) {
             return Flux.empty();
         }
+
         String style = (matcher.group(1) == null ? matcher.group(2) : matcher.group(1)).strip();
+        // 技能已加载，或正文已提示加载失败时，省去重复提示。
         if ((tool != null && tool.loadedNames().contains(style))
             || (answer.contains("未加载") && answer.contains(style))) {
             return Flux.empty();
         }
-        return Flux.just(new ChatEvent(null, "\n\n本次未加载「" + style + "」风格 Skill。"));
+        return Flux.just(new ChatEvent<>(ChatEventEnum.TEXT, "\n\n本次未加载「" + style + "」风格 Skill。"));
     }
 
     /**
      * 读取并构造尚未推送的成功事件。
      */
-    private ChatEvent skillLoadedEvent(SkillTool skillTool) {
+    private ChatEvent<SkillLoadedData> skillLoadedEvent(SkillTool skillTool) {
         String name = skillTool == null ? null : skillTool.pollLoadedName();
-        return name == null ? null : new ChatEvent("skill-loaded", Map.of("skillName", name));
+        return name == null ? null : new ChatEvent<>(ChatEventEnum.SKILL_LOADED, new SkillLoadedData(name));
     }
 
     /**
@@ -447,15 +490,43 @@ public class QaAgent {
      * 聊天流中的文本或结构化事件。
      */
     @Value
-    public static class ChatEvent {
+    public static class ChatEvent<T> {
         /**
-         * SSE 事件名称，正文帧不设名称。
+         * 聊天事件类型。
          */
-        String name;
+        ChatEventEnum type;
 
         /**
          * 正文或事件数据。
          */
-        Object data;
+        T data;
+    }
+
+    /**
+     * 技能加载事件的数据。
+     */
+    @Value
+    public static class SkillLoadedData {
+        /**
+         * 已加载的技能名称。
+         */
+        String skillName;
+    }
+
+    /**
+     * 工具执行事件的数据。
+     */
+    @Value
+    public static class ToolExecutedData {
+        /**
+         * 已执行的工具名称。
+         */
+        String toolName;
+
+        /**
+         * 工具所属小说 ID，沿用事件协议中的数字类型。
+         */
+        @JsonSerialize(as = Number.class)
+        Long novelId;
     }
 }

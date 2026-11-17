@@ -3,6 +3,7 @@ package cn.haowl.hinovel.agent.interfaces.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
+import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
 import cn.haowl.hinovel.agent.interfaces.dto.*;
@@ -275,7 +276,9 @@ public class AIController {
         command.setQuestion(request.getQuestion());
         command.setUserId(StpUtil.getLoginIdAsLong());
         return qaAgentService.streamChat(command)
-            .map(event -> ServerSentEvent.builder(event.getData()).event(event.getName()).build())
+            .map(event -> ServerSentEvent.<Object>builder(event.getData())
+                .event(ChatEventEnum.TEXT == event.getType() ? null : event.getType().getCode())
+                .build())
             .onErrorResume(e -> {
                 log.error("[aiChat][问答流式异常，sessionId={}]", command.getSessionId(), e);
                 String message = e.getMessage() != null ? e.getMessage() : QA_STREAM_ERROR_MESSAGE;
