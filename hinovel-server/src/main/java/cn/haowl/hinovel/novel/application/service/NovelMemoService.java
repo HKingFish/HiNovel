@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 创作手记应用服务。
  *
- * <p>按小说与用户维度读取、保存创作手记。</p>
+ * 按小说与用户维度读取、保存创作手记。
  *
  * @author haowl
  * @date 2026-11-12

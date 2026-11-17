@@ -7,7 +7,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 /**
  * 认证模块基础配置。
  *
- * <p>提供密码编码器 Bean，供 AuthService 注入使用。</p>
+ * 提供密码编码器 Bean，供 AuthService 注入使用。
  *
  * @author haowl
  * @since 2024

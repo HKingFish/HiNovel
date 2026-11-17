@@ -2,6 +2,7 @@ package cn.haowl.hinovel.ai.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
+import cn.haowl.hinovel.ai.application.log.LlmCallStatistics;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
 import cn.haowl.hinovel.ai.interfaces.dto.LlmCallLogQuery;
 import cn.haowl.hinovel.common.response.ApiResponse;
@@ -14,13 +15,11 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 /**
  * LLM 调用记录控制器。
  *
- * <p>提供 LLM 调用记录的分页查询、详情查看和消耗统计接口，
- * 供前端调用记录管理页面使用。</p>
+ * 提供 LLM 调用记录的分页查询、详情查看和消耗统计接口，
+ * 供前端调用记录管理页面使用。
  *
  * @author haowl
  */
@@ -56,7 +55,7 @@ public class LlmCallLogController {
      */
     @Operation(summary = "查询调用消耗统计", description = "统计指定时间范围内的调用次数、Token 消耗和总耗时")
     @GetMapping("/statistics")
-    public ApiResponse<Map<String, Object>> getStatistics(@ModelAttribute LlmCallLogQuery query) {
+    public ApiResponse<LlmCallStatistics> getStatistics(@ModelAttribute LlmCallLogQuery query) {
         return ApiResponse.success(
                 llmCallLogService.getCallStatistics(query, StpUtil.getLoginIdAsLong()));
     }

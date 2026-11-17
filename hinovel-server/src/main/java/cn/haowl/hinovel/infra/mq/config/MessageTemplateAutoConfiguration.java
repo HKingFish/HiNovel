@@ -16,6 +16,9 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @EnableAsync
 public class MessageTemplateAutoConfiguration {
 
+    /**
+     * 注册默认的 Spring 事件消息模板。
+     */
     @Bean
     @ConditionalOnMissingBean(MessageTemplate.class)
     public MessageTemplate messageTemplate(ApplicationEventPublisher eventPublisher) {

@@ -1,6 +1,8 @@
 package cn.haowl.hinovel.infra.oss.provider;
 
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
+import cn.haowl.hinovel.infra.oss.constant.OssConstants;
+import cn.haowl.hinovel.infra.oss.util.OssFileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,7 +22,7 @@ import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_UPLOAD_FA
 /**
  * 本地文件存储实现。
  *
- * <p>将文件存储至配置的本地目录，通过静态资源接口提供访问。</p>
+ * 将文件存储至配置的本地目录，通过静态资源接口提供访问。
  *
  * @author haowl
  * @since 2024
@@ -36,23 +38,20 @@ public class LocalOssProvider implements OssProvider {
 
     @Override
     public String upload(MultipartFile file, String bizType) {
-        String originalFilename = file.getOriginalFilename();
-        String extension = extractExtension(originalFilename);
+        String extension = OssFileUtils.getExtension(file.getOriginalFilename(), OssConstants.DEFAULT_FILE_EXTENSION);
         // 使用 UUID 避免文件名冲突
         String objectKey = bizType + "/" + UUID.randomUUID() + "." + extension;
-        Path targetPath = Paths.get(ossProperties.getLocal().getBasePath(), objectKey);
-
         // 转为绝对路径，避免 Windows 下 /data/... 被解析为相对路径
-        Path absolutePath = targetPath.toAbsolutePath();
+        Path absolutePath = Paths.get(ossProperties.getLocal().getBasePath(), objectKey).toAbsolutePath();
         try {
             Files.createDirectories(absolutePath.getParent());
             // 使用 Files.copy 替代 transferTo，避免 Tomcat 工作目录干扰
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, absolutePath, StandardCopyOption.REPLACE_EXISTING);
             }
-            log.info("本地文件上传成功，路径：{}", absolutePath);
+            log.info("[upload][本地文件上传成功，bytes={}]", file.getSize());
         } catch (IOException e) {
-            log.error("本地文件上传失败，路径：{}，异常：{}", absolutePath, e.getMessage());
+            log.error("[upload][本地文件上传失败，type={}]", e.getClass().getSimpleName());
             throw exception(OSS_UPLOAD_FAILED);
         }
 
@@ -67,14 +66,13 @@ public class LocalOssProvider implements OssProvider {
         Path targetPath = Paths.get(ossProperties.getLocal().getBasePath(), objectKey).toAbsolutePath();
 
         try {
-            boolean deleted = Files.deleteIfExists(targetPath);
-            if (deleted) {
-                log.info("本地文件删除成功，路径：{}", targetPath);
+            if (Files.deleteIfExists(targetPath)) {
+                log.info("[delete][本地文件删除成功]");
             } else {
-                log.warn("本地文件不存在，跳过删除，路径：{}", targetPath);
+                log.warn("[delete][本地文件不存在，跳过删除]");
             }
         } catch (IOException e) {
-            log.error("本地文件删除失败，路径：{}，异常：{}", targetPath, e.getMessage());
+            log.error("[delete][本地文件删除失败，type={}]", e.getClass().getSimpleName());
             throw exception(OSS_DELETE_FAILED);
         }
     }
@@ -82,15 +80,5 @@ public class LocalOssProvider implements OssProvider {
     @Override
     public String getAccessUrl(String objectKey) {
         return ossProperties.getLocal().getAccessUrlPrefix() + "/" + objectKey;
-    }
-
-    /**
-     * 从文件名中提取后缀名
-     */
-    private String extractExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return "bin";
-        }
-        return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 }

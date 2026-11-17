@@ -1,13 +1,11 @@
-package cn.haowl.hinovel.novel.interfaces.dto;
+package cn.haowl.hinovel.novel.domain.command;
 
 import lombok.Data;
 
 /**
- * 创建批注请求。
- *
- * @author haowl
- * @date 2026-11-12
- * @desc 承载批注的定位与内容
+ * @author : haowl
+ * @date : 2026/11/17 21:07
+ * @desc : 创建批注所需的定位与内容
  */
 @Data
 public class CreateAnnotationRequest {

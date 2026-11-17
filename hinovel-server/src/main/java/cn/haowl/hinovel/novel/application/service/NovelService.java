@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.novel.application.service;
 
+import cn.haowl.hinovel.novel.constant.NovelStatusEnum;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
@@ -15,8 +16,8 @@ import java.util.List;
 /**
  * 小说应用服务。
  *
- * <p>负责小说相关用例的流程编排，协调领域服务完成业务操作。
- * 不包含业务逻辑，业务规则由 {@link NovelDomainService} 和领域实体承担。</p>
+ * 负责小说相关用例的流程编排，协调领域服务完成业务操作。
+ * 不包含业务逻辑，业务规则由 {@link NovelDomainService} 和领域实体承担。
  */
 @Service
 public class NovelService {
@@ -36,7 +37,7 @@ public class NovelService {
     /**
      * 创建小说。
      *
-     * <p>编排流程：创建小说 → 初始化空白大纲 → 初始化 Agent 配置。</p>
+     * 编排流程：创建小说 → 初始化空白大纲 → 初始化 Agent 配置。
      *
      * @param userId  用户 ID
      * @param request 创建请求
@@ -80,7 +81,7 @@ public class NovelService {
 
         // 状态变更单独处理（状态转换有独立的领域规则）
         if (request.getStatus() != null) {
-            novel = novelDomainService.changeStatus(novel, request.getStatus());
+            novel = novelDomainService.changeStatus(novel, NovelStatusEnum.valueOf(request.getStatus()));
         }
 
         return novel;

@@ -9,6 +9,9 @@ import lombok.Data;
 @Data
 public class OutlineUpdateRequest {
 
+    /**
+     * 小说 ID。
+     */
     @NotNull(message = "小说ID不能为空")
     private Long novelId;
 

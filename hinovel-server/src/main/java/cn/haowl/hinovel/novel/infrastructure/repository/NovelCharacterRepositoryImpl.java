@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * 小说人物仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现小说人物及人物关系仓储接口。</p>
+ * 基于 MyBatis-Plus 实现小说人物及人物关系仓储接口。
  *
  * @author haowl
  */

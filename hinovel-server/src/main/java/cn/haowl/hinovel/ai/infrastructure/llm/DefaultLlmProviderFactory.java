@@ -19,9 +19,9 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * LLM 提供方工厂默认实现。
  *
- * <p>使用 ConcurrentHashMap 缓存 LLM 实例，按提供方 ID 隔离，避免重复创建。
+ * 使用 ConcurrentHashMap 缓存 LLM 实例，按提供方 ID 隔离，避免重复创建。
  * 集成 {@link ProviderHealthTracker} 实现健康状态追踪和自动 failover，
- * 当首选 Provider 不健康时自动切换到其他可用 Provider。</p>
+ * 当首选 Provider 不健康时自动切换到其他可用 Provider。
  *
  * @author haowl
  */
@@ -41,7 +41,9 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     @Autowired
     private ProviderHealthTracker healthTracker;
 
-    /** 提供方 ID -> LLM 实例缓存，避免重复创建 */
+    /**
+     * 按提供方 ID 复用模型实例。创建失败时不缓存，可通过 evict 和 evictAll 失效。
+     */
     private final ConcurrentHashMap<Long, LlmProviderPort> providerCache = new ConcurrentHashMap<>();
 
     @Override
@@ -69,19 +71,18 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
         if (healthTracker.isHealthy(preferredProviderId)) {
             return getByProviderId(preferredProviderId);
         }
-        log.warn("首选 Provider 不健康，尝试 failover，ID：{}", preferredProviderId);
+        log.warn("[getAvailableProvider][首选提供方不健康，查找备选，providerId={}]", preferredProviderId);
         // 查询所有激活的 Provider，尝试找到健康的替代
         List<LlmProvider> activeProviders = llmProviderQueryPort.listActiveProviders();
         for (LlmProvider candidate : activeProviders) {
-            if (!candidate.getId().equals(preferredProviderId)
+            if (!preferredProviderId.equals(candidate.getId())
                     && healthTracker.isHealthy(candidate.getId())) {
-                log.info("failover 到备选 Provider，ID：{}，名称：{}",
-                        candidate.getId(), candidate.getName());
+                log.info("[getAvailableProvider][切换到备选提供方，providerId={}]", candidate.getId());
                 return getByProvider(candidate);
             }
         }
         // 所有 Provider 都不健康，仍然尝试首选（可能冷却期已过）
-        log.warn("所有 Provider 均不健康，强制使用首选 Provider，ID：{}", preferredProviderId);
+        log.warn("[getAvailableProvider][无健康的备选提供方，尝试首选，providerId={}]", preferredProviderId);
         return getByProviderId(preferredProviderId);
     }
 
@@ -103,14 +104,14 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     public void evict(Long providerId) {
         if (providerId != null) {
             providerCache.remove(providerId);
-            log.info("已移除 LLM 提供方缓存，ID：{}", providerId);
+            log.info("[evict][已移除 LLM 提供方缓存，providerId={}]", providerId);
         }
     }
 
     @Override
     public void evictAll() {
         providerCache.clear();
-        log.info("已清空所有 LLM 提供方缓存");
+        log.info("[evictAll][已清空所有 LLM 提供方缓存]");
     }
 
     /**
@@ -133,21 +134,14 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
     /**
      * 根据提供方实体创建适配器实例。
      *
-     * <p>当前所有提供方（OpenAI、DeepSeek、通义千问）均兼容 OpenAI 协议，
+     * 当前所有提供方（OpenAI、DeepSeek、通义千问）均兼容 OpenAI 协议，
      * 统一使用 OpenAiCompatibleLlmAdapter。后续如有不兼容协议的提供方，
-     * 可在此处按 providerType 分发到不同的适配器实现。</p>
+     * 可在此处按 providerType 分发到不同的适配器实现。
      *
      * @param provider 提供方实体
      * @return LLM 提供方端口实例
      */
     private LlmProviderPort createAdapter(LlmProvider provider) {
-        log.info("创建 LLM 适配器，提供方：{}，类型：{}，模型：{}",
-                provider.getName(), provider.getProviderType(), provider.getModels());
-        return new OpenAiCompatibleLlmAdapter(
-                provider.getProviderType(),
-                provider.getBaseUrl(),
-                provider.getApiKey(),
-                provider.getModelList().isEmpty() ? null : provider.getModelList().get(0)
-        );
+        return new OpenAiCompatibleLlmAdapter(provider);
     }
 }

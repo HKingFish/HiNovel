@@ -3,19 +3,21 @@ package cn.haowl.hinovel.agent.infrastructure.agent;
 import cn.haowl.hinovel.agent.application.service.SkillService;
 import cn.haowl.hinovel.agent.application.service.agent.WritingIntentAssistant;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
-import cn.haowl.hinovel.agent.enums.AgentRole;
-import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
+import cn.haowl.hinovel.ai.constant.LlmCallStatusEnum;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
 import cn.haowl.hinovel.ai.domain.entity.SkillReadCall;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
-import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
+import cn.haowl.hinovel.novel.domain.repository.NovelAgentConfigRepository;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingHandle;
 import dev.langchain4j.model.output.TokenUsage;
@@ -47,18 +49,23 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * AiService 构建工厂。
  *
- * <p>封装 LangChain4J {@link AiServices} 的动态构建逻辑，
+ * 封装 LangChain4J {@link AiServices} 的动态构建逻辑，
  * 提供统一的 AiService 实例创建、Agent 配置解析、系统提示词获取、
- * 以及 {@link TokenStream} 到 {@link Flux} 的桥接能力。</p>
+ * 以及 {@link TokenStream} 到 {@link Flux} 的桥接能力。
  *
- * <p>集成 LLM 调用记录功能，在每次调用完成后异步记录请求、响应、
- * Token 消耗和耗时等信息。</p>
+ * 集成 LLM 调用记录功能，在每次调用完成后异步记录请求、响应、
+ * Token 消耗和耗时等信息。
  *
  * @author haowl
  */
 @Slf4j
 @Component
 public class AiServiceFactory {
+
+    /**
+     * 意图识别记录使用的请求摘要。
+     */
+    private static final String WRITING_INTENT_REQUEST = "判断当前问答是否要求写作或润色";
 
     /**
      * 按用户配置解析模型提供方。
@@ -70,13 +77,13 @@ public class AiServiceFactory {
      * 小说绑定的 Agent 配置。
      */
     @Autowired
-    private NovelAgentConfigMapper novelAgentConfigMapper;
+    private NovelAgentConfigRepository novelAgentConfigRepository;
 
     /**
      * Agent 元数据。
      */
     @Autowired
-    private AgentMapper agentMapper;
+    private AgentRepository agentRepository;
 
     /**
      * LLM 调用记录。
@@ -84,7 +91,9 @@ public class AiServiceFactory {
     @Autowired
     private LlmCallLogService llmCallLogService;
 
-    /** 内置 Skill 挂载和正文。 */
+    /**
+     * 内置 Skill 挂载和正文。
+     */
     @Autowired
     private SkillService skillService;
 
@@ -125,36 +134,48 @@ public class AiServiceFactory {
          */
         private Long userId;
 
-        /** 当次执行使用的模型提供方。 */
+        /**
+         * 当次执行使用的模型提供方。
+         */
         private LlmProviderPort provider;
 
-        /** 仅含目录元数据的系统提示词。 */
+        /**
+         * 仅含目录元数据的系统提示词。
+         */
         private String systemPrompt;
 
-        /** 当次执行的工具调用上限。 */
+        /**
+         * 当次执行的工具调用上限。
+         */
         private int maxIterations;
 
-        /** 当次执行的 Read Tool。 */
+        /**
+         * 当次执行的 Read Tool。
+         */
         private SkillTool skillTool;
 
-        /** 返回当前执行的读取快照。 */
+        /**
+         * 返回当前执行的读取快照。
+         */
         public List<SkillReadCall> skillReadCalls() {
             return skillTool == null ? List.of() : skillTool.readCalls();
         }
     }
 
-    /** 解析一次执行所用的 Agent、模型、提示词及 Skill 挂载。 */
+    /**
+     * 解析一次执行所用的 Agent、模型、提示词及 Skill 挂载。
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public CallContext prepareNovelCall(Long novelId, AgentRole role, Long userId, String defaultSystemPrompt) {
+    public CallContext prepareNovelCall(Long novelId, AgentRoleEnum role, Long userId, String defaultSystemPrompt) {
         Agent agent = resolveAgent(novelId, role);
         if (agent == null) {
-            throw exception(NOVEL_AGENT_NOT_CONFIGURED, getRoleName(role));
+            throw exception(NOVEL_AGENT_NOT_CONFIGURED, role.getName());
         }
         if (!agent.isAvailableTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
         if (agent.getLlmProviderId() == null) {
-            throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, getRoleName(role));
+            throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, role.getName());
         }
         List<AgentSkill> skills = skillService.listBoundSkills(agent.getId());
         LlmProviderPort provider = llmProviderFactory.getByProviderId(agent.getLlmProviderId());
@@ -178,7 +199,9 @@ public class AiServiceFactory {
                 .build();
     }
 
-    /** 按本次执行的模式注册挂载工具及现有场景工具。 */
+    /**
+     * 按本次执行的模式注册挂载工具及现有场景工具。
+     */
     public GenericAiAssistant buildNovelAssistant(CallContext context, boolean streaming, Object... sceneTools) {
         AiServices<GenericAiAssistant> builder = AiServices.builder(GenericAiAssistant.class)
                 .maxSequentialToolsInvocations(context.getMaxIterations());
@@ -202,7 +225,9 @@ public class AiServiceFactory {
         return builder.build();
     }
 
-    /** 将服务端通过 Read Tool 得到的正文交给当前写作或润色执行。 */
+    /**
+     * 将服务端通过 Read Tool 得到的正文交给当前写作或润色执行。
+     */
     public String writingPrompt(CallContext context, String userPrompt) {
         SkillTool skillTool = context.getSkillTool();
         if (skillTool == null || !skillTool.hasDefaultSkill()) {
@@ -217,21 +242,18 @@ public class AiServiceFactory {
      *
      * @param context        当前执行的调用上下文
      * @param userPrompt     用于判定的用户提示词
-     * @param callScene      调用场景
-     * @param requestContent 日志中的请求摘要
      * @return 模型返回的意图标签
      */
-    public String judgeWritingIntent(CallContext context, String userPrompt,
-                                     String callScene, String requestContent) {
+    public String judgeWritingIntent(CallContext context, String userPrompt) {
         WritingIntentAssistant assistant = AiServices.builder(WritingIntentAssistant.class)
                 .chatModel(context.getProvider().getChatModel())
                 .build();
         long startTime = System.currentTimeMillis();
-        SyncCallLogContext logContext =
-            SyncCallLogContext.builder()
-                .callScene(callScene)
+        CallLogContext logContext =
+            CallLogContext.builder()
+                .callScene(LlmCallSceneEnum.QA_WRITING_INTENT)
                 .callContext(context)
-                .requestContent(requestContent)
+                .requestContent(WRITING_INTENT_REQUEST)
                 .build();
         try {
             Result<String> result = assistant.judgeWritingIntent(userPrompt);
@@ -253,9 +275,14 @@ public class AiServiceFactory {
      * @return 文本和工具执行结果组成的事件流
      */
     public <T> Flux<T> tokenStreamToFlux(TokenStream tokenStream, TokenStreamOptions<T> options) {
-        String callScene = options.getCallScene();
         CallContext callContext = options.getCallContext();
-        String requestContent = options.getRequestContent();
+        CallLogContext logContext =
+            callContext == null || options.getCallScene() == null ? null : CallLogContext.builder()
+                .callScene(options.getCallScene())
+                .callContext(callContext)
+                .requestContent(options.getRequestContent())
+                .streaming(true)
+                .build();
         Function<ToolExecution, T> toolEvent = options.getToolEvent();
 
         return Flux.create(sink -> {
@@ -274,9 +301,8 @@ public class AiServiceFactory {
                     callContext.getSkillTool().cancel();
                 }
                 cancelStreamingHandle(upstream.get());
-                if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
-                    saveFailedCallLog(callScene, callContext, requestContent, "调用已取消",
-                            System.currentTimeMillis() - startTime, true);
+                if (logContext != null && logged.compareAndSet(false, true)) {
+                    saveFailedCallLog(logContext, "调用已取消", System.currentTimeMillis() - startTime);
                 }
             });
             if (options.getFirstEvent() != null) {
@@ -293,7 +319,8 @@ public class AiServiceFactory {
                             sink.next(options.getTextEvent().apply(partial.text()));
                         }
                     })
-                    .onPartialToolCallWithContext((partial, context) -> observeHandle.accept(context.streamingHandle()))
+                .onPartialToolCallWithContext(
+                    (partial, context) -> observeHandle.accept(context.streamingHandle()))
                     .beforeToolExecution(execution -> {
                         if (sink.isCancelled()) {
                             throw new CancellationException("调用已取消");
@@ -308,9 +335,9 @@ public class AiServiceFactory {
                 });
             }
             stream.onCompleteResponse(response -> {
-                        if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
-                            saveCallLog(callScene, callContext, requestContent, responseBuffer.toString(),
-                                    response, System.currentTimeMillis() - startTime, true);
+                    if (logContext != null && logged.compareAndSet(false, true)) {
+                        saveCallLog(logContext, responseBuffer.toString(), response,
+                            System.currentTimeMillis() - startTime);
                         }
                         sink.complete();
                     })
@@ -318,10 +345,10 @@ public class AiServiceFactory {
                         if (sink.isCancelled()) {
                             return;
                         }
-                        log.error("[tokenStreamToFlux][流式调用异常，{}]", options.getLogContext(), error);
-                        if (callContext != null && callScene != null && logged.compareAndSet(false, true)) {
-                            saveFailedCallLog(callScene, callContext, requestContent, error.getMessage(),
-                                    System.currentTimeMillis() - startTime, true);
+                        log.error("[tokenStreamToFlux][流式调用异常，{}，异常类型={}]",
+                            options.getLogContext(), error.getClass().getSimpleName());
+                        if (logContext != null && logged.compareAndSet(false, true)) {
+                            saveFailedCallLog(logContext, error.getMessage(), System.currentTimeMillis() - startTime);
                         }
                         sink.error(error);
                     })
@@ -332,13 +359,13 @@ public class AiServiceFactory {
     /**
      * 记录同步调用的成功日志。
      */
-    public void logSyncCall(SyncCallLogContext logContext, String responseContent, long processingTimeMs) {
-        saveCallLog(
-            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
-            responseContent, null, processingTimeMs, false);
+    public void logSyncCall(CallLogContext logContext, String responseContent, long processingTimeMs) {
+        saveCallLog(logContext, responseContent, null, processingTimeMs);
     }
 
-    /** 将客户端取消传给支持取消的模型流。 */
+    /**
+     * 将客户端取消传给支持取消的模型流。
+     */
     private void cancelStreamingHandle(StreamingHandle handle) {
         if (handle != null) {
             try {
@@ -354,19 +381,15 @@ public class AiServiceFactory {
     /**
      * 记录带 Token 用量的同步模型调用。
      */
-    private void logSyncResponse(SyncCallLogContext logContext, ChatResponse response, long processingTimeMs) {
-        saveCallLog(
-            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
-            response.aiMessage().text(), response, processingTimeMs, false);
+    private void logSyncResponse(CallLogContext logContext, ChatResponse response, long processingTimeMs) {
+        saveCallLog(logContext, response.aiMessage().text(), response, processingTimeMs);
     }
 
     /**
      * 记录同步调用的失败日志。
      */
-    public void logSyncCallFailed(SyncCallLogContext logContext, String errorMessage, long processingTimeMs) {
-        saveFailedCallLog(
-            logContext.getCallScene(), logContext.getCallContext(), logContext.getRequestContent(),
-            errorMessage, processingTimeMs, false);
+    public void logSyncCallFailed(CallLogContext logContext, String errorMessage, long processingTimeMs) {
+        saveFailedCallLog(logContext, errorMessage, processingTimeMs);
     }
 
     /**
@@ -383,7 +406,7 @@ public class AiServiceFactory {
         /**
          * 调用日志所属场景。
          */
-        String callScene;
+        LlmCallSceneEnum callScene;
 
         /**
          * 记录调用日志所用的上下文。
@@ -412,15 +435,15 @@ public class AiServiceFactory {
     }
 
     /**
-     * 同步调用成功和失败共用的日志字段。
+     * 一次模型调用的日志上下文。
      */
     @Value
     @Builder
-    public static class SyncCallLogContext {
+    public static class CallLogContext {
         /**
          * 调用日志所属场景。
          */
-        String callScene;
+        LlmCallSceneEnum callScene;
 
         /**
          * 调用使用的模型、Agent 和用户信息。
@@ -431,82 +454,62 @@ public class AiServiceFactory {
          * 记录到日志的请求内容。
          */
         String requestContent;
+
+        /**
+         * 是否以流式方式调用模型。
+         */
+        boolean streaming;
     }
 
     // ==================== 内部方法：调用日志 ====================
 
     /**
-     * 保存成功的调用日志。
-     *
-     * @param callScene        调用场景
-     * @param callContext      调用上下文
-     * @param requestContent   请求内容
-     * @param responseContent  响应内容
-     * @param chatResponse     LangChain4J 响应对象（流式调用时可获取 Token 信息，同步调用传 null）
-     * @param processingTimeMs 处理耗时
-     * @param isStreaming      是否流式调用
+     * 保存成功的调用记录和 Token 用量。
      */
-    private void saveCallLog(String callScene, CallContext callContext,
-                             String requestContent, String responseContent,
-                             ChatResponse chatResponse, long processingTimeMs,
-                             boolean isStreaming) {
-        LlmCallLog callLog = LlmCallLog.builder()
-                .callScene(callScene)
-                .agentId(callContext.getAgentId())
-                .agentName(callContext.getAgentName())
-                .llmProviderId(callContext.getLlmProviderId())
-                .llmProviderName(callContext.getLlmProviderName())
-                .modelName(callContext.getModelName())
-                .requestContent(requestContent)
+    private void saveCallLog(
+        CallLogContext context, String responseContent, ChatResponse chatResponse, long processingTimeMs) {
+        LlmCallLog callLog =
+            buildCallLog(context, processingTimeMs)
                 .responseContent(responseContent)
-                .processingTimeMs(processingTimeMs)
-                .status(LlmCallLog.STATUS_SUCCESS)
-                .isStreaming(isStreaming ? CommonConstants.ENABLED : CommonConstants.DISABLED)
-                .skillReadCalls(callContext.skillReadCalls())
-                .userId(callContext.getUserId())
+                .status(LlmCallStatusEnum.SUCCESS.name())
                 .build();
 
-        // 从 ChatResponse 中提取 Token 使用信息
         if (chatResponse != null && chatResponse.tokenUsage() != null) {
             TokenUsage tokenUsage = chatResponse.tokenUsage();
             callLog.setPromptTokens(tokenUsage.inputTokenCount());
             callLog.setCompletionTokens(tokenUsage.outputTokenCount());
             callLog.setTotalTokens(tokenUsage.totalTokenCount());
         }
-
         llmCallLogService.saveAsync(callLog);
     }
 
     /**
-     * 保存失败的调用日志。
-     *
-     * @param callScene        调用场景
-     * @param callContext      调用上下文
-     * @param requestContent   请求内容
-     * @param errorMessage     错误信息
-     * @param processingTimeMs 处理耗时
-     * @param isStreaming      是否流式调用
+     * 保存失败的调用记录。
      */
-    private void saveFailedCallLog(String callScene, CallContext callContext,
-                                   String requestContent, String errorMessage,
-                                   long processingTimeMs, boolean isStreaming) {
-        LlmCallLog callLog = LlmCallLog.builder()
-                .callScene(callScene)
-                .agentId(callContext.getAgentId())
-                .agentName(callContext.getAgentName())
-                .llmProviderId(callContext.getLlmProviderId())
-                .llmProviderName(callContext.getLlmProviderName())
-                .modelName(callContext.getModelName())
-                .requestContent(requestContent)
-                .status(LlmCallLog.STATUS_FAILED)
-                .errorMessage(errorMessage)
-                .processingTimeMs(processingTimeMs)
-                .isStreaming(isStreaming ? CommonConstants.ENABLED : CommonConstants.DISABLED)
-                .skillReadCalls(callContext.skillReadCalls())
-                .userId(callContext.getUserId())
-                .build();
+    private void saveFailedCallLog(CallLogContext context, String errorMessage, long processingTimeMs) {
+        llmCallLogService.saveAsync(buildCallLog(context, processingTimeMs)
+            .status(LlmCallStatusEnum.FAILED.name())
+            .errorMessage(errorMessage)
+            .build());
+    }
 
-        llmCallLogService.saveAsync(callLog);
+    /**
+     * 组装成功和失败记录共有的调用字段。
+     */
+    private LlmCallLog.LlmCallLogBuilder buildCallLog(CallLogContext context, long processingTimeMs) {
+        CallContext call = context.getCallContext();
+        return LlmCallLog.builder()
+            .callScene(context.getCallScene() == null ? null : context.getCallScene().name())
+            .agentId(call.getAgentId())
+            .agentName(call.getAgentName())
+            .llmProviderId(call.getLlmProviderId())
+            .llmProviderName(call.getLlmProviderName())
+            .modelName(call.getModelName())
+            .requestContent(context.getRequestContent())
+            .processingTimeMs(processingTimeMs)
+            .isStreaming(context.isStreaming() ? CommonConstants.ENABLED : CommonConstants.DISABLED)
+            .skillReadCalls(call.skillReadCalls())
+            .userId(call.getUserId());
     }
 
     // ==================== 内部方法：Agent 解析 ====================
@@ -518,8 +521,8 @@ public class AiServiceFactory {
      * @param role    Agent 角色
      * @return Agent 实体，未找到时返回 null
      */
-    private Agent resolveAgent(Long novelId, AgentRole role) {
-        NovelAgentConfig config = novelAgentConfigMapper.selectByNovelId(novelId);
+    private Agent resolveAgent(Long novelId, AgentRoleEnum role) {
+        NovelAgentConfig config = novelAgentConfigRepository.findByNovelId(novelId).orElse(null);
         if (config == null) {
             return null;
         }
@@ -527,7 +530,7 @@ public class AiServiceFactory {
         if (agentId == null) {
             return null;
         }
-        return agentMapper.selectById(agentId);
+        return agentRepository.findById(agentId).orElse(null);
     }
 
     /**
@@ -537,7 +540,7 @@ public class AiServiceFactory {
      * @param role   Agent 角色
      * @return Agent ID
      */
-    private Long extractAgentId(NovelAgentConfig config, AgentRole role) {
+    private Long extractAgentId(NovelAgentConfig config, AgentRoleEnum role) {
         return switch (role) {
             case AUTHOR -> config.getAuthorAgentId();
             case EDITOR -> config.getEditorAgentId();
@@ -545,13 +548,4 @@ public class AiServiceFactory {
         };
     }
 
-    /**
-     * 获取角色的中文名称（用于异常提示）。
-     *
-     * @param role Agent 角色
-     * @return 中文名称
-     */
-    private String getRoleName(AgentRole role) {
-        return role.getName();
-    }
 }

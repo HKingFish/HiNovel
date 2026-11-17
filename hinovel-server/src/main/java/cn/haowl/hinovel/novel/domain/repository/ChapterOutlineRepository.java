@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * 章节大纲仓储接口。
  *
- * <p>定义章节大纲的存储与查询操作。</p>
+ * 定义章节大纲的存储与查询操作。
  *
  * @author haowl
  */

@@ -16,6 +16,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("cn.haowl.hinovel.**.mapper")
 public class HiNovelApplication {
 
+    /**
+     * 启动 HiNovel 服务。
+     */
     public static void main(String[] args) {
         SpringApplication.run(HiNovelApplication.class, args);
     }

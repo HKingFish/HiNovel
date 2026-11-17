@@ -8,7 +8,8 @@ import cn.haowl.hinovel.user.constant.AuthConstants;
 import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
 import cn.haowl.hinovel.user.domain.service.AuthDomainService;
-import cn.haowl.hinovel.user.interfaces.dto.TokenResponse;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 认证应用服务。
  *
- * <p>协调用户认证相关的业务用例，负责流程编排和事务管理。</p>
+ * 协调用户认证相关的业务用例，负责流程编排和事务管理。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -49,9 +50,8 @@ public class AuthApplicationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void register(RegisterCommand command) {
-        log.info("用户注册: username={}, email={}", command.getUsername(), command.getEmail());
-        authDomainService.register(command.getUsername(), command.getEmail(), command.getPassword());
-        log.info("用户注册成功: username={}", command.getUsername());
+        User user = authDomainService.register(command.getUsername(), command.getEmail(), command.getPassword());
+        log.info("[register][用户注册成功，userId={}]", user.getId());
     }
 
     /**
@@ -60,23 +60,34 @@ public class AuthApplicationService {
      * @param command 登录命令
      * @return Token 响应
      */
-    public TokenResponse login(LoginCommand command) {
-        log.info("用户登录: account={}", command.getAccount());
-
+    public LoginResult login(LoginCommand command) {
         User user = authDomainService.authenticate(command.getAccount(), command.getPassword());
 
-        StpUtil.login(user.getId());
-        String token = StpUtil.getTokenValue();
+        String accessToken = issueAccessToken(user.getId());
 
-        log.info("用户登录成功: userId={}, username={}", user.getId(), user.getUsername());
-        return new TokenResponse(
-                token,
-                AuthConstants.DEFAULT_TOKEN_EXPIRES_SECONDS,
-                new TokenResponse.UserInfo(
-                        user.getId(), user.getUsername(),
-                        user.getEmail(), user.getRole(), user.getAvatarUrl()
-                )
-        );
+        log.info("[login][用户登录成功，userId={}]", user.getId());
+        return new LoginResult(accessToken, AuthConstants.DEFAULT_TOKEN_EXPIRES_SECONDS, user);
+    }
+
+    /**
+     * 使用邮箱密码授权并签发令牌。
+     *
+     * @param email    授权账号邮箱
+     * @param password 明文密码
+     * @return 访问令牌，凭据无效时为空
+     */
+    public String authorizeWithPassword(String email, String password) {
+        return authDomainService.authenticateByEmail(email, password)
+            .map(user -> issueAccessToken(user.getId()))
+            .orElse(null);
+    }
+
+    /**
+     * 为通过认证的用户创建会话并返回令牌。
+     */
+    private String issueAccessToken(Long userId) {
+        StpUtil.login(userId);
+        return StpUtil.getTokenValue();
     }
 
     /**
@@ -85,7 +96,7 @@ public class AuthApplicationService {
     public void logout() {
         Long userId = StpUtil.getLoginIdAsLong();
         StpUtil.logout();
-        log.info("用户登出成功: userId={}", userId);
+        log.info("[logout][用户登出成功: userId={}]", userId);
     }
 
     /**
@@ -94,13 +105,8 @@ public class AuthApplicationService {
      * @param userId 用户ID
      * @return 用户信息
      */
-    public TokenResponse.UserInfo getCurrentUserInfo(Long userId) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> exception(NOT_FOUND));
-        return new TokenResponse.UserInfo(
-                user.getId(), user.getUsername(),
-                user.getEmail(), user.getRole(), user.getAvatarUrl()
-        );
+    public User getCurrentUser(Long userId) {
+        return userRepository.findById(userId).orElseThrow(() -> exception(NOT_FOUND));
     }
 
     /**
@@ -126,23 +132,25 @@ public class AuthApplicationService {
     }
 
     /**
-     * 根据邮箱查询用户（供 OAuth2.0 密码模式使用）。
-     *
-     * @param email 邮箱
-     * @return 用户实体
+     * 用户登录结果。
      */
-    public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email).orElse(null);
-    }
+    @Getter
+    @AllArgsConstructor
+    public static class LoginResult {
 
-    /**
-     * 校验密码（供 OAuth2.0 密码模式使用）。
-     *
-     * @param rawPassword     明文密码
-     * @param encodedPassword 加密密码
-     * @return 是否匹配
-     */
-    public boolean checkPassword(String rawPassword, String encodedPassword) {
-        return authDomainService.authenticate("", rawPassword) != null;
+        /**
+         * 已签发的访问令牌。
+         */
+        private final String accessToken;
+
+        /**
+         * 访问令牌有效期（秒）。
+         */
+        private final long expiresIn;
+
+        /**
+         * 通过认证的用户。
+         */
+        private final User user;
     }
 }

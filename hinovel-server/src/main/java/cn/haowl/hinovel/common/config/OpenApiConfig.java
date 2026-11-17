@@ -21,6 +21,9 @@ public class OpenApiConfig {
      */
     private static final String SECURITY_SCHEME_NAME = "satoken";
 
+    /**
+     * 注册 HiNovel 接口文档。
+     */
     @Bean
     public OpenAPI hiNovelOpenApi() {
         return new OpenAPI()
@@ -31,10 +34,14 @@ public class OpenApiConfig {
                 );
     }
 
+    /**
+     * 构建接口文档元数据。
+     */
     private Info buildApiInfo() {
         return new Info()
                 .title("HiNOVEL 智能体平台 API")
-                .description("HiNOVEL 智能体平台后端接口文档，基于 Sa-Token 认证，支持 Agent 管理、对话、MCP 工具调用等功能")
+            .description("HiNOVEL 智能体平台后端接口文档，基于 Sa-Token 认证，"
+                + "支持 Agent 管理、对话、MCP 工具调用等功能")
                 .version("1.0.0")
                 .contact(new Contact()
                         .name("HiNovel Contributors")
@@ -49,7 +56,7 @@ public class OpenApiConfig {
         return new SecurityScheme()
                 .type(SecurityScheme.Type.APIKEY)
                 .in(SecurityScheme.In.HEADER)
-                .name("satoken")
+            .name(SECURITY_SCHEME_NAME)
                 .description("Sa-Token 登录凭证，登录后从响应中获取 accessToken 填入此处");
     }
 }

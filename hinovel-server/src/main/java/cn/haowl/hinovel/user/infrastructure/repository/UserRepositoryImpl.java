@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * 用户仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现用户仓储接口。</p>
+ * 基于 MyBatis-Plus 实现用户仓储接口。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30

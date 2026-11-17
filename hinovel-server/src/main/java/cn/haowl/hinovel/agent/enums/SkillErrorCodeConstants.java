@@ -11,6 +11,8 @@ import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.AGENT_SKIL
  */
 public interface SkillErrorCodeConstants {
 
-    /** ID 不在内置目录中。 */
+    /**
+     * ID 不在内置目录中。
+     */
     ErrorCode SKILL_NOT_EXISTS = new ErrorCode(AGENT_SKILL_ERROR_CODE_MIN + 1, "内置 Skill 不存在");
 }

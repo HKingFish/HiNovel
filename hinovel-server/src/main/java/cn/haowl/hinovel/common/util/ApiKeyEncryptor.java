@@ -12,16 +12,19 @@ import java.util.Base64;
 /**
  * API 密钥加解密工具类。
  *
- * <p>使用 AES-GCM 对称加密算法对 API 密钥进行加密存储和解密读取，
- * 防止数据库泄露导致密钥明文暴露。</p>
+ * 使用 AES-GCM 对称加密算法对 API 密钥进行加密存储和解密读取，
+ * 防止数据库泄露导致密钥明文暴露。
  *
- * <p>加密后的密文格式为 Base64 编码的 [IV(12字节) + 密文 + Tag(16字节)]。</p>
+ * 加密后的密文格式为 Base64 编码的 [IV(12字节) + 密文 + Tag(16字节)]。
  *
  * @author haowl
  */
 @Slf4j
 public final class ApiKeyEncryptor {
 
+    /**
+     * 禁止实例化加解密工具类。
+     */
     private ApiKeyEncryptor() {
     }
 
@@ -82,7 +85,7 @@ public final class ApiKeyEncryptor {
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            log.error("API 密钥加密失败，异常信息：{}", e.getMessage());
+            log.error("[encrypt][API 密钥加密失败，type={}]", e.getClass().getSimpleName());
             return null;
         }
     }
@@ -119,7 +122,7 @@ public final class ApiKeyEncryptor {
             byte[] decrypted = cipher.doFinal(encrypted);
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            log.error("API 密钥解密失败，异常信息：{}", e.getMessage());
+            log.error("[decrypt][API 密钥解密失败，type={}]", e.getClass().getSimpleName());
             return null;
         }
     }
@@ -145,7 +148,7 @@ public final class ApiKeyEncryptor {
     /**
      * 将密钥字符串标准化为 AES-128 所需的 16 字节。
      *
-     * <p>如果密钥不足 16 字节则右侧补零，超过则截断。</p>
+     * 如果密钥不足 16 字节则右侧补零，超过则截断。
      *
      * @param secretKey 原始密钥字符串
      * @return 标准化后的 16 字节密钥

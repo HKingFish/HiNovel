@@ -3,12 +3,12 @@ package cn.haowl.hinovel.user.constant;
 /**
  * 用户状态枚举。
  *
- * <p>定义用户的账号状态。</p>
+ * 定义用户的账号状态。
  *
  * @author haowl
  * @since 2024
  */
-public enum UserStatus {
+public enum UserStatusEnum {
 
     /**
      * 激活状态，用户可正常使用。

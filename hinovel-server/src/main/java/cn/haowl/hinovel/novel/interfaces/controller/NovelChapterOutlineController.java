@@ -26,8 +26,7 @@ public class NovelChapterOutlineController {
      */
     @GetMapping("/chapter/{chapterId}")
     public ApiResponse<ChapterOutline> getByChapterId(@PathVariable Long chapterId) {
-        ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
-        return ApiResponse.success(outline);
+        return ApiResponse.success(chapterOutlineService.getByChapterId(chapterId));
     }
 
     /**
@@ -35,8 +34,7 @@ public class NovelChapterOutlineController {
      */
     @GetMapping("/novel/{novelId}")
     public ApiResponse<List<ChapterOutline>> getByNovelId(@PathVariable Long novelId) {
-        List<ChapterOutline> outlines = chapterOutlineService.getByNovelId(novelId);
-        return ApiResponse.success(outlines);
+        return ApiResponse.success(chapterOutlineService.getByNovelId(novelId));
     }
 
     /**
@@ -44,8 +42,7 @@ public class NovelChapterOutlineController {
      */
     @PostMapping
     public ApiResponse<ChapterOutline> saveOrUpdate(@RequestBody ChapterOutline outline) {
-        ChapterOutline saved = chapterOutlineService.saveOrUpdateOutline(outline);
-        return ApiResponse.success(saved);
+        return ApiResponse.success(chapterOutlineService.saveOrUpdateOutline(outline));
     }
 
     /**

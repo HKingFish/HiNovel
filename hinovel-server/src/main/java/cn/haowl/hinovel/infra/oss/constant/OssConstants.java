@@ -3,13 +3,16 @@ package cn.haowl.hinovel.infra.oss.constant;
 /**
  * OSS 模块常量类。
  *
- * <p>定义 OSS 相关的状态、存储类型、文件类型、路径前缀等常量。</p>
+ * 定义 OSS 相关的状态、存储类型、文件类型、路径前缀等常量。
  *
  * @author haowl
  * @since 2024
  */
 public final class OssConstants {
 
+    /**
+     * 禁止实例化 OSS 常量类。
+     */
     private OssConstants() {
     }
 
@@ -34,19 +37,9 @@ public final class OssConstants {
     public static final String DEFAULT_BIZ_TYPE = "common";
 
     /**
-     * 状态：正常。
+     * 存储对象默认使用的扩展名。
      */
-    public static final String STATUS_ACTIVE = "ACTIVE";
-
-    /**
-     * 状态：未激活。
-     */
-    public static final String STATUS_INACTIVE = "INACTIVE";
-
-    /**
-     * 状态：已删除。
-     */
-    public static final String STATUS_DELETED = "DELETED";
+    public static final String DEFAULT_FILE_EXTENSION = "bin";
 
     /**
      * 存储类型：本地存储。

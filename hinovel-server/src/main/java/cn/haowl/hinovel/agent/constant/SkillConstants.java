@@ -7,15 +7,34 @@ package cn.haowl.hinovel.agent.constant;
  */
 public final class SkillConstants {
 
-    /** 去 AI 味 Skill 的稳定目录 ID。 */
+    /**
+     * 冷峻悬疑 Skill 的稳定目录 ID。
+     */
+    public static final Long COLD_SUSPENSE_SKILL_ID = 1L;
+
+    /**
+     * 温暖细腻 Skill 的稳定目录 ID。
+     */
+    public static final Long WARM_NARRATIVE_SKILL_ID = 2L;
+
+    /**
+     * 去 AI 味 Skill 的稳定目录 ID。
+     */
     public static final Long DE_AI_SKILL_ID = 3L;
 
-    /** 初始化数据中的小说创作模板 ID。 */
+    /**
+     * 初始化数据中的小说创作模板 ID。
+     */
     public static final Long WRITING_TEMPLATE_ID = 101L;
 
-    /** Read Tool 的失败结果编码。 */
+    /**
+     * Read Tool 的失败结果编码。
+     */
     public static final String SKILL_READ_FAILED = "SKILL_READ_FAILED";
 
+    /**
+     * 限制常量或工具类实例化。
+     */
     private SkillConstants() {
     }
 }

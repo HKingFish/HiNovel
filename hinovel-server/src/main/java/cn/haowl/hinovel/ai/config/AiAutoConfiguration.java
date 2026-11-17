@@ -8,7 +8,6 @@ import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.QdrantGrpcClient;
 import jakarta.annotation.Resource;
-import lombok.extern.slf4j.Slf4j;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -17,29 +16,31 @@ import org.springframework.context.annotation.Configuration;
 /**
  * AI 模块自动配置类。
  *
- * <p>负责注册 AI 相关核心 Bean，包括 Qdrant 客户端、聊天记忆等。
+ * 负责注册 AI 相关核心 Bean，包括 Qdrant 客户端、聊天记忆等。
  * 向量存储的动态管理由 {@link QdrantVectorStoreFactory} 负责，
- * LLM 模型的动态管理由 {@link DefaultLlmProviderFactory} 负责。</p>
+ * LLM 模型的动态管理由 {@link DefaultLlmProviderFactory} 负责。
  *
- * <p>Embedding 模型不再通过 yml 配置全局 Bean，而是由用户在数据库中配置后，
- * 由 {@link QdrantVectorStoreFactory} 按用户维度动态构建。</p>
+ * Embedding 模型不再通过 yml 配置全局 Bean，而是由用户在数据库中配置后，
+ * 由 {@link QdrantVectorStoreFactory} 按用户维度动态构建。
  *
  * @author haowl
  */
-@Slf4j
 @Configuration
 @ComponentScan(basePackages = "cn.haowl.hinovel.ai")
 @MapperScan(basePackages = "cn.haowl.hinovel.ai.infrastructure.mapper")
 public class AiAutoConfiguration {
 
+    /**
+     * AI 模块连接配置。
+     */
     @Resource
     private AiProperties aiProperties;
 
     /**
      * 注册 Qdrant 客户端（gRPC 连接）。
      *
-     * <p>客户端为单例，由 {@link QdrantVectorStoreFactory}
-     * 统一管理各集合的向量存储实例，支持每本小说独立集合。</p>
+     * 客户端为单例，由 {@link QdrantVectorStoreFactory}
+     * 统一管理各集合的向量存储实例，支持每本小说独立集合。
      *
      * @return QdrantClient 实例
      */
@@ -51,6 +52,9 @@ public class AiAutoConfiguration {
                         .build());
     }
 
+    /**
+     * 注册基于 Redis 的会话记忆提供器。
+     */
     @Bean
     public ChatMemoryProvider chatMemoryProvider(RedisChatMemoryStore redisChatMemoryStore) {
         return memoryId -> MessageWindowChatMemory.builder()

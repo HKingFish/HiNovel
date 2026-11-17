@@ -15,30 +15,51 @@ import java.util.List;
 @Data
 public class InterviewAnswerRequest {
 
+    /**
+     * 会话 ID。
+     */
     @Schema(description = "对话 ID（面试会话标识，由 /start 接口返回）", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "对话 ID 不能为空")
     private Long conversationId;
 
+    /**
+     * 用户回答。
+     */
     @Schema(description = "候选人的回答内容", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "回答内容不能为空")
     private String answer;
 
+    /**
+     * 当前问题序号。
+     */
     @Schema(description = "当前是第几题（从 1 开始）", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "当前题目序号不能为空")
     @Min(value = 1, message = "题目序号最小为 1")
     private Integer currentIndex;
 
+    /**
+     * 问题总数。
+     */
     @Schema(description = "本次面试总题数", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "总题数不能为空")
     @Min(value = 1, message = "总题数最小为 1")
     private Integer totalQuestions;
 
+    /**
+     * 关联知识库 ID。
+     */
     @Schema(description = "关联知识库 ID 列表，与开始面试时保持一致")
     private List<Long> knowledgeBaseIds;
 
+    /**
+     * 面试主题。
+     */
     @Schema(description = "面试方向（与开始面试时保持一致，用于知识库精准检索）")
     private String topic;
 
+    /**
+     * 面试主题模式。
+     */
     @Schema(description = "面试方向模式：knowledge 表示知识库模式，其他值为普通模式")
     private String topicMode;
 }

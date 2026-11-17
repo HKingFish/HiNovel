@@ -9,18 +9,16 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.util.DigestUtils;
 
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
  * 小说章节历史版本实体。
  *
- * <p>记录章节每次内容变更的快照，支持版本回溯和内容对比。</p>
+ * 记录章节每次内容变更的快照，支持版本回溯和内容对比。
  *
  * @author haowl
  */
@@ -41,6 +39,9 @@ public class NovelChapterVersion {
      */
     public static final int PUBLISHED = 1;
 
+    /**
+     * 章节版本 ID。
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
@@ -121,7 +122,7 @@ public class NovelChapterVersion {
                 .chapterId(chapterId)
                 .content(safeContent)
                 .wordCount(calculateWordCount(safeContent))
-                .contentMd5(calculateMd5(safeContent))
+            .contentMd5(DigestUtils.md5DigestAsHex(safeContent.getBytes(StandardCharsets.UTF_8)))
                 .remark(remark)
                 .published(published)
                 .createTime(LocalDateTime.now())
@@ -155,7 +156,7 @@ public class NovelChapterVersion {
      * @return 是否已发布
      */
     public boolean checkPublished() {
-        return Objects.equals(this.published, PUBLISHED);
+        return Integer.valueOf(PUBLISHED).equals(this.published);
     }
 
     /**
@@ -191,21 +192,5 @@ public class NovelChapterVersion {
             return 0;
         }
         return content.replaceAll("\\s+", "").length();
-    }
-
-    /**
-     * 计算字符串的 MD5 值。
-     *
-     * @param input 输入字符串
-     * @return MD5 十六进制字符串
-     */
-    private static String calculateMd5(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            return String.format("%032x", new BigInteger(1, digest));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("MD5 算法不可用", e);
-        }
     }
 }

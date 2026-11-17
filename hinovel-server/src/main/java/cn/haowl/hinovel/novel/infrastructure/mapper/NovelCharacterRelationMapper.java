@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * 人物关系 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现人物关系的数据访问操作。</p>
+ * 基于 MyBatis-Plus 实现人物关系的数据访问操作。
  *
  * @author haowl
  */

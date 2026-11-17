@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.novel.infrastructure.mapper;
 
+import cn.haowl.hinovel.novel.constant.AnnotationStatusEnum;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -10,7 +11,7 @@ import java.util.List;
 /**
  * 章节批注 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现章节批注的数据访问操作。</p>
+ * 基于 MyBatis-Plus 实现章节批注的数据访问操作。
  *
  * @author haowl
  */
@@ -38,7 +39,7 @@ public interface ChapterAnnotationMapper extends BaseMapper<ChapterAnnotation> {
     default List<ChapterAnnotation> selectPendingByChapterId(Long chapterId) {
         return selectList(new LambdaQueryWrapper<ChapterAnnotation>()
                 .eq(ChapterAnnotation::getChapterId, chapterId)
-                .eq(ChapterAnnotation::getStatus, "PENDING")
+            .eq(ChapterAnnotation::getStatus, AnnotationStatusEnum.PENDING.name())
                 .orderByAsc(ChapterAnnotation::getCreateTime));
     }
 }

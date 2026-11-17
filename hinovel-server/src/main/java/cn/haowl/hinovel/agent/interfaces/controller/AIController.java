@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * AI 功能控制器。
  *
- * <p>提供 AI 改写、审核等 SubAgents 系统功能。</p>
+ * 提供 AI 改写、审核等 SubAgents 系统功能。
  *
  * @author haowl
  * @since 2024
@@ -36,14 +36,19 @@ import java.util.List;
 public class AIController {
 
     /**
+     * 游标分页默认返回的消息条数。
+     */
+    private static final String DEFAULT_CHAT_MESSAGE_PAGE_SIZE = "30";
+
+    /**
      * 流式问答失败时的兜底文案。
      */
     private static final String QA_STREAM_ERROR_MESSAGE = "AI 问答异常";
 
     /**
-     * SSE 异常事件名。
+     * 流式改写失败时的兜底文案。
      */
-    private static final String SSE_EVENT_ERROR = "error";
+    private static final String REWRITE_STREAM_ERROR_MESSAGE = "AI 改写异常";
 
     /**
      * AI 改写、审核应用服务。
@@ -60,9 +65,9 @@ public class AIController {
     /**
      * AI 流式改写功能（SSE）。
      *
-     * <p>根据章节大纲调用作者 Agent 流式改写章节内容，
+     * 根据章节大纲调用作者 Agent 流式改写章节内容，
      * 通过 SSE 逐 Token 推送生成结果，前端实时展示。
-     * 使用 {@link ServerSentEvent} 精确控制 SSE 帧格式，避免 String 被 JSON 序列化加引号。</p>
+     * 使用 {@link ServerSentEvent} 精确控制 SSE 帧格式，避免 String 被 JSON 序列化加引号。
      *
      * @param request 改写请求
      * @return SSE 流式响应，逐 Token 推送生成内容
@@ -70,15 +75,23 @@ public class AIController {
     @Operation(summary = "AI 流式改写", description = "根据大纲流式改写章节内容（SSE）")
     @PostMapping(value = "/rewrite", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> aiRewrite(@RequestBody AIAuthorRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return aiService.aiRewrite(request, userId);
+        return aiService.aiRewrite(request, StpUtil.getLoginIdAsLong())
+            .map(token -> ServerSentEvent.builder(token).build())
+            .onErrorResume(error -> {
+                log.error("[aiRewrite][流式改写失败，chapterId={}，异常类型={}]",
+                    request.getChapterId(), error.getClass().getSimpleName());
+                return Flux.just(ServerSentEvent.<String>builder()
+                    .event(ChatEventEnum.ERROR.getCode())
+                    .data(error.getMessage() == null ? REWRITE_STREAM_ERROR_MESSAGE : error.getMessage())
+                    .build());
+            });
     }
 
     /**
      * AI 审核功能。
      *
-     * <p>调用编辑 Agent 对章节内容进行多维度审核（一致性、逻辑性、人物、剧情），
-     * 返回结构化的审核结果，包含问题列表和改进建议。</p>
+     * 调用编辑 Agent 对章节内容进行多维度审核（一致性、逻辑性、人物、剧情），
+     * 返回结构化的审核结果，包含问题列表和改进建议。
      *
      * @param request 审核请求
      * @return 审核结果
@@ -86,9 +99,7 @@ public class AIController {
     @Operation(summary = "AI 审核", description = "审核章节内容的一致性和质量")
     @PostMapping("/audit")
     public ApiResponse<AIAuditorResponse> aiAudit(@RequestBody AIAuditorRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        AIAuditorResponse response = aiService.aiAudit(request, userId);
-        return ApiResponse.success(response);
+        return ApiResponse.success(aiService.aiAudit(request, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -186,8 +197,7 @@ public class AIController {
     @Operation(summary = "切换会话收藏", description = "切换指定会话的收藏状态")
     @PutMapping("/chat/sessions/{sessionId}/favorite")
     public ApiResponse<Boolean> toggleChatSessionFavorite(@PathVariable Long sessionId) {
-        boolean favorite = qaAgentService.toggleFavorite(sessionId);
-        return ApiResponse.success(favorite);
+        return ApiResponse.success(qaAgentService.toggleFavorite(sessionId));
     }
 
     /**
@@ -234,7 +244,7 @@ public class AIController {
     public ApiResponse<ChatMessagePageResponse> listChatMessagesPage(
             @PathVariable Long sessionId,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(defaultValue = "30") int pageSize) {
+            @RequestParam(defaultValue = DEFAULT_CHAT_MESSAGE_PAGE_SIZE) int pageSize) {
         ChatMessagePageQuery query = new ChatMessagePageQuery();
         query.setSessionId(sessionId);
         query.setCursorId(cursorId);
@@ -246,7 +256,7 @@ public class AIController {
     /**
      * 撤回问答消息。
      *
-     * <p>撤回后的消息在后续问答中不会发送给 LLM。</p>
+     * 撤回后的消息在后续问答中不会发送给 LLM。
      *
      * @param messageId 消息 ID
      * @return 操作结果
@@ -261,8 +271,8 @@ public class AIController {
     /**
      * AI 流式问答（SSE）。
      *
-     * <p>接收用户问题，通过向量检索查询相关内容后流式生成回答。
-     * 完成后自动保存用户消息和 AI 回复到数据库。</p>
+     * 接收用户问题，通过向量检索查询相关内容后流式生成回答。
+     * 完成后自动保存用户消息和 AI 回复到数据库。
      *
      * @param request 问答请求
      * @return SSE 流式响应
@@ -280,13 +290,14 @@ public class AIController {
                 .event(ChatEventEnum.TEXT == event.getType() ? null : event.getType().getCode())
                 .build())
             .onErrorResume(e -> {
-                log.error("[aiChat][问答流式异常，sessionId={}]", command.getSessionId(), e);
+                log.error("[aiChat][问答流式异常，sessionId={}，异常类型={}]",
+                    command.getSessionId(), e.getClass().getSimpleName());
                 String message = e.getMessage() != null ? e.getMessage() : QA_STREAM_ERROR_MESSAGE;
                 if (e instanceof BusinessException businessException) {
                     message = businessException.getCode() + " " + message;
                 }
                 return Flux.just(ServerSentEvent.<Object>builder()
-                    .event(SSE_EVENT_ERROR)
+                    .event(ChatEventEnum.ERROR.getCode())
                     .data(message)
                     .build());
             });

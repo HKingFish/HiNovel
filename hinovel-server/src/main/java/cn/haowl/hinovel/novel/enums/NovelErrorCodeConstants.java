@@ -7,8 +7,8 @@ import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.*;
 /**
  * Novel 模块错误码常量接口。
  *
- * <p>定义 Novel 小说模块相关的错误码。
- * 错误码范围：[1-002-000-000 ~ 1-003-000-000)</p>
+ * 定义 Novel 小说模块相关的错误码。
+ * 错误码范围：[1-002-000-000 ~ 1-003-000-000)
  *
  * @author haowl
  * @see ErrorCode

@@ -6,13 +6,13 @@ import lombok.Getter;
 /**
  * Embedding 模型类型枚举。
  *
- * <p>定义支持的嵌入模型运行模式，用于区分本地 ONNX 模型和远程 API 调用。</p>
+ * 定义支持的嵌入模型运行模式，用于区分本地 ONNX 模型和远程 API 调用。
  *
  * @author haowl
  */
 @Getter
 @AllArgsConstructor
-public enum EmbeddingModelType {
+public enum EmbeddingModelTypeEnum {
 
     /**
      * 本地 ONNX 模型（如 BGE-M3，无需网络调用，进程内推理）。

@@ -7,11 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author : haowl
@@ -21,7 +18,9 @@ import java.util.Map;
 @Repository
 public class SkillRepositoryImpl implements SkillRepository {
 
-    /** 挂载表访问。 */
+    /**
+     * 挂载表访问。
+     */
     @Autowired
     private AgentSkillBindingMapper agentSkillBindingMapper;
 
@@ -31,12 +30,8 @@ public class SkillRepositoryImpl implements SkillRepository {
     }
 
     @Override
-    public Map<Long, List<Long>> findSkillIdsByAgentIds(Collection<Long> agentIds) {
-        Map<Long, List<Long>> result = new HashMap<>();
-        for (AgentSkillBinding binding : agentSkillBindingMapper.selectByAgentIds(agentIds)) {
-            result.computeIfAbsent(binding.getAgentId(), key -> new ArrayList<>()).add(binding.getSkillId());
-        }
-        return result;
+    public List<AgentSkillBinding> findByAgentIds(Collection<Long> agentIds) {
+        return agentSkillBindingMapper.selectByAgentIds(agentIds);
     }
 
     @Override

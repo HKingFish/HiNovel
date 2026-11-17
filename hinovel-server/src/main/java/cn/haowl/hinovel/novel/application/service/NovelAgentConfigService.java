@@ -1,11 +1,10 @@
 package cn.haowl.hinovel.novel.application.service;
 
-import cn.haowl.hinovel.agent.domain.entity.Agent;
-import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
+import cn.haowl.hinovel.novel.domain.repository.NovelAgentConfigRepository;
 import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
-import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelAgentConfigResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +21,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 小说 Agent 配置服务。
  *
- * <p>提供小说 Agent 配置的查询、保存和初始化功能。
- * 跨模块依赖 AgentMapper 查询 Agent 名称（只读）。</p>
+ * 提供小说 Agent 配置的查询、保存和初始化功能。
  */
 @Slf4j
 @Service
@@ -33,15 +31,17 @@ public class NovelAgentConfigService {
      * 小说 Agent 配置数据访问。
      */
     @Autowired
-    private NovelAgentConfigMapper novelAgentConfigMapper;
+    private NovelAgentConfigRepository configRepository;
 
     /**
      * Agent 数据访问。
      */
     @Autowired
-    private AgentMapper agentMapper;
+    private AgentRepository agentRepository;
 
-    /** 小说归属校验。 */
+    /**
+     * 小说归属校验。
+     */
     @Autowired
     private NovelDomainService novelDomainService;
 
@@ -52,7 +52,7 @@ public class NovelAgentConfigService {
      * @return Agent 配置响应
      */
     public NovelAgentConfigResponse getConfig(Long novelId) {
-        NovelAgentConfig config = novelAgentConfigMapper.selectByNovelId(novelId);
+        NovelAgentConfig config = configRepository.findByNovelId(novelId).orElse(null);
         if (config == null) {
             NovelAgentConfigResponse response = new NovelAgentConfigResponse();
             response.setNovelId(novelId);
@@ -74,32 +74,24 @@ public class NovelAgentConfigService {
         novelDomainService.validateOwnership(novelId, userId);
         for (Long agentId : Stream.of(request.getAuthorAgentId(), request.getEditorAgentId(), request.getQaAgentId())
                 .filter(java.util.Objects::nonNull).distinct().toList()) {
-            Agent agent = agentMapper.selectById(agentId);
-            if (agent == null || !agent.isAvailableTo(userId)) {
-                throw exception(AGENT_NOT_OWNED);
-            }
+            agentRepository.findById(agentId)
+                .filter(agent -> agent.isAvailableTo(userId))
+                .orElseThrow(() -> exception(AGENT_NOT_OWNED));
         }
-        NovelAgentConfig config = novelAgentConfigMapper.selectByNovelId(novelId);
+        NovelAgentConfig config = configRepository.findByNovelId(novelId).orElse(null);
 
         if (config == null) {
             config = new NovelAgentConfig();
             config.setNovelId(novelId);
-            config.setAuthorAgentId(request.getAuthorAgentId());
-            config.setEditorAgentId(request.getEditorAgentId());
-            config.setQaAgentId(request.getQaAgentId());
             config.setCreateTime(LocalDateTime.now());
-            config.setUpdateTime(LocalDateTime.now());
             config.setDeleted(CommonConstants.DELETED_FALSE);
-            novelAgentConfigMapper.insert(config);
-        } else {
-            config.setAuthorAgentId(request.getAuthorAgentId());
-            config.setEditorAgentId(request.getEditorAgentId());
-            config.setQaAgentId(request.getQaAgentId());
-            config.setUpdateTime(LocalDateTime.now());
-            novelAgentConfigMapper.updateById(config);
         }
+        config.configureAuthorAgent(request.getAuthorAgentId());
+        config.configureEditorAgent(request.getEditorAgentId());
+        config.configureQaAgent(request.getQaAgentId());
+        config.setUpdateTime(LocalDateTime.now());
 
-        return convertToResponse(config);
+        return convertToResponse(configRepository.save(config));
     }
 
     /**
@@ -109,15 +101,15 @@ public class NovelAgentConfigService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void initConfig(Long novelId) {
-        NovelAgentConfig config = novelAgentConfigMapper.selectByNovelId(novelId);
+        NovelAgentConfig config = configRepository.findByNovelId(novelId).orElse(null);
         if (config == null) {
             config = new NovelAgentConfig();
             config.setNovelId(novelId);
             config.setCreateTime(LocalDateTime.now());
             config.setUpdateTime(LocalDateTime.now());
             config.setDeleted(CommonConstants.DELETED_FALSE);
-            novelAgentConfigMapper.insert(config);
-            log.info("初始化小说 Agent 配置成功，novelId: {}", novelId);
+            configRepository.save(config);
+            log.info("[initConfig][已初始化小说 Agent 配置，novelId={}]", novelId);
         }
     }
 
@@ -135,22 +127,16 @@ public class NovelAgentConfigService {
         response.setUpdateTime(config.getUpdateTime());
 
         if (config.getAuthorAgentId() != null) {
-            Agent authorAgent = agentMapper.selectById(config.getAuthorAgentId());
-            if (authorAgent != null) {
-                response.setAuthorAgentName(authorAgent.getName());
-            }
+            agentRepository.findById(config.getAuthorAgentId())
+                .ifPresent(agent -> response.setAuthorAgentName(agent.getName()));
         }
         if (config.getEditorAgentId() != null) {
-            Agent editorAgent = agentMapper.selectById(config.getEditorAgentId());
-            if (editorAgent != null) {
-                response.setEditorAgentName(editorAgent.getName());
-            }
+            agentRepository.findById(config.getEditorAgentId())
+                .ifPresent(agent -> response.setEditorAgentName(agent.getName()));
         }
         if (config.getQaAgentId() != null) {
-            Agent qaAgent = agentMapper.selectById(config.getQaAgentId());
-            if (qaAgent != null) {
-                response.setQaAgentName(qaAgent.getName());
-            }
+            agentRepository.findById(config.getQaAgentId())
+                .ifPresent(agent -> response.setQaAgentName(agent.getName()));
         }
 
         return response;

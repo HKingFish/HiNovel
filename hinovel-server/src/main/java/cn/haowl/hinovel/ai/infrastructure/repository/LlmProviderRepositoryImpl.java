@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * LLM 提供方仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现 LLM 提供方仓储接口。</p>
+ * 基于 MyBatis-Plus 实现 LLM 提供方仓储接口。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30

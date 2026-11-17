@@ -12,15 +12,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * LLM 调用记录服务。
  *
- * <p>提供调用记录的异步写入、分页查询和消耗统计能力。
- * 写入操作使用 {@code @Async} 异步执行，避免阻塞主业务流程。</p>
+ * 提供调用记录的异步写入、分页查询和消耗统计能力。
+ * 写入操作使用 {@code @Async} 异步执行，避免阻塞主业务流程。
  *
  * @author haowl
  */
@@ -37,7 +35,7 @@ public class LlmCallLogService {
     /**
      * 异步保存调用记录。
      *
-     * <p>截断超长内容后入库，异常时仅打印日志，不影响主业务。</p>
+     * 截断超长内容后入库，异常时仅打印日志，不影响主业务。
      *
      * @param callLog 调用记录实体
      */
@@ -47,8 +45,8 @@ public class LlmCallLogService {
             truncateContent(callLog);
             llmCallLogMapper.insert(callLog);
         } catch (Exception e) {
-            log.error("[saveAsync][保存 LLM 调用记录失败，场景={}，异常信息：{}]",
-                    callLog.getCallScene(), e.getMessage());
+            log.error("[saveAsync][保存 LLM 调用记录失败，userId={}，agentId={}，异常类型={}]",
+                callLog.getUserId(), callLog.getAgentId(), e.getClass().getSimpleName());
         }
     }
 
@@ -62,10 +60,9 @@ public class LlmCallLogService {
     public IPage<LlmCallLog> listByPage(LlmCallLogQuery query, Long userId) {
         log.info("[listByPage][分页查询调用记录，userId={}，pageNum={}，pageSize={}]",
                 userId, query.getPageNum(), query.getPageSize());
-        LambdaQueryWrapper<LlmCallLog> wrapper = buildQueryWrapper(query, userId);
-        wrapper.orderByDesc(LlmCallLog::getCreateTime);
         return llmCallLogMapper.selectPage(
-                new Page<>(query.getPageNum(), query.getPageSize()), wrapper);
+            new Page<>(query.getPageNum(), query.getPageSize()),
+            buildQueryWrapper(query, userId).orderByDesc(LlmCallLog::getCreateTime));
     }
 
     /**
@@ -75,29 +72,24 @@ public class LlmCallLogService {
      * @param userId 当前用户 ID
      * @return 包含 successCount、failCount、totalTokens、totalDuration 的统计结果
      */
-    public Map<String, Object> getCallStatistics(LlmCallLogQuery query, Long userId) {
+    public LlmCallStatistics getCallStatistics(LlmCallLogQuery query, Long userId) {
         log.info("[getCallStatistics][统计调用消耗，userId={}]", userId);
         List<LlmCallLog> logs = llmCallLogMapper.selectList(buildQueryWrapper(query, userId));
 
         long successCount = logs.stream()
-                .filter(l -> LlmCallLog.STATUS_SUCCESS.equals(l.getStatus()))
+            .filter(LlmCallLog::isSuccess)
                 .count();
         long failCount = logs.stream()
-                .filter(l -> LlmCallLog.STATUS_FAILED.equals(l.getStatus()))
+            .filter(LlmCallLog::isFailed)
                 .count();
         long totalTokens = logs.stream()
-                .mapToLong(l -> l.getTotalTokens() != null ? l.getTotalTokens() : 0)
+            .mapToLong(log -> log.getTotalTokens() != null ? log.getTotalTokens() : 0)
                 .sum();
         long totalDuration = logs.stream()
-                .mapToLong(l -> l.getProcessingTimeMs() != null ? l.getProcessingTimeMs() : 0)
+            .mapToLong(log -> log.getProcessingTimeMs() != null ? log.getProcessingTimeMs() : 0)
                 .sum();
 
-        Map<String, Object> result = new HashMap<>(4);
-        result.put("successCount", successCount);
-        result.put("failCount", failCount);
-        result.put("totalTokens", totalTokens);
-        result.put("totalDuration", totalDuration);
-        return result;
+        return new LlmCallStatistics(successCount, failCount, totalTokens, totalDuration);
     }
 
     /**
@@ -106,9 +98,8 @@ public class LlmCallLogService {
      * @return 调用记录列表
      */
     public List<LlmCallLog> listAll() {
-        LambdaQueryWrapper<LlmCallLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.orderByDesc(LlmCallLog::getCreateTime);
-        return llmCallLogMapper.selectList(wrapper);
+        return llmCallLogMapper.selectList(
+            new LambdaQueryWrapper<LlmCallLog>().orderByDesc(LlmCallLog::getCreateTime));
     }
 
     /**

@@ -16,9 +16,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * @author : haowl
@@ -27,6 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class AgentSkillHttpTest {
 
+    /**
+     * 验证未登录访问目录时返回的错误码。
+     */
     @Test
     void unauthenticatedCatalogueGetsTheActualHttpAndBusinessCodes() throws Exception {
         SaTokenContext previous = SaManager.getSaTokenContext();
@@ -44,6 +45,9 @@ class AgentSkillHttpTest {
         }
     }
 
+    /**
+     * 验证空白问题在执行问答前被拒绝。
+     */
     @Test
     void blankChatQuestionIsRejectedBeforeExecution() throws Exception {
         QaAgent qa = mock(QaAgent.class);

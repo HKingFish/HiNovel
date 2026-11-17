@@ -2,10 +2,9 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
-import cn.haowl.hinovel.novel.constant.NovelChapterStatus;
+import cn.haowl.hinovel.novel.constant.NovelChapterStatusEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -16,15 +15,17 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 小说章节实体。
  *
- * <p>小说聚合内部实体，由 Novel 聚合根管理。</p>
+ * 小说聚合内部实体，由 Novel 聚合根管理。
  *
  * @author haowl
  */
 @Data
-@EqualsAndHashCode(callSuper = false)
 @TableName("novel_chapter")
 public class NovelChapter extends BaseEntity {
 
+    /**
+     * 存储章节正文的数据库列名。
+     */
     public static final String CONTENT_FIELD = "content";
 
     /**
@@ -60,17 +61,23 @@ public class NovelChapter extends BaseEntity {
     /**
      * 状态：DRAFT-草稿，PUBLISHED-已发布。
      *
-     * @see NovelChapterStatus
+     * @see NovelChapterStatusEnum
      */
-    private NovelChapterStatus status;
+    private NovelChapterStatusEnum status;
 
     /**
      * 发布后内容是否有改动，需要重新发布。0-无需重新发布，1-需要重新发布。
+     *
+     * @see CommonConstants#DISABLED
+     * @see CommonConstants#ENABLED
      */
     private Integer needRepublish;
 
     /**
      * 是否已完成向量数据库存储。0-未存储，1-已存储。
+     *
+     * @see CommonConstants#DISABLED
+     * @see CommonConstants#ENABLED
      */
     private Integer vectorStored;
 
@@ -93,7 +100,7 @@ public class NovelChapter extends BaseEntity {
         chapter.setContent("");
         chapter.setWordCount(0);
         chapter.setSortOrder(chapterNumber);
-        chapter.setStatus(NovelChapterStatus.DRAFT);
+        chapter.setStatus(NovelChapterStatusEnum.DRAFT);
         chapter.setNeedRepublish(CommonConstants.DISABLED);
         chapter.setVectorStored(CommonConstants.DISABLED);
         chapter.setDeleted(CommonConstants.DELETED_FALSE);
@@ -111,7 +118,7 @@ public class NovelChapter extends BaseEntity {
         if (this.content == null || this.content.isBlank()) {
             throw exception(PARAM_ERROR);
         }
-        this.status = NovelChapterStatus.PUBLISHED;
+        this.status = NovelChapterStatusEnum.PUBLISHED;
         this.needRepublish = CommonConstants.DISABLED;
         this.setUpdateTime(LocalDateTime.now());
     }
@@ -126,7 +133,7 @@ public class NovelChapter extends BaseEntity {
         this.wordCount = content == null ? 0 : content.length();
         this.setUpdateTime(LocalDateTime.now());
         this.vectorStored = CommonConstants.DISABLED;
-        if (NovelChapterStatus.PUBLISHED.equals(this.status)) {
+        if (NovelChapterStatusEnum.PUBLISHED == this.status) {
             this.needRepublish = CommonConstants.ENABLED;
         }
     }
@@ -145,14 +152,14 @@ public class NovelChapter extends BaseEntity {
      * 判断是否已发布。
      */
     public boolean isPublished() {
-        return NovelChapterStatus.PUBLISHED.equals(this.status);
+        return NovelChapterStatusEnum.PUBLISHED == this.status;
     }
 
     /**
      * 判断是否草稿。
      */
     public boolean isDraft() {
-        return NovelChapterStatus.DRAFT.equals(this.status);
+        return NovelChapterStatusEnum.DRAFT == this.status;
     }
 
     /**
@@ -164,8 +171,12 @@ public class NovelChapter extends BaseEntity {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
         NovelChapter that = (NovelChapter) obj;
         return Objects.equals(getId(), that.getId());
     }

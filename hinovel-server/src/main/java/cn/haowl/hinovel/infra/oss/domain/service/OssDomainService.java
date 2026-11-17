@@ -1,13 +1,17 @@
 package cn.haowl.hinovel.infra.oss.domain.service;
 
 import cn.haowl.hinovel.infra.oss.config.OssProperties;
-import cn.haowl.hinovel.infra.oss.constant.OssConstants;
+import cn.haowl.hinovel.infra.oss.constant.OssUploadStatusEnum;
+import cn.haowl.hinovel.infra.oss.domain.command.UploadCommand;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
 import cn.haowl.hinovel.infra.oss.domain.repository.OssUploadLogRepository;
 import cn.haowl.hinovel.infra.oss.provider.OssProvider;
+import cn.haowl.hinovel.infra.oss.util.OssFileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
 
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TOO_LARGE;
@@ -16,7 +20,7 @@ import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TYPE
 /**
  * OSS 领域服务。
  *
- * <p>处理文件上传相关的业务逻辑。</p>
+ * 处理文件上传相关的业务逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -45,29 +49,28 @@ public class OssDomainService {
     /**
      * 上传文件。
      *
-     * @param file    文件
-     * @param bizType 业务类型
-     * @param bizId   业务ID
-     * @param userId  用户ID
+     * @param command 上传命令
      * @return 上传日志
      */
-    public OssUploadLog upload(MultipartFile file, String bizType, Long bizId, Long userId) {
+    public OssUploadLog upload(UploadCommand command) {
+        MultipartFile file = command.getFile();
         validateFile(file);
 
-        String fileUrl = ossProvider.upload(file, bizType);
-
-        OssUploadLog log = OssUploadLog.create(
-                userId,
-                bizType,
-                bizId,
-                file.getOriginalFilename(),
-                file.getSize(),
-                file.getContentType(),
-                fileUrl,
-                ossProperties.getType()
-        );
-
-        return ossUploadLogRepository.save(log);
+        String fileUrl = ossProvider.upload(file, command.getBizType());
+        LocalDateTime now = LocalDateTime.now();
+        return ossUploadLogRepository.save(OssUploadLog.builder()
+            .userId(command.getUserId())
+            .bizType(command.getBizType())
+            .bizId(command.getBizId())
+            .originalFilename(file.getOriginalFilename())
+            .fileSize(file.getSize())
+            .contentType(file.getContentType())
+            .fileUrl(fileUrl)
+            .storageType(ossProperties.getType())
+            .status(OssUploadStatusEnum.ACTIVE.name())
+            .createTime(now)
+            .updateTime(now)
+            .build());
     }
 
     /**
@@ -78,7 +81,7 @@ public class OssDomainService {
     public void delete(String fileUrl) {
         ossProvider.delete(fileUrl);
 
-        ossUploadLogRepository.updateStatusByFileUrl(fileUrl, OssConstants.STATUS_DELETED);
+        ossUploadLogRepository.updateStatusByFileUrl(fileUrl, OssUploadStatusEnum.DELETED);
     }
 
     /**
@@ -92,13 +95,8 @@ public class OssDomainService {
             throw exception(OSS_FILE_TOO_LARGE);
         }
 
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || !originalFilename.contains(".")) {
-            throw exception(OSS_FILE_TYPE_NOT_ALLOWED);
-        }
-
-        String extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
-        if (!ossProperties.getAllowedTypeList().contains(extension)) {
+        String extension = OssFileUtils.getExtension(file.getOriginalFilename(), null);
+        if (extension == null || !ossProperties.getAllowedTypeList().contains(extension)) {
             throw exception(OSS_FILE_TYPE_NOT_ALLOWED);
         }
     }

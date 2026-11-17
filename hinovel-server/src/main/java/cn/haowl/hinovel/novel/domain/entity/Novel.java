@@ -1,8 +1,10 @@
 package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import cn.haowl.hinovel.novel.constant.NovelStatusEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.util.Objects;
 
@@ -12,7 +14,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 小说实体。
  *
- * <p>小说聚合根，管理小说基本信息和章节。</p>
+ * 小说聚合根，管理小说基本信息和章节。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -46,7 +48,9 @@ public class Novel extends BaseEntity {
     private String coverUrl;
 
     /**
-     * 状态：ONGOING-连载中，COMPLETED-已完结，PAUSED-暂停。
+     * 小说连载状态。
+     *
+     * @see NovelStatusEnum
      */
     private String status;
 
@@ -76,7 +80,7 @@ public class Novel extends BaseEntity {
         novel.setUserId(userId);
         novel.setTitle(title);
         novel.setDescription(description);
-        novel.setStatus(NovelStatus.ONGOING.name());
+        novel.setStatus(NovelStatusEnum.ONGOING.name());
         novel.setWordCount(0L);
         novel.setChapterCount(0);
         return novel;
@@ -116,30 +120,30 @@ public class Novel extends BaseEntity {
      * 完结小说。
      */
     public void complete() {
-        if (NovelStatus.COMPLETED.name().equals(this.status)) {
+        if (isCompleted()) {
             return;
         }
-        this.status = NovelStatus.COMPLETED.name();
+        this.status = NovelStatusEnum.COMPLETED.name();
     }
 
     /**
      * 暂停连载。
      */
     public void pause() {
-        if (NovelStatus.PAUSED.name().equals(this.status)) {
+        if (isPaused()) {
             return;
         }
-        this.status = NovelStatus.PAUSED.name();
+        this.status = NovelStatusEnum.PAUSED.name();
     }
 
     /**
      * 恢复连载。
      */
     public void resume() {
-        if (NovelStatus.ONGOING.name().equals(this.status)) {
+        if (isOngoing()) {
             return;
         }
-        this.status = NovelStatus.ONGOING.name();
+        this.status = NovelStatusEnum.ONGOING.name();
     }
 
     /**
@@ -202,7 +206,7 @@ public class Novel extends BaseEntity {
      * @return 是否连载中
      */
     public boolean isOngoing() {
-        return NovelStatus.ONGOING.name().equals(this.status);
+        return NovelStatusEnum.ONGOING == EnumUtils.getEnum(NovelStatusEnum.class, this.status);
     }
 
     /**
@@ -211,7 +215,7 @@ public class Novel extends BaseEntity {
      * @return 是否已完结
      */
     public boolean isCompleted() {
-        return NovelStatus.COMPLETED.name().equals(this.status);
+        return NovelStatusEnum.COMPLETED == EnumUtils.getEnum(NovelStatusEnum.class, this.status);
     }
 
     /**
@@ -220,15 +224,6 @@ public class Novel extends BaseEntity {
      * @return 是否暂停
      */
     public boolean isPaused() {
-        return NovelStatus.PAUSED.name().equals(this.status);
-    }
-
-    /**
-     * 小说状态枚举。
-     */
-    public enum NovelStatus {
-        ONGOING,
-        COMPLETED,
-        PAUSED
+        return NovelStatusEnum.PAUSED == EnumUtils.getEnum(NovelStatusEnum.class, this.status);
     }
 }

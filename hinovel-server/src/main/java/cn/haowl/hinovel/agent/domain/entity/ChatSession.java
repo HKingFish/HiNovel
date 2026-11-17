@@ -11,7 +11,7 @@ import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
 /**
  * AI 问答会话实体。
  *
- * <p>每个会话归属于一本小说，记录用户与 AI 的多轮对话。</p>
+ * 每个会话归属于一本小说，记录用户与 AI 的多轮对话。
  *
  * @author haowl
  */

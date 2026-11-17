@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * 章节版本仓储接口。
  *
- * <p>定义章节版本的存储和查询操作。</p>
+ * 定义章节版本的存储和查询操作。
  *
  * @author haowl
  */

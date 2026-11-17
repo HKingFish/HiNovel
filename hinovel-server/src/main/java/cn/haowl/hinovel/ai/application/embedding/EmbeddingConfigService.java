@@ -17,8 +17,8 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 嵌入式模型配置应用服务。
  *
- * <p>提供嵌入式模型配置的 CRUD 操作，apiKey 加密存储，用户数据隔离。
- * 面向展示的返回值统一做密钥脱敏。</p>
+ * 提供嵌入式模型配置的 CRUD 操作，apiKey 加密存储，用户数据隔离。
+ * 面向展示的返回值统一做密钥脱敏。
  *
  * @author wylon
  * @date 2026/3/23 14:56
@@ -75,9 +75,9 @@ public class EmbeddingConfigService {
      * @return 创建后的配置实体（apiKey 已脱敏）
      */
     public EmbeddingConfig create(Long userId, EmbeddingConfigRequest request) {
-        log.info("[create][创建嵌入式模型配置，userId={}，name={}]", userId, request.getName());
+        log.info("[create][创建嵌入式模型配置，userId={}]", userId);
         String apiKey = request.getApiKey();
-        String encryptedKey = (apiKey != null && !apiKey.isBlank())
+        String encryptedKey = apiKey != null && !apiKey.isBlank()
                 ? apiKeyService.encrypt(apiKey) : null;
         EmbeddingConfig config = EmbeddingConfig.create(
                 userId, request.getName(), request.getModelType(), request.getBaseUrl(),

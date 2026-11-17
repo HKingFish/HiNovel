@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * 小说配置仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现小说配置仓储接口。</p>
+ * 基于 MyBatis-Plus 实现小说配置仓储接口。
  *
  * @author haowl
  */

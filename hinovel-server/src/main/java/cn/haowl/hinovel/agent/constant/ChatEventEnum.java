@@ -2,20 +2,31 @@ package cn.haowl.hinovel.agent.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author : wylon
  * @date : 2026/11/17 17:43
- * @desc :
+ * @desc : 问答流式响应的事件类型
  */
 @Getter
-@Slf4j
 @AllArgsConstructor
 public enum ChatEventEnum {
+    /**
+     * 文本片段。
+     */
     TEXT("text", "正文"),
+    /**
+     * 已读取的 Skill。
+     */
     SKILL_LOADED("skill-loaded", "技能加载"),
-    TOOL_EXECUTED("tool-executed", "工具执行");
+    /**
+     * 工具执行结果。
+     */
+    TOOL_EXECUTED("tool-executed", "工具执行"),
+    /**
+     * 流式响应异常。
+     */
+    ERROR("error", "流式响应异常");
 
     /**
      * 事件代码。

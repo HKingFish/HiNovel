@@ -12,20 +12,35 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.PASSWORD_FORMAT
 /**
  * 密码值对象。
  *
- * <p>表示用户的密码，封装密码验证逻辑。</p>
+ * 表示用户的密码，封装密码验证逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
  */
 public final class Password implements Serializable {
 
+    /**
+     * 序列化版本号。
+     */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 密码最小长度。
+     */
     private static final int MIN_LENGTH = 6;
+    /**
+     * 密码最大长度。
+     */
     private static final int MAX_LENGTH = 20;
 
+    /**
+     * 密码值。
+     */
     private final String value;
 
+    /**
+     * 构造已经校验的密码。
+     */
     private Password(String value) {
         this.value = value;
     }

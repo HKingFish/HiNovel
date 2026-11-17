@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 /**
  * 小说列表服务。
  *
- * <p>提供小说列表查询功能，包含 Agent 配置信息。</p>
+ * 提供小说列表查询功能，包含 Agent 配置信息。
  *
  * @author haowl
  * @since 2024

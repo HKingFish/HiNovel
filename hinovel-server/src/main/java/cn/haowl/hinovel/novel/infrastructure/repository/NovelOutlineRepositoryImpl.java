@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * 小说大纲仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现小说大纲仓储接口。</p>
+ * 基于 MyBatis-Plus 实现小说大纲仓储接口。
  */
 @Repository
 public class NovelOutlineRepositoryImpl implements NovelOutlineRepository {

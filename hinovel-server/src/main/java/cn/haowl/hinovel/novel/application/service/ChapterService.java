@@ -2,6 +2,7 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
@@ -22,8 +23,8 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 章节应用服务。
  *
- * <p>协调领域服务完成章节的创建、更新、删除、自动保存及版本管理，
- * 核心业务逻辑委托给 {@link ChapterDomainService}。</p>
+ * 协调领域服务完成章节的创建、更新、删除、自动保存及版本管理，
+ * 核心业务逻辑委托给 {@link ChapterDomainService}。
  */
 @Service
 public class ChapterService {
@@ -71,12 +72,12 @@ public class ChapterService {
         novelService.getNovelById(userId, request.getNovelId());
 
         // 委托领域服务创建章节
-        NovelChapter chapter = chapterDomainService.createChapter(
-                request.getNovelId(),
-                request.getTitle(),
-                request.getContent(),
-                request.getSortOrder()
-        );
+        NovelChapter chapter = chapterDomainService.createChapter(CreateChapterCommand.builder()
+            .novelId(request.getNovelId())
+            .title(request.getTitle())
+            .content(request.getContent())
+            .sortOrder(request.getSortOrder())
+            .build());
 
         // 刷新小说统计
         novelService.refreshNovelStats(request.getNovelId());
@@ -95,12 +96,8 @@ public class ChapterService {
     public NovelChapter updateChapter(Long userId, Long chapterId, ChapterUpdateRequest request) {
         NovelChapter chapter = getChapterById(userId, chapterId);
 
-        // 保存章节时始终创建历史版本（作为内容安全保障）
-        boolean createVersion = true;
-
-        // 委托领域服务更新章节
-        chapter = chapterDomainService.updateChapter(
-                chapter, request.getTitle(), request.getContent(), createVersion);
+        // 正文发生变化时保留历史版本
+        chapter = chapterDomainService.updateChapter(chapter, request.getTitle(), request.getContent());
 
         // 处理排序号和状态（应用层关注点）
         if (request.getSortOrder() != null) {
@@ -173,8 +170,7 @@ public class ChapterService {
     public NovelChapter getChapterById(Long userId, Long chapterId) {
         NovelChapter chapter = chapterDomainService.getChapter(chapterId);
 
-        if (chapter.getDeleted() != null
-                && chapter.getDeleted().equals(CommonConstants.DELETED_TRUE)) {
+        if (CommonConstants.DELETED_TRUE.equals(chapter.getDeleted())) {
             throw exception(NOT_FOUND);
         }
 

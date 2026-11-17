@@ -1,5 +1,8 @@
 package cn.haowl.hinovel.ai.interfaces.dto;
 
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
+import cn.haowl.hinovel.ai.constant.LlmCallStatusEnum;
+import cn.haowl.hinovel.common.constant.CommonConstants;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -19,34 +22,48 @@ import java.time.LocalDateTime;
 public class LlmCallLogQuery {
 
     /**
+     * 调用记录每页默认条数。
+     */
+    private static final int DEFAULT_LOG_PAGE_SIZE = 20;
+
+    /**
+     * 时间筛选参数格式。
+     */
+    private static final String FILTER_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
+    /**
      * 页码（从 1 开始）。
      */
-    private int pageNum = 1;
+    private int pageNum = CommonConstants.DEFAULT_PAGE_NUM;
 
     /**
      * 每页条数。
      */
-    private int pageSize = 20;
+    private int pageSize = DEFAULT_LOG_PAGE_SIZE;
 
     /**
      * 调用场景（可选，为空则不过滤）。
+     *
+     * @see LlmCallSceneEnum
      */
     private String callScene;
 
     /**
      * 调用状态（可选，为空则不过滤）。
+     *
+     * @see LlmCallStatusEnum
      */
     private String status;
 
     /**
      * 开始时间（可选）。
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = FILTER_TIME_FORMAT)
     private LocalDateTime startTime;
 
     /**
      * 结束时间（可选）。
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = FILTER_TIME_FORMAT)
     private LocalDateTime endTime;
 }

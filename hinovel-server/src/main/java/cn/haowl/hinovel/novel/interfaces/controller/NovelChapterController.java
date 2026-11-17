@@ -7,6 +7,7 @@ import cn.haowl.hinovel.novel.application.service.NovelChapterService;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
+import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
 import cn.haowl.hinovel.novel.interfaces.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,7 +19,7 @@ import java.util.List;
 /**
  * 小说章节管理接口。
  *
- * <p>提供章节 CRUD、历史版本、小说大纲等功能。</p>
+ * 提供章节 CRUD、历史版本、小说大纲等功能。
  *
  * @author haowl
  * @since 2024
@@ -49,8 +50,7 @@ public class NovelChapterController {
     @Operation(summary = "获取小说章节列表")
     @GetMapping("/novel/{novelId}")
     public ApiResponse<List<NovelChapter>> getNovelChapters(@PathVariable Long novelId) {
-        List<NovelChapter> chapters = chapterService.getNovelChapters(novelId);
-        return ApiResponse.success(chapters);
+        return ApiResponse.success(chapterService.getNovelChapters(novelId));
     }
 
     /**
@@ -78,8 +78,7 @@ public class NovelChapterController {
     @Operation(summary = "获取章节详情")
     @GetMapping("/{chapterId}")
     public ApiResponse<NovelChapter> getChapter(@PathVariable Long chapterId) {
-        NovelChapter chapter = chapterService.getChapter(chapterId);
-        return ApiResponse.success(chapter);
+        return ApiResponse.success(chapterService.getChapter(chapterId));
     }
 
     /**
@@ -91,8 +90,7 @@ public class NovelChapterController {
     @Operation(summary = "创建章节")
     @PostMapping
     public ApiResponse<NovelChapter> createChapter(@RequestBody NovelChapter chapter) {
-        NovelChapter created = chapterService.createChapter(chapter);
-        return ApiResponse.success(created);
+        return ApiResponse.success(chapterService.createChapter(chapter));
     }
 
     /**
@@ -108,8 +106,7 @@ public class NovelChapterController {
             @PathVariable Long chapterId,
             @RequestBody NovelChapter chapter) {
         chapter.setId(chapterId);
-        NovelChapter updated = chapterService.updateChapter(chapter);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(chapterService.updateChapter(chapter));
     }
 
     /**
@@ -128,7 +125,7 @@ public class NovelChapterController {
     /**
      * 发布章节。
      *
-     * <p>发布后异步触发 AI 总结大纲和向量存储。</p>
+     * 发布后异步触发 AI 总结大纲和向量存储。
      *
      * @param chapterId 章节 ID
      * @return 发布结果
@@ -143,7 +140,7 @@ public class NovelChapterController {
     /**
      * 手动同步章节内容到向量数据库。
      *
-     * <p>适用于未自动入库或需要重新同步的场景，异步执行。</p>
+     * 适用于未自动入库或需要重新同步的场景，异步执行。
      *
      * @param chapterId 章节 ID
      * @return 同步触发结果
@@ -170,7 +167,7 @@ public class NovelChapterController {
     /**
      * 将 AI 大纲替换为用户大纲。
      *
-     * <p>用户确认后，将 aiOutlineContent 覆盖到 outlineContent。</p>
+     * 用户确认后，将 aiOutlineContent 覆盖到 outlineContent。
      *
      * @param chapterId 章节 ID
      * @return 替换后的大纲
@@ -191,8 +188,7 @@ public class NovelChapterController {
     @Operation(summary = "获取章节历史版本")
     @GetMapping("/{chapterId}/versions")
     public ApiResponse<List<NovelChapterVersion>> getChapterVersions(@PathVariable Long chapterId) {
-        List<NovelChapterVersion> versions = chapterService.getChapterVersions(chapterId);
-        return ApiResponse.success(versions);
+        return ApiResponse.success(chapterService.getChapterVersions(chapterId));
     }
 
     /**
@@ -207,8 +203,7 @@ public class NovelChapterController {
     public ApiResponse<NovelChapter> restoreChapterVersion(
             @PathVariable Long chapterId,
             @PathVariable Long versionId) {
-        NovelChapter chapter = chapterService.restoreChapterVersion(chapterId, versionId);
-        return ApiResponse.success(chapter);
+        return ApiResponse.success(chapterService.restoreChapterVersion(chapterId, versionId));
     }
 
     /**
@@ -238,8 +233,7 @@ public class NovelChapterController {
     @Operation(summary = "获取小说大纲")
     @GetMapping("/outline/novel/{novelId}")
     public ApiResponse<NovelOutline> getNovelOutline(@PathVariable Long novelId) {
-        NovelOutline outline = chapterService.getNovelOutline(novelId);
-        return ApiResponse.success(outline);
+        return ApiResponse.success(chapterService.getNovelOutline(novelId));
     }
 
     /**
@@ -251,8 +245,7 @@ public class NovelChapterController {
     @Operation(summary = "保存小说大纲")
     @PostMapping("/outline")
     public ApiResponse<NovelOutline> saveNovelOutline(@RequestBody NovelOutline outline) {
-        NovelOutline saved = chapterService.saveNovelOutline(outline);
-        return ApiResponse.success(saved);
+        return ApiResponse.success(chapterService.saveNovelOutline(outline));
     }
 
     /**
@@ -267,8 +260,7 @@ public class NovelChapterController {
     public ApiResponse<NovelChapter> updateChapterNumber(
             @PathVariable Long chapterId,
             @RequestBody UpdateChapterNumberRequest request) {
-        NovelChapter updated = chapterService.updateChapterNumber(chapterId, request.getChapterNumber());
-        return ApiResponse.success(updated);
+        return ApiResponse.success(chapterService.updateChapterNumber(chapterId, request.getChapterNumber()));
     }
 
     /**

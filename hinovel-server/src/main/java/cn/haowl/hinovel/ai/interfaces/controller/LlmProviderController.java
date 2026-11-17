@@ -2,7 +2,7 @@ package cn.haowl.hinovel.ai.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
-import cn.haowl.hinovel.ai.constant.LlmProviderType;
+import cn.haowl.hinovel.ai.constant.LlmProviderTypeEnum;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
 import cn.haowl.hinovel.ai.interfaces.dto.LlmProviderRequest;
 import cn.haowl.hinovel.ai.interfaces.dto.ProviderTypeVO;
@@ -18,8 +18,8 @@ import java.util.List;
 /**
  * LLM 提供方管理控制器。
  *
- * <p>提供 LLM 提供方的增删改查、激活/停用等管理接口，
- * 供前端 LLM Provider 管理页面调用。</p>
+ * 提供 LLM 提供方的增删改查、激活/停用等管理接口，
+ * 供前端 LLM Provider 管理页面调用。
  *
  * @author haowl
  */
@@ -37,7 +37,7 @@ public class LlmProviderController {
     /**
      * 获取所有 LLM 提供方列表。
      *
-     * <p>返回的 apiKey 已脱敏处理，不暴露完整密钥。</p>
+     * 返回的 apiKey 已脱敏处理，不暴露完整密钥。
      *
      * @return 提供方列表（apiKey 已脱敏）
      */
@@ -50,7 +50,7 @@ public class LlmProviderController {
     /**
      * 获取 LLM 提供方详情。
      *
-     * <p>返回的 apiKey 已脱敏处理，不暴露完整密钥。</p>
+     * 返回的 apiKey 已脱敏处理，不暴露完整密钥。
      *
      * @param id 提供方 ID
      * @return 提供方详情（apiKey 已脱敏）
@@ -77,7 +77,7 @@ public class LlmProviderController {
     /**
      * 更新 LLM 提供方。
      *
-     * <p>如果前端未修改 apiKey（传入空值或脱敏值），则保留原有加密密钥不变。</p>
+     * 如果前端未修改 apiKey（传入空值或脱敏值），则保留原有加密密钥不变。
      *
      * @param id      提供方 ID
      * @param request 更新请求
@@ -137,7 +137,7 @@ public class LlmProviderController {
     @Operation(summary = "获取提供方类型", description = "返回所有支持的 LLM 提供方类型及其官方 API 地址")
     @GetMapping("/types")
     public ApiResponse<List<ProviderTypeVO>> listProviderTypes() {
-        List<ProviderTypeVO> types = Arrays.stream(LlmProviderType.values())
+        List<ProviderTypeVO> types = Arrays.stream(LlmProviderTypeEnum.values())
                 .map(type -> new ProviderTypeVO(
                         type.name(),
                         type.getDisplayName(),

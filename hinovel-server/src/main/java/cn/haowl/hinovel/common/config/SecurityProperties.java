@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * 安全配置属性。
  *
- * <p>管理 API 密钥加密等安全相关的配置项。</p>
+ * 管理 API 密钥加密等安全相关的配置项。
  *
  * @author haowl
  */

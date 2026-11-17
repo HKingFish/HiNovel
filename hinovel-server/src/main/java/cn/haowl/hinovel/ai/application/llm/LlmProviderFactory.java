@@ -5,8 +5,8 @@ import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
 /**
  * LLM 提供方工厂接口。
  *
- * <p>参考 VectorStoreFactory 设计理念，支持按提供方配置动态获取并缓存 LLM 实例，
- * 避免重复创建，同时支持配置变更后刷新实例。</p>
+ * 参考 VectorStoreFactory 设计理念，支持按提供方配置动态获取并缓存 LLM 实例，
+ * 避免重复创建，同时支持配置变更后刷新实例。
  *
  * @author haowl
  */
@@ -31,8 +31,8 @@ public interface LlmProviderFactory {
     /**
      * 获取可用的 LLM 提供方实例（支持 failover）。
      *
-     * <p>优先使用指定的 providerId，若该 Provider 不健康，
-     * 自动切换到其他可用的 Provider，避免单点故障导致全站不可用。</p>
+     * 优先使用指定的 providerId，若该 Provider 不健康，
+     * 自动切换到其他可用的 Provider，避免单点故障导致全站不可用。
      *
      * @param preferredProviderId 优先使用的提供方 ID
      * @return 可用的 LLM 提供方端口实例

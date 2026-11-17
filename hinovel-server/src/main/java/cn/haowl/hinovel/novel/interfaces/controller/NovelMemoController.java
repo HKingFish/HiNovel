@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 小说创作手记接口。
  *
- * <p>提供创作手记的读取和保存功能，按小说 + 用户维度存储。</p>
+ * 提供创作手记的读取和保存功能，按小说 + 用户维度存储。
  *
  * @author haowl
  */
@@ -37,8 +37,7 @@ public class NovelMemoController {
     @Operation(summary = "获取创作手记")
     @GetMapping("/{novelId}")
     public ApiResponse<NovelMemo> getMemo(@PathVariable Long novelId) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(novelMemoService.getMemo(novelId, userId));
+        return ApiResponse.success(novelMemoService.getMemo(novelId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -51,8 +50,7 @@ public class NovelMemoController {
     @Operation(summary = "保存创作手记")
     @PutMapping("/{novelId}")
     public ApiResponse<Void> saveMemo(@PathVariable Long novelId, @RequestBody SaveMemoRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        novelMemoService.saveMemo(novelId, userId, request.getContent());
+        novelMemoService.saveMemo(novelId, StpUtil.getLoginIdAsLong(), request.getContent());
         return ApiResponse.success();
     }
 }

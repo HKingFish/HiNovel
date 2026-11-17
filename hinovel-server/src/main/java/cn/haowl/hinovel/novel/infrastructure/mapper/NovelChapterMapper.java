@@ -12,8 +12,8 @@ import java.util.List;
 /**
  * 小说章节 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现章节的数据访问操作，
- * 复杂 SQL（如前几章子查询）定义在对应的 XML 映射文件中。</p>
+ * 基于 MyBatis-Plus 实现章节的数据访问操作，
+ * 复杂 SQL（如前几章子查询）定义在对应的 XML 映射文件中。
  *
  * @author haowl
  */
@@ -106,7 +106,7 @@ public interface NovelChapterMapper extends BaseMapper<NovelChapter> {
     /**
      * 查询指定章节之前的若干章（按章节号倒序取 limit 条，再正序返回）。
      *
-     * <p>SQL 定义在 XML 映射文件中，用于 AI 改写时携带前情提要。</p>
+     * SQL 定义在 XML 映射文件中，用于 AI 改写时携带前情提要。
      *
      * @param novelId       小说 ID
      * @param chapterNumber 当前章节号（不包含自身）

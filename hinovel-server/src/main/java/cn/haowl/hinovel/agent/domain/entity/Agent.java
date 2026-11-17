@@ -17,7 +17,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * Agent 实体。
  *
- * <p>AI Agent 配置实体，包含模型参数和系统提示词。</p>
+ * AI Agent 配置实体，包含模型参数和系统提示词。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -106,7 +106,7 @@ public class Agent extends BaseEntity {
     /**
      * 绑定的 Skill ID 列表。
      *
-     * <p>非持久化字段，由绑定表关联查询后填充；无绑定时为空数组。</p>
+     * 非持久化字段，由绑定表关联查询后填充；无绑定时为空数组。
      */
     @TableField(exist = false)
     private List<Integer> skillIds;
@@ -240,7 +240,9 @@ public class Agent extends BaseEntity {
         return Objects.equals(this.userId, userId);
     }
 
-    /** 判断当前用户是否可以选用该 Agent。 */
+    /**
+     * 判断当前用户是否可以选用该 Agent。
+     */
     public boolean isAvailableTo(Long userId) {
         return userId != null && (isBuiltin() || belongsTo(userId));
     }

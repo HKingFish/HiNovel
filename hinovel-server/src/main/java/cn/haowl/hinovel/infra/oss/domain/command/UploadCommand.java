@@ -1,14 +1,15 @@
-package cn.haowl.hinovel.infra.oss.application.query;
+package cn.haowl.hinovel.infra.oss.domain.command;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
- * OSS 上传日志查询条件。
+ * 文件上传命令。
  *
- * <p>表示上传日志查询的读操作请求。</p>
+ * 表示文件上传的写操作请求。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -17,12 +18,12 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OssUploadLogQuery {
+public class UploadCommand {
 
     /**
-     * 用户ID。
+     * 上传的文件。
      */
-    private Long userId;
+    private MultipartFile file;
 
     /**
      * 业务类型。
@@ -33,4 +34,9 @@ public class OssUploadLogQuery {
      * 业务ID。
      */
     private Long bizId;
+
+    /**
+     * 用户ID。
+     */
+    private Long userId;
 }

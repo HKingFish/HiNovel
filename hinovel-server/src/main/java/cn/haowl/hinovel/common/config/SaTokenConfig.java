@@ -9,10 +9,12 @@ import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpHeaders;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.UNAUTHORIZED;
 
@@ -45,13 +47,14 @@ public class SaTokenConfig {
                 )
                 .setAuth(obj -> {
                     // OPTIONS 预检请求直接放行，避免干扰 CorsFilter 的跨域头写入
-                    if ("OPTIONS".equals(SaHolder.getRequest().getMethod())) {
+                    if (HttpMethod.OPTIONS.matches(SaHolder.getRequest().getMethod())) {
                         return;
                     }
                     SaRouter.match("/**").check(r -> StpUtil.checkLogin());
                 })
                 .setError(e -> {
-                    SaHolder.getResponse().setHeader(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8");
+                    SaHolder.getResponse().setHeader(
+                        HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
                     if (e instanceof NotLoginException) {
                         SaHolder.getResponse().setStatus(CommonConstants.HTTP_STATUS_UNAUTHORIZED);
                         return unauthorized;

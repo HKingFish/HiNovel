@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * {@link BusinessException} 工具类。
  *
- * <p>用于格式化异常信息提示，使用 {@code {}} 作为占位符。
+ * 用于格式化异常信息提示，使用 {@code {}} 作为占位符。
  *
  * @author haowl
  * @see BusinessException
@@ -18,6 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class ServiceExceptionUtil {
 
+    /**
+     * 禁止实例化异常工具类。
+     */
     private ServiceExceptionUtil() {
     }
 
@@ -34,7 +37,7 @@ public final class ServiceExceptionUtil {
     /**
      * 根据错误码和参数创建业务异常。
      *
-     * <p>错误消息中的 {@code {}} 占位符会被参数替换。
+     * 错误消息中的 {@code {}} 占位符会被参数替换。
      *
      * @param errorCode 错误码
      * @param params    参数列表
@@ -64,8 +67,7 @@ public final class ServiceExceptionUtil {
      * @return 业务异常
      */
     public static BusinessException exception0(Integer code, String messagePattern, Object... params) {
-        String message = doFormat(code, messagePattern, params);
-        return new BusinessException(code, message);
+        return new BusinessException(code, doFormat(code, messagePattern, params));
     }
 
     /**
@@ -94,9 +96,9 @@ public final class ServiceExceptionUtil {
         int l;
         for (l = 0; l < params.length; l++) {
             j = messagePattern.indexOf("{}", i);
-            if (j == -1) {
-                log.error("[doFormat][参数过多：错误码({})|错误内容({})|参数({})", code, messagePattern, params);
-                if (i == 0) {
+            if (-1 == j) {
+                log.error("[doFormat][参数过多：code={}，parameterCount={}]", code, params.length);
+                if (0 == i) {
                     return messagePattern;
                 } else {
                     sbuf.append(messagePattern.substring(i));
@@ -109,7 +111,7 @@ public final class ServiceExceptionUtil {
             }
         }
         if (messagePattern.indexOf("{}", i) != -1) {
-            log.error("[doFormat][参数过少：错误码({})|错误内容({})|参数({})", code, messagePattern, params);
+            log.error("[doFormat][参数过少：code={}，parameterCount={}]", code, params.length);
         }
         sbuf.append(messagePattern.substring(i));
         return sbuf.toString();

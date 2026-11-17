@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * 小说大纲仓储接口。
  *
- * <p>定义小说大纲实体的存储和查询操作。</p>
+ * 定义小说大纲实体的存储和查询操作。
  */
 public interface NovelOutlineRepository {
 

@@ -1,14 +1,16 @@
 package cn.haowl.hinovel.agent.application.service.agent;
 
-import cn.haowl.hinovel.agent.enums.AgentRole;
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
-import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.SyncCallLogContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallLogContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.TokenStreamOptions;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelContentRetrievalTool;
+import cn.haowl.hinovel.agent.interfaces.dto.ChapterRewriteCommand;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
 import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
@@ -29,8 +31,8 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 作者 Agent 服务。
  *
- * <p>通过 {@link AiServiceFactory} 动态构建 {@link GenericAiAssistant} 实例，
- * 以声明式方式完成章节改写。支持按小说绑定的作者 Agent 配置选择不同的模型提供方。</p>
+ * 通过 {@link AiServiceFactory} 动态构建 {@link GenericAiAssistant} 实例，
+ * 以声明式方式完成章节改写。支持按小说绑定的作者 Agent 配置选择不同的模型提供方。
  *
  * @author haowl
  */
@@ -56,16 +58,6 @@ public class AuthorAgent {
     @Autowired
     private ChapterAnnotationService chapterAnnotationService;
     /**
-     * 调用场景常量：改写
-     */
-    private static final String CALL_SCENE_REWRITE = "REWRITE";
-
-    /**
-     * 调用场景常量：根据建议重写
-     */
-    private static final String CALL_SCENE_REGENERATE = "REGENERATE";
-
-    /**
      * 作者 Agent 默认系统提示词（引用统一模板）
      */
     private static final String DEFAULT_SYSTEM_PROMPT = AgentPromptTemplates.AUTHOR_SYSTEM_PROMPT;
@@ -79,17 +71,18 @@ public class AuthorAgent {
      * @return 生成的章节内容
      */
     public String rewriteChapterByOutline(NovelChapter chapter, ChapterOutline outline, Long userId) {
-        log.info("作者 Agent 改写章节，chapterId={}，title={}", chapter.getId(), chapter.getTitle());
+        log.info("[rewriteChapterByOutline][作者 Agent 改写章节，chapterId={}]", chapter.getId());
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRoleEnum.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
-        String userPrompt = buildRewritePrompt(chapter, outline);
+        String userPrompt = AgentPromptTemplates.buildRewritePrompt(
+            ChapterRewriteCommand.builder().chapter(chapter).outline(outline).build());
 
-        SyncCallLogContext logContext =
-            SyncCallLogContext.builder()
-                .callScene(CALL_SCENE_REWRITE)
+        CallLogContext logContext =
+            CallLogContext.builder()
+                .callScene(LlmCallSceneEnum.REWRITE)
                 .callContext(callContext)
                 .requestContent(userPrompt)
                 .build();
@@ -98,14 +91,14 @@ public class AuthorAgent {
             String content = assistant.chat(callContext.getSystemPrompt(),
                 aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.info("作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms",
+            log.info("[rewriteChapterByOutline][作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms]",
                 chapter.getId(), content.length(), processingTimeMs);
             aiServiceFactory.logSyncCall(logContext, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.error("作者 Agent 改写失败，chapterId={}，耗时={}ms，异常信息：{}",
-                chapter.getId(), processingTimeMs, e.getMessage());
+            log.error("[rewriteChapterByOutline][作者 Agent 改写失败，chapterId={}，耗时={}ms，异常类型={}]",
+                chapter.getId(), processingTimeMs, e.getClass().getSimpleName());
             aiServiceFactory.logSyncCallFailed(logContext, e.getMessage(), processingTimeMs);
             throw e;
         }
@@ -121,44 +114,37 @@ public class AuthorAgent {
      */
     public Flux<String> streamRewriteChapterByOutline(NovelChapter chapter, ChapterOutline outline,
                                                       Long userId) {
-        return streamRewriteChapterByOutline(chapter, outline, List.of(), null, null, userId);
+        return streamRewriteChapterByOutline(
+            ChapterRewriteCommand.builder().chapter(chapter).outline(outline).build(), userId);
     }
 
     /**
      * 流式改写章节（SSE），支持携带前几章内容、全文大纲和用户临时需求。
      *
-     * @param chapter             章节信息
-     * @param outline             章节大纲
-     * @param previousChapters    前几章内容（用于前情提要，可为空列表）
-     * @param novelOutlineContent 全文大纲内容（可为 null）
-     * @param userRequirement     用户临时需求（可为 null）
-     * @param userId              当前用户 ID
-     * @return 逐 Token 推送的 Flux 流
+     * @param command 改写内容和上下文
+     * @param userId  当前用户 ID
+     * @return 改写文本流
      */
-    public Flux<String> streamRewriteChapterByOutline(NovelChapter chapter, ChapterOutline outline,
-                                                      List<NovelChapter> previousChapters,
-                                                      String novelOutlineContent,
-                                                      String userRequirement,
-                                                      Long userId) {
-        log.info("作者 Agent 流式改写章节，chapterId={}，title={}，前情章数={}，携带全文大纲={}，携带用户需求={}",
-            chapter.getId(), chapter.getTitle(),
-            previousChapters.size(), novelOutlineContent != null,
-            userRequirement != null && !userRequirement.isBlank());
+    public Flux<String> streamRewriteChapterByOutline(ChapterRewriteCommand command, Long userId) {
+        NovelChapter chapter = command.getChapter();
+        log.info("[streamRewriteChapterByOutline][作者 Agent 流式改写章节，chapterId={}，前情章数={}，携带全文大纲={}，携带用户需求={}]",
+            chapter.getId(),
+            command.getPreviousChapters().size(), command.getNovelOutlineContent() != null,
+            command.getUserRequirement() != null && !command.getUserRequirement().isBlank());
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRoleEnum.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         NovelContentRetrievalTool retrievalTool =
             NovelContentRetrievalTool.create(vectorStoreFactory, chapter.getNovelId(), userId);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true, retrievalTool);
-        String userPrompt = buildRewritePrompt(chapter, outline,
-            previousChapters, novelOutlineContent, userRequirement);
+        String userPrompt = AgentPromptTemplates.buildRewritePrompt(command);
 
         TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
             aiServiceFactory.writingPrompt(callContext, userPrompt));
         TokenStreamOptions<String> streamOptions =
             TokenStreamOptions.<String>builder()
                 .logContext("chapterId=" + chapter.getId())
-                .callScene(CALL_SCENE_REWRITE)
+                .callScene(LlmCallSceneEnum.REWRITE)
                 .callContext(callContext)
                 .requestContent(userPrompt)
                 .textEvent(Function.identity())
@@ -177,17 +163,17 @@ public class AuthorAgent {
      */
     public String rewriteBySuggestions(NovelChapter chapter, ChapterOutline outline,
                                        List<String> suggestions, Long userId) {
-        log.info("作者 Agent 根据建议重写，chapterId={}，建议数={}", chapter.getId(), suggestions.size());
+        log.info("[rewriteBySuggestions][作者 Agent 根据建议重写，chapterId={}，建议数={}]", chapter.getId(), suggestions.size());
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
-            chapter.getNovelId(), AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+            chapter.getNovelId(), AgentRoleEnum.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
-        String userPrompt = buildSuggestionRewritePrompt(chapter, outline, suggestions);
+        String userPrompt = AgentPromptTemplates.buildSuggestionRewritePrompt(chapter, outline, suggestions);
 
-        SyncCallLogContext logContext =
-            SyncCallLogContext.builder()
-                .callScene(CALL_SCENE_REGENERATE)
+        CallLogContext logContext =
+            CallLogContext.builder()
+                .callScene(LlmCallSceneEnum.REGENERATE)
                 .callContext(callContext)
                 .requestContent(userPrompt)
                 .build();
@@ -196,105 +182,20 @@ public class AuthorAgent {
             String content = assistant.chat(callContext.getSystemPrompt(),
                 aiServiceFactory.writingPrompt(callContext, userPrompt));
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.info("作者 Agent 建议重写完成，chapterId={}，生成字数={}，耗时={}ms",
+            log.info("[rewriteBySuggestions][作者 Agent 建议重写完成，chapterId={}，生成字数={}，耗时={}ms]",
                 chapter.getId(), content.length(), processingTimeMs);
             aiServiceFactory.logSyncCall(logContext, content, processingTimeMs);
             return content;
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.error("作者 Agent 建议重写失败，chapterId={}，耗时={}ms，异常信息：{}",
-                chapter.getId(), processingTimeMs, e.getMessage());
+            log.error("[rewriteBySuggestions][作者 Agent 建议重写失败，chapterId={}，耗时={}ms，异常类型={}]",
+                chapter.getId(), processingTimeMs, e.getClass().getSimpleName());
             aiServiceFactory.logSyncCallFailed(logContext, e.getMessage(), processingTimeMs);
             throw e;
         }
     }
 
-    /**
-     * 构建大纲改写 Prompt（无上下文版本，兼容旧调用）。
-     *
-     * @param chapter 章节信息
-     * @param outline 章节大纲
-     * @return 用户 Prompt
-     */
-    private String buildRewritePrompt(NovelChapter chapter, ChapterOutline outline) {
-        return AgentPromptTemplates.buildRewritePrompt(chapter, outline, List.of(), null, null);
-    }
-
-    /**
-     * 构建大纲改写 Prompt（完整版本，支持前情提要、全文大纲和用户临时需求）。
-     *
-     * @param chapter             章节信息
-     * @param outline             章节大纲
-     * @param previousChapters    前几章内容（用于前情提要）
-     * @param novelOutlineContent 全文大纲内容（可为 null）
-     * @param userRequirement     用户临时需求（可为 null）
-     * @return 用户 Prompt
-     */
-    private String buildRewritePrompt(NovelChapter chapter, ChapterOutline outline,
-                                      List<NovelChapter> previousChapters,
-                                      String novelOutlineContent,
-                                      String userRequirement) {
-        return AgentPromptTemplates.buildRewritePrompt(
-            chapter, outline, previousChapters, novelOutlineContent, userRequirement);
-    }
-
-    /**
-     * 构建基于建议的重写 Prompt。
-     *
-     * @param chapter     章节信息
-     * @param outline     章节大纲
-     * @param suggestions 修改建议
-     * @return 用户 Prompt
-     */
-    private String buildSuggestionRewritePrompt(NovelChapter chapter, ChapterOutline outline,
-                                                List<String> suggestions) {
-        return AgentPromptTemplates.buildSuggestionRewritePrompt(chapter, outline, suggestions);
-    }
-
     // ==================== 批注改写 ====================
-
-    /**
-     * 调用场景常量：批注改写
-     */
-    private static final String CALL_SCENE_ANNOTATION_REWRITE = "ANNOTATION_REWRITE";
-
-    /**
-     * 流式批注改写（SSE）。
-     *
-     * <p>根据批注意见对指定文本片段进行改写，同时传入整章内容保证连贯性。
-     * 只改写被批注的文本片段，不改动其他内容。</p>
-     *
-     * @param novelId            小说 ID
-     * @param fullChapterContent 整章正文内容（用于保证改写连贯性）
-     * @param originalText       被批注的原文片段
-     * @param rewriteRequirement 改写要求（用户输入的提示词）
-     * @param userId             当前用户 ID
-     * @return 逐 Token 推送的 Flux 流
-     */
-    private Flux<String> streamAnnotationRewrite(Long novelId, String fullChapterContent,
-                                                 String originalText, String rewriteRequirement,
-                                                 Long userId) {
-        log.info("[streamAnnotationRewrite][批注改写，novelId={}，原文长度={}，改写要求长度={}]",
-            novelId, originalText.length(), rewriteRequirement.length());
-
-        CallContext callContext = aiServiceFactory.prepareNovelCall(
-            novelId, AgentRole.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
-        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true);
-        String userPrompt = buildAnnotationRewritePrompt(
-            fullChapterContent, originalText, rewriteRequirement);
-
-        TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
-            aiServiceFactory.writingPrompt(callContext, userPrompt));
-        TokenStreamOptions<String> streamOptions =
-            TokenStreamOptions.<String>builder()
-                .logContext("annotationRewrite-novelId=" + novelId)
-                .callScene(CALL_SCENE_ANNOTATION_REWRITE)
-                .callContext(callContext)
-                .requestContent(userPrompt)
-                .textEvent(Function.identity())
-                .build();
-        return aiServiceFactory.tokenStreamToFlux(tokenStream, streamOptions);
-    }
 
     /**
      * 按批注归属或指定小说执行流式改写。
@@ -314,12 +215,28 @@ public class AuthorAgent {
             novelId = annotation.getNovelId();
         }
 
-        return streamAnnotationRewrite(
-            novelId,
-            request.getFullChapterContent(),
-            request.getOriginalText(),
-            request.getAnnotationContent(),
-            userId);
+        String originalText = request.getOriginalText();
+        String rewriteRequirement = request.getAnnotationContent();
+        log.info("[streamAnnotationRewrite][批注改写，novelId={}，原文长度={}，改写要求长度={}]",
+            novelId, originalText.length(), rewriteRequirement.length());
+
+        CallContext callContext = aiServiceFactory.prepareNovelCall(
+            novelId, AgentRoleEnum.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
+        GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, true);
+        String userPrompt = buildAnnotationRewritePrompt(
+            request.getFullChapterContent(), originalText, rewriteRequirement);
+
+        TokenStream tokenStream = assistant.streamChat(callContext.getSystemPrompt(),
+            aiServiceFactory.writingPrompt(callContext, userPrompt));
+        TokenStreamOptions<String> streamOptions =
+            TokenStreamOptions.<String>builder()
+                .logContext("annotationRewrite-novelId=" + novelId)
+                .callScene(LlmCallSceneEnum.ANNOTATION_REWRITE)
+                .callContext(callContext)
+                .requestContent(userPrompt)
+                .textEvent(Function.identity())
+                .build();
+        return aiServiceFactory.tokenStreamToFlux(tokenStream, streamOptions);
     }
 
     /**

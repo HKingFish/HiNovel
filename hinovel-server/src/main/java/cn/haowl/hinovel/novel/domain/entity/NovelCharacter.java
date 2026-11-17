@@ -1,6 +1,8 @@
 package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import cn.haowl.hinovel.novel.constant.CharacterGenderEnum;
+import cn.haowl.hinovel.novel.constant.CharacterRoleTypeEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -8,8 +10,8 @@ import lombok.EqualsAndHashCode;
 /**
  * 小说人物实体。
  *
- * <p>对应 novel_character 表，封装人物基本信息、人设描述
- * 以及角色类型等核心业务逻辑。</p>
+ * 对应 novel_character 表，封装人物基本信息、人设描述
+ * 以及角色类型等核心业务逻辑。
  *
  * @author haowl
  */
@@ -17,26 +19,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @TableName("novel_character")
 public class NovelCharacter extends BaseEntity {
-
-    /**
-     * 角色类型：主角。
-     */
-    public static final String ROLE_TYPE_PROTAGONIST = "PROTAGONIST";
-
-    /**
-     * 角色类型：配角。
-     */
-    public static final String ROLE_TYPE_SUPPORTING = "SUPPORTING";
-
-    /**
-     * 角色类型：反派。
-     */
-    public static final String ROLE_TYPE_ANTAGONIST = "ANTAGONIST";
-
-    /**
-     * 角色类型：其他。
-     */
-    public static final String ROLE_TYPE_OTHER = "OTHER";
 
     /**
      * 所属小说 ID。
@@ -59,7 +41,9 @@ public class NovelCharacter extends BaseEntity {
     private String avatarUrl;
 
     /**
-     * 性别：MALE-男，FEMALE-女，OTHER-其他。
+     * 性别编码。
+     *
+     * @see CharacterGenderEnum
      */
     private String gender;
 
@@ -99,7 +83,9 @@ public class NovelCharacter extends BaseEntity {
     private String notes;
 
     /**
-     * 角色类型：PROTAGONIST-主角，SUPPORTING-配角，ANTAGONIST-反派，OTHER-其他。
+     * 角色类型编码。
+     *
+     * @see CharacterRoleTypeEnum
      */
     private String roleType;
 
@@ -133,7 +119,7 @@ public class NovelCharacter extends BaseEntity {
         NovelCharacter character = new NovelCharacter();
         character.setNovelId(novelId);
         character.setName(name);
-        character.setRoleType(roleType != null ? roleType : ROLE_TYPE_OTHER);
+        character.setRoleType(roleType != null ? roleType : CharacterRoleTypeEnum.OTHER.name());
         character.setSortOrder(sortOrder != null ? sortOrder : 0);
         return character;
     }
@@ -221,7 +207,7 @@ public class NovelCharacter extends BaseEntity {
      * @return 主角返回 true
      */
     public boolean isProtagonist() {
-        return ROLE_TYPE_PROTAGONIST.equals(this.roleType);
+        return CharacterRoleTypeEnum.PROTAGONIST == CharacterRoleTypeEnum.fromCode(this.roleType);
     }
 
     /**
@@ -230,7 +216,7 @@ public class NovelCharacter extends BaseEntity {
      * @return 配角返回 true
      */
     public boolean isSupporting() {
-        return ROLE_TYPE_SUPPORTING.equals(this.roleType);
+        return CharacterRoleTypeEnum.SUPPORTING == CharacterRoleTypeEnum.fromCode(this.roleType);
     }
 
     /**
@@ -239,7 +225,7 @@ public class NovelCharacter extends BaseEntity {
      * @return 反派返回 true
      */
     public boolean isAntagonist() {
-        return ROLE_TYPE_ANTAGONIST.equals(this.roleType);
+        return CharacterRoleTypeEnum.ANTAGONIST == CharacterRoleTypeEnum.fromCode(this.roleType);
     }
 
     /**

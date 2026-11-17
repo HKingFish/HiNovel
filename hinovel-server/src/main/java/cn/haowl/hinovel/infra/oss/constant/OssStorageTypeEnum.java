@@ -3,12 +3,12 @@ package cn.haowl.hinovel.infra.oss.constant;
 /**
  * OSS 存储类型枚举。
  *
- * <p>定义支持的 OSS 存储类型。</p>
+ * 定义支持的 OSS 存储类型。
  *
  * @author haowl
  * @since 2024
  */
-public enum OssStorageType {
+public enum OssStorageTypeEnum {
 
     /**
      * 本地存储。

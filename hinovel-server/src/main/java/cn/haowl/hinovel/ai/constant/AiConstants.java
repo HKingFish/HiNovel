@@ -3,12 +3,15 @@ package cn.haowl.hinovel.ai.constant;
 /**
  * AI 模块通用常量。
  *
- * <p>集中管理 AI 模块中使用的常量值，避免魔法值散落在代码各处。</p>
+ * 集中管理 AI 模块中使用的常量值，避免魔法值散落在代码各处。
  *
  * @author haowl
  */
 public final class AiConstants {
 
+    /**
+     * 仅通过类名访问模块常量。
+     */
     private AiConstants() {
     }
 
@@ -34,13 +37,19 @@ public final class AiConstants {
      */
     public static final int PROVIDER_RECOVERY_COOLDOWN_SECONDS = 120;
 
-    /** 通义千问 OpenAI 兼容接口基础地址 */
+    /**
+     * 通义千问 OpenAI 兼容接口基础地址
+     */
     public static final String QWEN_COMPATIBLE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
-    /** 通义千问默认模型 */
+    /**
+     * 通义千问默认模型
+     */
     public static final String QWEN_DEFAULT_MODEL = "qwen2.5-omni-7b";
 
-    /** 通义千问环境变量 API Key 标识 */
+    /**
+     * 通义千问环境变量 API Key 标识
+     */
     public static final String QWEN_ENV_API_KEY = "aliQwen-api";
 
     // ==================== Embedding 相关常量 ====================

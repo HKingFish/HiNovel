@@ -3,13 +3,16 @@ package cn.haowl.hinovel.user.constant;
 /**
  * 认证模块常量。
  *
- * <p>定义认证相关的常量配置。</p>
+ * 定义认证相关的常量配置。
  *
  * @author haowl
  * @since 2024
  */
 public final class AuthConstants {
 
+    /**
+     * 禁止实例化认证常量类。
+     */
     private AuthConstants() {
     }
 

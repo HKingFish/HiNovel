@@ -1,6 +1,6 @@
 package cn.haowl.hinovel.agent.infrastructure.tool;
 
-import cn.haowl.hinovel.agent.application.service.ChapterVectorService;
+import cn.haowl.hinovel.agent.constant.ChapterVectorContentTypeEnum;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
 import cn.haowl.hinovel.ai.application.vector.VectorStorePort;
 import dev.langchain4j.agent.tool.Tool;
@@ -8,24 +8,32 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.util.List;
 
 /**
  * 小说内容检索工具。
  *
- * <p>供其他 Agent 调用，从 Qdrant 向量数据库中检索与查询语义相关的小说内容。
- * 使用 LangChain4J {@link Tool} 注解，可被 AiService 自动发现和调用。</p>
+ * 供其他 Agent 调用，从 Qdrant 向量数据库中检索与查询语义相关的小说内容。
+ * 使用 LangChain4J {@link Tool} 注解，可被 AiService 自动发现和调用。
  *
- * <p>该工具不注册为 Spring Bean，而是在需要时通过构造方法注入对应小说的向量存储实例，
- * 以支持不同小说使用独立的向量集合。</p>
+ * 该工具不注册为 Spring Bean，而是在需要时通过构造方法注入对应小说的向量存储实例，
+ * 以支持不同小说使用独立的向量集合。
  *
  * @author haowl
  */
 @Slf4j
 public class NovelContentRetrievalTool {
 
+    /**
+     * 当前小说的向量存储。
+     */
     private final VectorStorePort vectorStore;
+    /**
+     * 当前小说 ID。
+     */
+
     private final Long novelId;
 
     /**
@@ -47,8 +55,8 @@ public class NovelContentRetrievalTool {
     /**
      * 根据工厂、小说 ID 和用户 ID 创建检索工具实例。
      *
-     * <p>使用用户在数据库中配置的 Embedding 模型。若用户未配置 Embedding 模型，
-     * 返回 null 表示不启用 RAG 功能，调用方应据此跳过工具挂载。</p>
+     * 使用用户在数据库中配置的 Embedding 模型。若用户未配置 Embedding 模型，
+     * 返回 null 表示不启用 RAG 功能，调用方应据此跳过工具挂载。
      *
      * @param vectorStoreFactory 向量存储工厂
      * @param novelId            小说 ID
@@ -68,8 +76,8 @@ public class NovelContentRetrievalTool {
     /**
      * 从小说向量数据库中检索与查询内容语义相关的片段。
      *
-     * <p>该方法会返回最相似的文本片段，包含章节标题、内容类型等元信息，
-     * 帮助 Agent 了解小说已有的剧情、人物、场景等信息。</p>
+     * 该方法会返回最相似的文本片段，包含章节标题、内容类型等元信息，
+     * 帮助 Agent 了解小说已有的剧情、人物、场景等信息。
      *
      * @param query 查询内容（如"主角的性格特点"、"第三章发生了什么"等）
      * @return 检索到的相关内容，包含来源章节信息
@@ -78,7 +86,7 @@ public class NovelContentRetrievalTool {
             "可用于查找剧情细节、人物描写、场景设定等。" +
             "返回最相关的文本片段及其来源章节信息。")
     public String retrieveNovelContent(String query) {
-        log.info("检索小说内容，小说ID={}，查询={}", novelId, query);
+        log.info("[retrieveNovelContent][检索小说内容，小说ID={}]", novelId);
 
         try {
             EmbeddingSearchResult<TextSegment> searchResult = vectorStore.search(query, DEFAULT_TOP_K);
@@ -105,18 +113,20 @@ public class NovelContentRetrievalTool {
                 if (chapterTitle != null) {
                     result.append("「").append(chapterTitle).append("」");
                 }
-                result.append(" | 类型：").append(ChapterVectorService.CONTENT_TYPE_OUTLINE.equals(contentType) ? "大纲" : "正文");
+                result.append(" | 类型：")
+                    .append(ChapterVectorContentTypeEnum.OUTLINE
+                        == EnumUtils.getEnum(ChapterVectorContentTypeEnum.class, contentType) ? "大纲" : "正文");
                 result.append(String.format(" | 相似度：%.2f", score));
                 result.append("\n");
                 result.append(segment.text());
                 result.append("\n\n");
             }
 
-            log.info("检索完成，小说ID={}，匹配数={}", novelId, matches.size());
+            log.info("[retrieveNovelContent][检索完成，小说ID={}，匹配数={}]", novelId, matches.size());
             return result.toString();
         } catch (Exception e) {
-            log.error("检索小说内容失败，小说ID={}，查询={}，异常信息：{}",
-                    novelId, query, e.getMessage(), e);
+            log.error("[retrieveNovelContent][检索小说内容失败，小说ID={}，异常类型={}]",
+                novelId, e.getClass().getSimpleName());
             return "检索失败：" + e.getMessage();
         }
     }

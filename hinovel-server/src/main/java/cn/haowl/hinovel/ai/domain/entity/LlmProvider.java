@@ -1,10 +1,14 @@
 package cn.haowl.hinovel.ai.domain.entity;
 
-import cn.haowl.hinovel.ai.constant.LlmProviderType;
+import cn.haowl.hinovel.ai.constant.LlmProviderTypeEnum;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +20,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * LLM 提供方实体。
  *
- * <p>存储不同 LLM 提供商的配置信息，包括 OpenAI、DeepSeek 等第三方 AI 服务的 API 配置。</p>
+ * 存储不同 LLM 提供商的配置信息，包括 OpenAI、DeepSeek 等第三方 AI 服务的 API 配置。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -25,9 +29,13 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @TableName("ai_llm_provider")
 public class LlmProvider extends BaseEntity {
+
+    /**
+     * 旧版模型列表的空值编码。
+     */
+    private static final String EMPTY_MODELS = "[]";
 
     /**
      * 提供方名称。
@@ -35,7 +43,9 @@ public class LlmProvider extends BaseEntity {
     private String name;
 
     /**
-     * 提供方类型。
+     * 提供方类型编码。
+     *
+     * @see LlmProviderTypeEnum
      */
     private String providerType;
 
@@ -50,7 +60,7 @@ public class LlmProvider extends BaseEntity {
     private String apiKey;
 
     /**
-     * 支持的模型列表（JSON 格式）。
+     * 支持的模型列表，按逗号分隔并兼容旧版空值。
      */
     private String models;
 
@@ -78,8 +88,8 @@ public class LlmProvider extends BaseEntity {
      * @param userId       所属用户 ID
      * @return LLM 提供方实体
      */
-    public static LlmProvider create(String name, String providerType, String baseUrl,
-                                     String apiKey, List<String> models, Long userId) {
+    public static LlmProvider create(
+        String name, String providerType, String baseUrl, String apiKey, List<String> models, Long userId) {
         if (name == null || name.isBlank()) {
             throw exception(PARAM_ERROR);
         }
@@ -91,7 +101,7 @@ public class LlmProvider extends BaseEntity {
         provider.setProviderType(providerType);
         provider.setBaseUrl(baseUrl);
         provider.setApiKey(apiKey);
-        provider.setModels(models == null ? "[]" : String.join(",", models));
+        provider.updateModels(models);
         provider.setIsActive(CommonConstants.ENABLED);
         provider.setUserId(userId);
         return provider;
@@ -135,7 +145,7 @@ public class LlmProvider extends BaseEntity {
      * @param models 模型列表
      */
     public void updateModels(List<String> models) {
-        this.models = models == null ? "[]" : String.join(",", models);
+        this.models = models == null ? EMPTY_MODELS : String.join(",", models);
     }
 
     /**
@@ -144,7 +154,7 @@ public class LlmProvider extends BaseEntity {
      * @return 模型列表
      */
     public List<String> getModelList() {
-        if (this.models == null || this.models.isBlank() || "[]".equals(this.models)) {
+        if (this.models == null || this.models.isBlank() || EMPTY_MODELS.equals(this.models)) {
             return List.of();
         }
         return Arrays.asList(this.models.split(","));
@@ -179,7 +189,7 @@ public class LlmProvider extends BaseEntity {
      * @return 是否为 OpenAI
      */
     public boolean isOpenAi() {
-        return LlmProviderType.OPENAI.name().equals(this.providerType);
+        return LlmProviderTypeEnum.OPENAI == EnumUtils.getEnum(LlmProviderTypeEnum.class, this.providerType);
     }
 
     /**
@@ -188,7 +198,7 @@ public class LlmProvider extends BaseEntity {
      * @return 是否为 DeepSeek
      */
     public boolean isDeepSeek() {
-        return LlmProviderType.DEEPSEEK.name().equals(this.providerType);
+        return LlmProviderTypeEnum.DEEPSEEK == EnumUtils.getEnum(LlmProviderTypeEnum.class, this.providerType);
     }
 
     /**
@@ -197,7 +207,7 @@ public class LlmProvider extends BaseEntity {
      * @return 是否为通义千问
      */
     public boolean isQwen() {
-        return LlmProviderType.QWEN.name().equals(this.providerType);
+        return LlmProviderTypeEnum.QWEN == EnumUtils.getEnum(LlmProviderTypeEnum.class, this.providerType);
     }
 
     @Override

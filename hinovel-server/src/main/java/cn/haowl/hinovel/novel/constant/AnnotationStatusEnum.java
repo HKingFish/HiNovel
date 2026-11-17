@@ -1,13 +1,11 @@
 package cn.haowl.hinovel.novel.constant;
 
 /**
- * 批注状态枚举。
- *
- * <p>定义批注的生命周期状态。</p>
- *
- * @author haowl
+ * @author : haowl
+ * @date : 2026/11/17 21:10
+ * @desc : 章节批注处理状态
  */
-public enum AnnotationStatus {
+public enum AnnotationStatusEnum {
 
     /**
      * 待处理。

@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 /**
  * API 密钥加解密服务。
  *
- * <p>封装 API 密钥的加密、解密和脱敏操作，
- * 统一管理加密密钥的获取方式。</p>
+ * 封装 API 密钥的加密、解密和脱敏操作，
+ * 统一管理加密密钥的获取方式。
  *
  * @author haowl
  */
@@ -58,14 +58,13 @@ public class ApiKeyService {
     /**
      * 对 API 密钥进行脱敏处理。
      *
-     * <p>先解密再脱敏，返回类似 sk-0c****8e6f 的格式。</p>
+     * 先解密再脱敏，返回类似 sk-0c****8e6f 的格式。
      *
      * @param encryptedApiKey 加密后的密文
      * @return 脱敏后的字符串
      */
     public String decryptAndMask(String encryptedApiKey) {
-        String plainKey = decrypt(encryptedApiKey);
-        return ApiKeyEncryptor.mask(plainKey);
+        return ApiKeyEncryptor.mask(decrypt(encryptedApiKey));
     }
 
     /**

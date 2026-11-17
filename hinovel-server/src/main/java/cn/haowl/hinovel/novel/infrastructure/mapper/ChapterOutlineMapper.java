@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * 章节大纲 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现章节大纲的数据访问操作。</p>
+ * 基于 MyBatis-Plus 实现章节大纲的数据访问操作。
  *
  * @author haowl
  */

@@ -12,21 +12,33 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.EMAIL_FORMAT_ER
 /**
  * 邮箱值对象。
  *
- * <p>表示用户的邮箱地址，封装邮箱验证逻辑。</p>
+ * 表示用户的邮箱地址，封装邮箱验证逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
  */
 public final class Email implements Serializable {
 
+    /**
+     * 序列化版本号。
+     */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 允许的邮箱地址格式。
+     */
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
     );
 
+    /**
+     * 规范化的邮箱地址。
+     */
     private final String value;
 
+    /**
+     * 构造已经校验的邮箱地址。
+     */
     private Email(String value) {
         this.value = value;
     }

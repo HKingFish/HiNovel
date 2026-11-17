@@ -13,10 +13,15 @@ import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
  */
 public final class AgentSkillPrompts {
 
+    /**
+     * 限制常量或工具类实例化。
+     */
     private AgentSkillPrompts() {
     }
 
-    /** 初始 System Prompt 仅公开挂载名称和描述。 */
+    /**
+     * 初始 System Prompt 仅公开挂载名称和描述。
+     */
     public static String buildSkillSection(List<AgentSkill> skills) {
         StringBuilder section = new StringBuilder("\n\n【Skill 使用规则】\n");
         section.append("若用户明确指定写作风格，按名称查找匹配的已挂载 Skill。")

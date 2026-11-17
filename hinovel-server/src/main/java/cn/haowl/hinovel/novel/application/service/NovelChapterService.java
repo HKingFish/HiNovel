@@ -1,23 +1,24 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
+import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
-import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageQuery;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
@@ -26,10 +27,9 @@ import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_B
 /**
  * 小说章节应用服务。
  *
- * <p>协调领域服务完成章节的 CRUD、分页查询、版本管理、大纲管理等功能，
- * 核心业务逻辑委托给 {@link ChapterDomainService}。</p>
+ * 协调领域服务完成章节的 CRUD、分页查询、版本管理、大纲管理等功能，
+ * 核心业务逻辑委托给 {@link ChapterDomainService}。
  */
-@Slf4j
 @Service
 public class NovelChapterService {
 
@@ -80,11 +80,8 @@ public class NovelChapterService {
      * @return 章节分页响应
      */
     public ChapterPageResponse getNovelChaptersPage(ChapterPageQuery query) {
-        List<NovelChapter> chapters = chapterDomainService.listChaptersPage(query.getNovelId(),
-                query.getPageNum(), query.getPageSize(), query.getStatus(),
-                query.getVectorStored(), query.getTitle());
-        int total = chapterDomainService.countChapters(query.getNovelId(), query.getStatus(),
-                query.getVectorStored(), query.getTitle());
+        List<NovelChapter> chapters = chapterDomainService.listChaptersPage(query);
+        int total = chapterDomainService.countChapters(query);
 
         ChapterPageResponse response = new ChapterPageResponse();
         response.setList(chapters);
@@ -148,12 +145,12 @@ public class NovelChapterService {
      */
     @Transactional(rollbackFor = Exception.class)
     public NovelChapter createChapter(NovelChapter chapter) {
-        NovelChapter created = chapterDomainService.createChapter(
-                chapter.getNovelId(),
-                chapter.getTitle(),
-                chapter.getContent(),
-                chapter.getSortOrder()
-        );
+        NovelChapter created = chapterDomainService.createChapter(CreateChapterCommand.builder()
+            .novelId(chapter.getNovelId())
+            .title(chapter.getTitle())
+            .content(chapter.getContent())
+            .sortOrder(chapter.getSortOrder())
+            .build());
         novelService.refreshNovelStats(chapter.getNovelId());
         return created;
     }
@@ -168,6 +165,18 @@ public class NovelChapterService {
     public NovelChapter updateChapter(NovelChapter chapter) {
         NovelChapter existing = chapterDomainService.getChapter(chapter.getId());
         return chapterDomainService.updateChapter(existing, chapter.getTitle(), chapter.getContent());
+    }
+
+    /**
+     * 更新指定小说内的章节内容并保留历史版本。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public NovelChapter updateChapterContent(Long novelId, Long chapterId, String content) {
+        NovelChapter chapter = chapterDomainService.getChapter(chapterId);
+        if (!chapter.belongsToNovel(novelId)) {
+            throw exception(FORBIDDEN);
+        }
+        return chapterDomainService.updateChapter(chapter, chapter.getTitle(), content);
     }
 
     /**
@@ -303,7 +312,7 @@ public class NovelChapterService {
     /**
      * 批量更新章节排序（拖拽排序场景）。
      *
-     * <p>按传入的章节 ID 顺序更新 sortOrder，同时同步更新 chapterNumber。</p>
+     * 按传入的章节 ID 顺序更新 sortOrder，同时同步更新 chapterNumber。
      *
      * @param novelId    小说 ID
      * @param chapterIds 按期望顺序排列的章节 ID 列表

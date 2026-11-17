@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * OSS 上传日志 Mapper。
  *
- * <p>提供上传日志数据的 CRUD 操作，继承 MyBatis-Plus BaseMapper。</p>
+ * 提供上传日志数据的 CRUD 操作，继承 MyBatis-Plus BaseMapper。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30

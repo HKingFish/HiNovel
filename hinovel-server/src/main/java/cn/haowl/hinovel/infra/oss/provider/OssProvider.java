@@ -5,7 +5,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * OSS 统一存储接口。
  *
- * <p>支持本地存储（LOCAL）和阿里云 OSS（ALIYUN），通过配置切换。</p>
+ * 支持本地存储（LOCAL）和阿里云 OSS（ALIYUN），通过配置切换。
  *
  * @author haowl
  * @since 2024

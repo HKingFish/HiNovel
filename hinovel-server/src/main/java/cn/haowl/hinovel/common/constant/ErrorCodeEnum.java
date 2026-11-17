@@ -1,20 +1,23 @@
-package cn.haowl.hinovel.common.response;
+package cn.haowl.hinovel.common.constant;
 
 import lombok.Getter;
 
 /**
  * 错误码枚举。
  *
- * <p>messageKey 对应 i18n/messages.properties 中的键，用于国际化消息查找。</p>
+ * messageKey 对应 i18n/messages.properties 中的键，用于国际化消息查找。
  *
  * @author haowl
  * @since 2024
  */
 @Getter
-public enum ErrorCode {
+public enum ErrorCodeEnum {
 
     // ==================== 业务参数错误 40001-40099 ====================
 
+    /**
+     * 资源不存在。
+     */
     NOT_FOUND(40000, "error.40000", "资源不存在"),
     /**
      * 参数错误。
@@ -213,7 +216,10 @@ public enum ErrorCode {
      */
     private final String defaultMessage;
 
-    ErrorCode(int code, String messageKey, String defaultMessage) {
+    /**
+     * 初始化错误码及国际化消息。
+     */
+    ErrorCodeEnum(int code, String messageKey, String defaultMessage) {
         this.code = code;
         this.messageKey = messageKey;
         this.defaultMessage = defaultMessage;

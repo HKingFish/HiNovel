@@ -1,11 +1,12 @@
 package cn.haowl.hinovel.agent.application.service;
 
-import cn.haowl.hinovel.agent.enums.AgentRole;
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
-import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.SyncCallLogContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallLogContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
@@ -24,9 +25,9 @@ import org.springframework.stereotype.Service;
 /**
  * 章节发布服务。
  *
- * <p>提供章节发布功能，发布后根据 {@link NovelSettings} 配置异步触发：
+ * 提供章节发布功能，发布后根据 {@link NovelSettings} 配置异步触发：
  * 1. AI 总结章节大纲（存入 aiOutlineContent 字段，不覆盖用户大纲）
- * 2. 将章节内容和大纲存入向量数据库</p>
+ * 2. 将章节内容和大纲存入向量数据库
  *
  * @author haowl
  */
@@ -64,14 +65,11 @@ public class ChapterPublishService {
     @Autowired
     private NovelSettingsService novelSettingsService;
 
-    /** 发布前校验小说归属。 */
+    /**
+     * 发布前校验小说归属。
+     */
     @Autowired
     private NovelDomainService novelDomainService;
-
-    /**
-     * 调用场景常量：AI 总结大纲
-     */
-    private static final String CALL_SCENE_SUMMARIZE_OUTLINE = "SUMMARIZE_OUTLINE";
 
     /**
      * AI 总结大纲默认系统提示词（引用统一模板）
@@ -83,7 +81,7 @@ public class ChapterPublishService {
     /**
      * 发布章节。
      *
-     * <p>发布后根据 {@link NovelSettings} 配置决定是否异步触发 AI 大纲和向量存储。</p>
+     * 发布后根据 {@link NovelSettings} 配置决定是否异步触发 AI 大纲和向量存储。
      *
      * @param chapterId 章节 ID
      * @param userId 当前发布用户 ID
@@ -100,7 +98,7 @@ public class ChapterPublishService {
         // 确保大纲记录存在
         ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
         if (outline == null) {
-            outline = createEmptyOutline(chapter);
+            outline = ChapterOutline.createEmpty(novelId, chapterId);
             chapterOutlineService.saveOrUpdateOutline(outline);
         }
 
@@ -108,20 +106,17 @@ public class ChapterPublishService {
         NovelSettings settings = novelSettingsService.getEffectiveSettings(novelId, userId);
 
         // 根据配置决定是否触发 AI 总结大纲
-        if (CommonConstants.ENABLED == settings.getAutoOutlineAfterPublish()) {
+        if (Integer.valueOf(CommonConstants.ENABLED).equals(settings.getAutoOutlineAfterPublish())) {
             asyncSummarizeOutline(chapter, outline, userId);
         } else {
-            log.info("小说配置关闭了发布后自动生成 AI 大纲，跳过，novelId={}", novelId);
+            log.info("[publishChapter][小说配置关闭了发布后自动生成 AI 大纲，跳过，novelId={}]", novelId);
         }
 
         // 根据配置决定是否触发向量存储
-        if (CommonConstants.ENABLED == settings.getAutoVectorAfterPublish()) {
-            String outlineContent = outline.getOutlineContent();
-            chapterVectorService.storeChapterVectors(
-                    novelId, chapterId,
-                    chapter.getTitle(), chapter.getContent(), outlineContent, userId);
+        if (Integer.valueOf(CommonConstants.ENABLED).equals(settings.getAutoVectorAfterPublish())) {
+            chapterVectorService.storeChapterVectors(chapter, outline.getOutlineContent(), userId);
         } else {
-            log.info("小说配置关闭了发布后自动存储向量，跳过，novelId={}", novelId);
+            log.info("[publishChapter][小说配置关闭了发布后自动存储向量，跳过，novelId={}]", novelId);
         }
 
         PublishChapterResponse response = new PublishChapterResponse();
@@ -133,7 +128,7 @@ public class ChapterPublishService {
     /**
      * 异步调用 AI 总结章节大纲。
      *
-     * <p>生成的大纲存入 aiOutlineContent 字段，不覆盖用户自己的 outlineContent。</p>
+     * 生成的大纲存入 aiOutlineContent 字段，不覆盖用户自己的 outlineContent。
      *
      * @param chapter 章节信息
      * @param outline 章节大纲实体
@@ -143,14 +138,14 @@ public class ChapterPublishService {
     public void asyncSummarizeOutline(NovelChapter chapter, ChapterOutline outline, Long userId) {
         Long chapterId = chapter.getId();
         Long novelId = chapter.getNovelId();
-        log.info("开始 AI 总结章节大纲，章节ID={}", chapterId);
+        log.info("[asyncSummarizeOutline][开始 AI 总结章节大纲，章节ID={}]", chapterId);
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = null;
 
         try {
             callContext = aiServiceFactory.prepareNovelCall(
-                    novelId, AgentRole.EDITOR, userId, SUMMARIZE_SYSTEM_PROMPT);
+                novelId, AgentRoleEnum.EDITOR, userId, SUMMARIZE_SYSTEM_PROMPT);
             GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
             String userPrompt = buildSummarizePrompt(chapter);
 
@@ -161,22 +156,22 @@ public class ChapterPublishService {
             outline.setAiOutlineContent(aiOutline);
             chapterOutlineService.saveOrUpdateOutline(outline);
 
-            log.info("AI 总结大纲完成，章节ID={}，耗时={}ms", chapterId, processingTimeMs);
-            SyncCallLogContext logContext =
-                SyncCallLogContext.builder()
-                    .callScene(CALL_SCENE_SUMMARIZE_OUTLINE)
+            log.info("[asyncSummarizeOutline][AI 总结大纲完成，章节ID={}，耗时={}ms]", chapterId, processingTimeMs);
+            CallLogContext logContext =
+                CallLogContext.builder()
+                    .callScene(LlmCallSceneEnum.SUMMARIZE_OUTLINE)
                     .callContext(callContext)
                     .requestContent(userPrompt)
                     .build();
             aiServiceFactory.logSyncCall(logContext, aiOutline, processingTimeMs);
         } catch (Exception e) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.error("AI 总结大纲失败，章节ID={}，耗时={}ms，异常信息：{}",
-                    chapterId, processingTimeMs, e.getMessage(), e);
+            log.error("[asyncSummarizeOutline][AI 总结大纲失败，章节ID={}，耗时={}ms，异常类型={}]",
+                chapterId, processingTimeMs, e.getClass().getSimpleName());
             if (callContext != null) {
-                SyncCallLogContext logContext =
-                    SyncCallLogContext.builder()
-                        .callScene(CALL_SCENE_SUMMARIZE_OUTLINE)
+                CallLogContext logContext =
+                    CallLogContext.builder()
+                        .callScene(LlmCallSceneEnum.SUMMARIZE_OUTLINE)
                         .callContext(callContext)
                         .requestContent("总结章节大纲")
                         .build();
@@ -201,19 +196,9 @@ public class ChapterPublishService {
                 novelOutlineContent = novelOutline.getOutlineContent();
             }
         } catch (Exception e) {
-            log.debug("获取全文大纲失败，跳过，异常信息：{}", e.getMessage());
+            log.debug("[buildSummarizePrompt][获取全文大纲失败，跳过，异常类型={}]", e.getClass().getSimpleName());
         }
         return AgentPromptTemplates.buildSummarizeOutlinePrompt(chapter, novelOutlineContent);
-    }
-
-    /**
-     * 创建空白大纲记录（通过工厂方法）。
-     *
-     * @param chapter 章节信息
-     * @return 大纲实体
-     */
-    private ChapterOutline createEmptyOutline(NovelChapter chapter) {
-        return ChapterOutline.createEmpty(chapter.getNovelId(), chapter.getId());
     }
 
     /**
@@ -225,9 +210,7 @@ public class ChapterPublishService {
     public void syncChapterVector(Long chapterId, Long userId) {
         NovelChapter chapter = chapterService.getChapter(chapterId);
         ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
-        String outlineContent = outline != null ? outline.getOutlineContent() : null;
         chapterVectorService.storeChapterVectors(
-                chapter.getNovelId(), chapterId,
-                chapter.getTitle(), chapter.getContent(), outlineContent, userId);
+            chapter, outline != null ? outline.getOutlineContent() : null, userId);
     }
 }

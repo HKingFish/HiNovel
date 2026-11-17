@@ -1,14 +1,15 @@
 package cn.haowl.hinovel.agent.application.service.agent;
 
-import cn.haowl.hinovel.agent.enums.AgentRole;
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
-import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.SyncCallLogContext;
+import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallLogContext;
 import cn.haowl.hinovel.agent.infrastructure.agent.AuditResultParser;
 import cn.haowl.hinovel.agent.infrastructure.agent.GenericAiAssistant;
 import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
 import cn.haowl.hinovel.agent.interfaces.dto.ChapterAuditCommand;
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +23,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class EditorAgent {
-    /**
-     * 章节审核的调用日志场景。
-     */
-    private static final String CALL_SCENE_AUDIT = "AUDIT";
-
     /**
      * 构建编辑 Agent 并记录调用。
      */
@@ -56,16 +52,16 @@ public class EditorAgent {
 
         CallContext callContext =
             aiServiceFactory.prepareNovelCall(
-                chapter.getNovelId(), AgentRole.EDITOR, command.getUserId(),
+                chapter.getNovelId(), AgentRoleEnum.EDITOR, command.getUserId(),
                 AgentPromptTemplates.EDITOR_AUDIT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
         String userPrompt =
             AgentPromptTemplates.buildAuditPrompt(
                 chapter, command.getOutline(), command.getNovelOutline());
 
-        SyncCallLogContext logContext =
-            SyncCallLogContext.builder()
-                .callScene(CALL_SCENE_AUDIT)
+        CallLogContext logContext =
+            CallLogContext.builder()
+                .callScene(LlmCallSceneEnum.AUDIT)
                 .callContext(callContext)
                 .requestContent(userPrompt)
                 .build();
@@ -83,8 +79,8 @@ public class EditorAgent {
             return response;
         } catch (RuntimeException error) {
             long processingTimeMs = System.currentTimeMillis() - startTime;
-            log.error("[auditChapter][审核失败，chapterId={}，耗时={}ms]",
-                chapterId, processingTimeMs, error);
+            log.error("[auditChapter][审核失败，chapterId={}，耗时={}ms，异常类型={}]",
+                chapterId, processingTimeMs, error.getClass().getSimpleName());
             aiServiceFactory.logSyncCallFailed(logContext, error.getMessage(), processingTimeMs);
             throw error;
         }

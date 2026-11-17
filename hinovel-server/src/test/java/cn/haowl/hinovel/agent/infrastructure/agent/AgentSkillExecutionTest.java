@@ -2,13 +2,13 @@ package cn.haowl.hinovel.agent.infrastructure.agent;
 
 import cn.haowl.hinovel.agent.application.service.SkillService;
 import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.entity.AgentSkill;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
-import cn.haowl.hinovel.agent.enums.AgentRole;
-import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatMessageMapper;
 import cn.haowl.hinovel.agent.infrastructure.mapper.ChatSessionMapper;
 import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
@@ -17,6 +17,7 @@ import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
+import cn.haowl.hinovel.ai.constant.SkillReadStatusEnum;
 import cn.haowl.hinovel.ai.domain.entity.LlmCallLog;
 import cn.haowl.hinovel.ai.domain.entity.SkillReadCall;
 import cn.haowl.hinovel.common.exception.BusinessException;
@@ -24,7 +25,7 @@ import cn.haowl.hinovel.novel.application.service.NovelService;
 import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
 import cn.haowl.hinovel.novel.domain.entity.NovelAgentConfig;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
-import cn.haowl.hinovel.novel.infrastructure.mapper.NovelAgentConfigMapper;
+import cn.haowl.hinovel.novel.domain.repository.NovelAgentConfigRepository;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -43,6 +44,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -54,16 +56,46 @@ import static org.mockito.Mockito.*;
  */
 class AgentSkillExecutionTest {
 
+    /**
+     * 测试小说 ID。
+     */
     private static final long NOVEL_ID = 10L;
+    /**
+     * 测试会话 ID。
+     */
     private static final long SESSION_ID = 20L;
+    /**
+     * 测试用户 ID。
+     */
     private static final long USER_ID = 30L;
+    /**
+     * 测试 Agent ID。
+     */
     private static final long AGENT_ID = 40L;
+    /**
+     * 测试模型提供方 ID。
+     */
     private static final long PROVIDER_ID = 50L;
+    /**
+     * 测试风格 Skill 名称。
+     */
     private static final String STYLE = "冷峻悬疑";
+    /**
+     * 默认 Skill 名称。
+     */
     private static final String DEFAULT_SKILL = "去 AI 味";
+    /**
+     * 测试风格 Skill 正文。
+     */
     private static final String STYLE_BODY = "留白示例正文";
+    /**
+     * 默认 Skill 正文。
+     */
     private static final String DEFAULT_BODY = "去 AI 味正文";
 
+    /**
+     * 验证历史与日志各自记录的 Skill 调用范围。
+     */
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void chatKeepsOnlySuccessesInHistoryAndEveryReadInTheLog(boolean styleSucceeds) {
@@ -129,18 +161,22 @@ class AgentSkillExecutionTest {
         ArgumentCaptor<ChatMessage> saved = ArgumentCaptor.forClass(ChatMessage.class);
         verify(messages, times(2)).insert(saved.capture());
         assertEquals(expectedText, saved.getAllValues().getLast().getContent());
-        assertEquals(expectedNames, ChatMessageResponse.fromEntity(saved.getAllValues().getLast()).getLoadedSkillNames());
+        assertEquals(expectedNames,
+            ChatMessageResponse.fromEntity(saved.getAllValues().getLast()).getLoadedSkillNames());
         assertEquals(List.of(), ChatMessageResponse.fromEntity(saved.getAllValues().getFirst()).getLoadedSkillNames());
         ArgumentCaptor<LlmCallLog> logged = ArgumentCaptor.forClass(LlmCallLog.class);
         verify(logs, times(2)).saveAsync(logged.capture());
         assertEquals("QA_WRITING_INTENT", logged.getAllValues().getFirst().getCallScene());
         List<SkillReadCall> calls = logged.getAllValues().getLast().getSkillReadCalls();
         assertEquals(List.of(DEFAULT_SKILL, STYLE), calls.stream().map(SkillReadCall::getSkillName).toList());
-        assertEquals(List.of(SkillReadCall.Status.SUCCESS,
-                        styleSucceeds ? SkillReadCall.Status.SUCCESS : SkillReadCall.Status.FAILED),
+        assertEquals(List.of(SkillReadStatusEnum.SUCCESS,
+                styleSucceeds ? SkillReadStatusEnum.SUCCESS : SkillReadStatusEnum.FAILED),
                 calls.stream().map(SkillReadCall::getStatus).toList());
     }
 
+    /**
+     * 验证未知会话在读取 Skill 前终止。
+     */
     @Test
     void unknownSessionRejectsChatBeforeReadingAnySkillsOrWritingMessages() {
         AiServiceFactory factory = mock(AiServiceFactory.class);
@@ -153,6 +189,9 @@ class AgentSkillExecutionTest {
         verifyNoInteractions(factory, messages);
     }
 
+    /**
+     * 验证同步审核也能读取 Skill。
+     */
     @Test
     void editorCanUseTheSameReadToolInASynchronousExecution() {
         SkillService skills = mock(SkillService.class);
@@ -170,12 +209,15 @@ class AgentSkillExecutionTest {
             }
         });
         AiServiceFactory factory = factory(skills, provider, mock(LlmCallLogService.class));
-        var call = factory.prepareNovelCall(NOVEL_ID, AgentRole.EDITOR, USER_ID, "审核");
+        var call = factory.prepareNovelCall(NOVEL_ID, AgentRoleEnum.EDITOR, USER_ID, "审核");
 
         assertEquals("审核结果", factory.buildNovelAssistant(call, false).chat(call.getSystemPrompt(), "审核文本"));
         assertEquals(List.of(STYLE), call.getSkillTool().loadedNames());
     }
 
+    /**
+     * 验证取消流式请求时保留已发生的读取记录。
+     */
     @Test
     void cancellationAfterDefaultLoadStillRecordsTheRead() {
         SkillService skills = mock(SkillService.class);
@@ -204,6 +246,9 @@ class AgentSkillExecutionTest {
         verifyNoInteractions(streaming);
     }
 
+    /**
+     * 验证无法加载指定风格时仍会发送提示。
+     */
     @Test
     void unmountedStyleGetsANoticeEvenWhenTheModelOnlyGeneratesProse() {
         SkillService skills = mock(SkillService.class);
@@ -226,6 +271,9 @@ class AgentSkillExecutionTest {
                 events.stream().map(QaAgent.ChatEvent::getData).toList());
     }
 
+    /**
+     * 验证历史跨用户配置无法读取私有挂载。
+     */
     @Test
     void historicalForeignAgentAssignmentCannotLoadPrivateBindings() {
         SkillService skills = mock(SkillService.class);
@@ -233,10 +281,13 @@ class AgentSkillExecutionTest {
         AiServiceFactory factory = factory(skills, provider, mock(LlmCallLogService.class));
 
         assertEquals(1003010003, assertThrows(BusinessException.class, () ->
-                factory.prepareNovelCall(NOVEL_ID, AgentRole.QA, USER_ID + 1, "问答")).getCode());
+            factory.prepareNovelCall(NOVEL_ID, AgentRoleEnum.QA, USER_ID + 1, "问答")).getCode());
         verifyNoInteractions(skills, provider);
     }
 
+    /**
+     * 构建使用测试依赖的问答 Agent。
+     */
     private QaAgent qa(AiServiceFactory factory) {
         ChatSessionMapper sessions = mock(ChatSessionMapper.class);
         when(sessions.selectById(SESSION_ID)).thenReturn(ChatSession.create(NOVEL_ID, "会话"));
@@ -246,6 +297,9 @@ class AgentSkillExecutionTest {
                 settings, mock(NovelService.class));
     }
 
+    /**
+     * 配置问答 Agent 依赖。
+     */
     private QaAgent qaAgent(AiServiceFactory factory, VectorStoreFactory vectorStoreFactory,
                             ChatSessionMapper sessions, ChatMessageMapper messages,
                             NovelSettingsService settings, NovelService novelService) {
@@ -259,6 +313,9 @@ class AgentSkillExecutionTest {
         return qa;
     }
 
+    /**
+     * 构建指定问题的问答参数。
+     */
     private QaChatCommand command(String question) {
         QaChatCommand command = new QaChatCommand();
         command.setNovelId(NOVEL_ID);
@@ -268,25 +325,31 @@ class AgentSkillExecutionTest {
         return command;
     }
 
+    /**
+     * 构建供测试使用的模型调用工厂。
+     */
     private AiServiceFactory factory(SkillService skills, LlmProviderPort provider, LlmCallLogService logs) {
         LlmProviderFactory providers = mock(LlmProviderFactory.class);
         when(providers.getByProviderId(PROVIDER_ID)).thenReturn(provider);
-        NovelAgentConfigMapper configs = mock(NovelAgentConfigMapper.class);
-        when(configs.selectByNovelId(NOVEL_ID)).thenReturn(NovelAgentConfig.builder()
-                .qaAgentId(AGENT_ID).editorAgentId(AGENT_ID).build());
-        AgentMapper agents = mock(AgentMapper.class);
+        NovelAgentConfigRepository configs = mock(NovelAgentConfigRepository.class);
+        when(configs.findByNovelId(NOVEL_ID)).thenReturn(Optional.of(NovelAgentConfig.builder()
+            .qaAgentId(AGENT_ID).editorAgentId(AGENT_ID).build()));
+        AgentRepository agents = mock(AgentRepository.class);
         Agent agent = Agent.builder().name("测试 Agent").userId(USER_ID).llmProviderId(PROVIDER_ID).build();
         agent.setId(AGENT_ID);
-        when(agents.selectById(AGENT_ID)).thenReturn(agent);
+        when(agents.findById(AGENT_ID)).thenReturn(Optional.of(agent));
         AiServiceFactory factory = new AiServiceFactory();
         ReflectionTestUtils.setField(factory, "llmProviderFactory", providers);
-        ReflectionTestUtils.setField(factory, "novelAgentConfigMapper", configs);
-        ReflectionTestUtils.setField(factory, "agentMapper", agents);
+        ReflectionTestUtils.setField(factory, "novelAgentConfigRepository", configs);
+        ReflectionTestUtils.setField(factory, "agentRepository", agents);
         ReflectionTestUtils.setField(factory, "llmCallLogService", logs);
         ReflectionTestUtils.setField(factory, "skillService", skills);
         return factory;
     }
 
+    /**
+     * 构造测试 Skill 元数据。
+     */
     private AgentSkill skill(Long id, String name) {
         AgentSkill skill = new AgentSkill();
         skill.setId(id);
@@ -295,11 +358,17 @@ class AgentSkillExecutionTest {
         return skill;
     }
 
+    /**
+     * 模拟读取测试风格 Skill。
+     */
     private ToolExecutionRequest readStyle() {
         return ToolExecutionRequest.builder().id("style-1").name("loadSkill")
                 .arguments("{\"name\":\"冷峻悬疑\"}").build();
     }
 
+    /**
+     * 构建模拟模型响应。
+     */
     private ChatResponse response(AiMessage message) {
         return ChatResponse.builder().aiMessage(message).build();
     }

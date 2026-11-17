@@ -1,8 +1,8 @@
 package cn.haowl.hinovel.novel.application.service;
 
+import cn.haowl.hinovel.novel.domain.command.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.infrastructure.mapper.ChapterAnnotationMapper;
-import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 章节批注应用服务。
  *
- * <p>提供批注的增删改查及状态流转操作。</p>
+ * 提供批注的增删改查及状态流转操作。
  *
  * @author haowl
  */
@@ -48,16 +48,7 @@ public class ChapterAnnotationService {
      * @return 创建后的批注
      */
     public ChapterAnnotation createSelfAnnotation(CreateAnnotationRequest request, Long userId) {
-        ChapterAnnotation annotation = ChapterAnnotation.createSelfAnnotation(
-                request.getChapterId(),
-                request.getNovelId(),
-                userId,
-                request.getStartOffset(),
-                request.getEndOffset(),
-                request.getOriginalText(),
-                request.getAnnotationContent()
-        );
-        return createAnnotation(annotation);
+        return createAnnotation(ChapterAnnotation.createSelfAnnotation(request, userId));
     }
 
     /**
@@ -124,7 +115,7 @@ public class ChapterAnnotationService {
     public void saveAiRewriteResult(Long annotationId, String rewriteResult) {
         ChapterAnnotation annotation = annotationMapper.selectById(annotationId);
         if (annotation == null) {
-            log.warn("批注不存在，ID：{}", annotationId);
+            log.warn("[saveAiRewriteResult][批注不存在，annotationId={}]", annotationId);
             return;
         }
         annotation.saveAiRewriteResult(rewriteResult);
@@ -139,7 +130,7 @@ public class ChapterAnnotationService {
     public void acceptAnnotation(Long annotationId) {
         ChapterAnnotation annotation = annotationMapper.selectById(annotationId);
         if (annotation == null) {
-            log.warn("批注不存在，ID：{}", annotationId);
+            log.warn("[acceptAnnotation][批注不存在，annotationId={}]", annotationId);
             return;
         }
         annotation.accept();
@@ -163,7 +154,7 @@ public class ChapterAnnotationService {
     public void markAsViewed(Long annotationId) {
         ChapterAnnotation annotation = annotationMapper.selectById(annotationId);
         if (annotation == null) {
-            log.warn("批注不存在，ID：{}", annotationId);
+            log.warn("[markAsViewed][批注不存在，annotationId={}]", annotationId);
             return;
         }
         annotation.markAsViewed();
@@ -178,7 +169,7 @@ public class ChapterAnnotationService {
     public void resolveAnnotation(Long annotationId) {
         ChapterAnnotation annotation = annotationMapper.selectById(annotationId);
         if (annotation == null) {
-            log.warn("批注不存在，ID：{}", annotationId);
+            log.warn("[resolveAnnotation][批注不存在，annotationId={}]", annotationId);
             return;
         }
         annotation.resolve();

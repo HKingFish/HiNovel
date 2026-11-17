@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
@@ -13,7 +15,7 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
 /**
  * 认证领域服务。
  *
- * <p>处理用户认证相关的业务逻辑。</p>
+ * 处理用户认证相关的业务逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -48,8 +50,7 @@ public class AuthDomainService {
         if (userRepository.existsByUsername(username)) {
             throw exception(USERNAME_ALREADY_EXISTS);
         }
-        User user = User.create(username, email, password, passwordEncoder);
-        return userRepository.save(user);
+        return userRepository.save(User.create(username, email, passwordEncoder.encode(password)));
     }
 
     /**
@@ -72,6 +73,18 @@ public class AuthDomainService {
         }
 
         return user;
+    }
+
+    /**
+     * 验证邮箱密码授权凭据。
+     *
+     * @param email    授权账号邮箱
+     * @param password 明文密码
+     * @return 凭据有效的用户
+     */
+    public Optional<User> authenticateByEmail(String email, String password) {
+        return userRepository.findByEmail(email)
+            .filter(user -> user.verifyPassword(password, passwordEncoder));
     }
 
     /**

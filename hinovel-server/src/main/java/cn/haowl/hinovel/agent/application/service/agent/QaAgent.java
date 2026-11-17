@@ -1,9 +1,9 @@
 package cn.haowl.hinovel.agent.application.service.agent;
 
+import cn.haowl.hinovel.agent.constant.AgentRoleEnum;
 import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
-import cn.haowl.hinovel.agent.enums.AgentRole;
 import cn.haowl.hinovel.agent.infrastructure.agent.AgentPromptTemplates;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory;
 import cn.haowl.hinovel.agent.infrastructure.agent.AiServiceFactory.CallContext;
@@ -17,13 +17,10 @@ import cn.haowl.hinovel.agent.infrastructure.tool.NovelCreationTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
 import cn.haowl.hinovel.agent.interfaces.dto.*;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
-import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
-import cn.haowl.hinovel.novel.application.service.NovelChapterService;
-import cn.haowl.hinovel.novel.application.service.NovelService;
-import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
+import cn.haowl.hinovel.novel.application.service.*;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
-import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.langchain4j.service.TokenStream;
 import lombok.Value;
@@ -47,15 +44,15 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 问答 Agent 服务。
  *
- * <p>通过 {@link AiServiceFactory} 动态构建带向量检索工具的 AiService 实例，
- * 实现基于小说内容的智能问答。支持会话管理和历史消息上下文。</p>
+ * 通过 {@link AiServiceFactory} 动态构建带向量检索工具的 AiService 实例，
+ * 实现基于小说内容的智能问答。支持会话管理和历史消息上下文。
  *
- * <p>核心流程：
+ * 核心流程：
  * 1. 接收用户问题，创建或复用会话
  * 2. 加载历史对话上下文
  * 3. 构建带向量检索 Tool 的问答 Agent
  * 4. 流式调用 LLM，逐 Token 推送回答
- * 5. 完成后保存用户消息和 AI 回复到数据库</p>
+ * 5. 完成后保存用户消息和 AI 回复到数据库
  *
  * @author haowl
  */
@@ -63,14 +60,6 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Service
 public class QaAgent {
 
-    /**
-     * 问答写作判定的调用场景。
-     */
-    private static final String CALL_SCENE_QA_WRITING_INTENT = "QA_WRITING_INTENT";
-    /**
-     * 在日志中标识写作判定，不重复保存用户文本。
-     */
-    private static final String WRITING_INTENT_REQUEST = "判断当前问答是否要求写作或润色";
     /**
      * 写作判定中表示非写作意图的标签。
      */
@@ -109,10 +98,6 @@ public class QaAgent {
     private NovelSettingsService novelSettingsService;
 
     /**
-     * 调用场景常量：问答
-     */
-    private static final String CALL_SCENE_QA = "QA";
-    /**
      * 章节与大纲查询。
      */
     @Autowired
@@ -126,7 +111,7 @@ public class QaAgent {
      * 人物图谱查询。
      */
     @Autowired
-    private NovelCharacterRepository novelCharacterRepository;
+    private NovelCharacterService novelCharacterService;
     /**
      * 小说归属校验。
      */
@@ -163,7 +148,7 @@ public class QaAgent {
         session.setNovelId(novelId);
         session.setTitle(title != null && !title.isBlank() ? title : "新对话");
         chatSessionMapper.insert(session);
-        log.info("创建问答会话，小说ID={}，会话ID={}", novelId, session.getId());
+        log.info("[createSession][创建问答会话，小说ID={}，会话ID={}]", novelId, session.getId());
         return session;
     }
 
@@ -175,7 +160,7 @@ public class QaAgent {
     @Transactional(rollbackFor = Exception.class)
     public void deleteSession(Long sessionId) {
         chatSessionMapper.deleteById(sessionId);
-        log.info("删除问答会话，会话ID={}", sessionId);
+        log.info("[deleteSession][删除问答会话，会话ID={}]", sessionId);
     }
 
     /**
@@ -192,7 +177,7 @@ public class QaAgent {
         }
         session.updateTitle(title);
         chatSessionMapper.updateById(session);
-        log.info("重命名问答会话，会话ID={}，新标题={}", sessionId, title);
+        log.info("[renameSession][重命名问答会话，会话ID={}]", sessionId);
     }
 
     /**
@@ -209,7 +194,7 @@ public class QaAgent {
         }
         session.toggleFavorite();
         chatSessionMapper.updateById(session);
-        log.info("切换问答会话收藏状态，会话ID={}，收藏={}", sessionId, session.hasFavorited());
+        log.info("[toggleFavorite][切换问答会话收藏状态，会话ID={}，收藏={}]", sessionId, session.hasFavorited());
         return session.hasFavorited();
     }
 
@@ -264,7 +249,7 @@ public class QaAgent {
     /**
      * 撤回消息。
      *
-     * <p>将指定消息标记为已撤回，撤回后的消息在后续问答中不会发送给 LLM。</p>
+     * 将指定消息标记为已撤回，撤回后的消息在后续问答中不会发送给 LLM。
      *
      * @param messageId 消息 ID
      */
@@ -276,7 +261,7 @@ public class QaAgent {
         }
         message.revoke();
         chatMessageMapper.updateById(message);
-        log.info("撤回问答消息，消息ID={}，会话ID={}", messageId, message.getSessionId());
+        log.info("[revokeMessage][撤回问答消息，消息ID={}，会话ID={}]", messageId, message.getSessionId());
     }
 
     // ==================== 问答核心逻辑 ====================
@@ -284,9 +269,9 @@ public class QaAgent {
     /**
      * 流式问答（SSE）。
      *
-     * <p>接收用户问题，通过向量检索工具查询相关内容，
+     * 接收用户问题，通过向量检索工具查询相关内容，
      * 结合历史对话上下文和全文大纲，流式生成回答。
-     * 完成后自动保存用户消息和 AI 回复。</p>
+     * 完成后自动保存用户消息和 AI 回复。
      *
      * @param command 问答命令
      * @return 逐 Token 推送的 Flux 流
@@ -312,7 +297,7 @@ public class QaAgent {
 
             CallContext callContext =
                 aiServiceFactory.prepareNovelCall(
-                    novelId, AgentRole.QA, userId, DEFAULT_SYSTEM_PROMPT);
+                    novelId, AgentRoleEnum.QA, userId, DEFAULT_SYSTEM_PROMPT);
             SkillTool skillTool = callContext.getSkillTool();
             GenericAiAssistant assistant =
                 aiServiceFactory.buildNovelAssistant(
@@ -320,7 +305,7 @@ public class QaAgent {
                     true,
                     NovelContentRetrievalTool.create(vectorStoreFactory, novelId, userId),
                     NovelCreationTool.create(novelId, novelChapterService, chapterOutlineService),
-                    NovelCharacterTool.create(novelId, novelCharacterRepository));
+                    NovelCharacterTool.create(novelId, novelCharacterService));
 
             // 先保存用户消息，回复流中途中断时也能在会话中看到原问题。
             saveMessage(ChatMessage.createUserMessage(sessionId, novelId, question), userId, null);
@@ -332,7 +317,7 @@ public class QaAgent {
             TokenStreamOptions<ChatEvent<?>> streamOptions =
                 TokenStreamOptions.<ChatEvent<?>>builder()
                     .logContext("novelId=" + novelId + ",sessionId=" + sessionId)
-                    .callScene(CALL_SCENE_QA)
+                    .callScene(LlmCallSceneEnum.QA)
                     .callContext(callContext)
                     .requestContent(userPrompt)
                     .textEvent(token -> new ChatEvent<>(ChatEventEnum.TEXT, token))
@@ -393,8 +378,7 @@ public class QaAgent {
         try {
             String result =
                 aiServiceFactory.judgeWritingIntent(
-                    context, AgentPromptTemplates.buildQaPrompt(question, chatHistory, null),
-                    CALL_SCENE_QA_WRITING_INTENT, WRITING_INTENT_REQUEST);
+                    context, AgentPromptTemplates.buildQaPrompt(question, chatHistory, null));
             return result == null || !WRITING_INTENT_OTHER.equalsIgnoreCase(
                 result.strip().replaceFirst("[。.!！]+$", ""));
         } catch (RuntimeException e) {
@@ -465,7 +449,7 @@ public class QaAgent {
             chatMessageMapper.selectRecentMessages(sessionId, contextLength);
         List<String> history = new ArrayList<>();
         for (ChatMessage msg : recentMessages) {
-            String roleLabel = ChatMessage.ROLE_USER.equals(msg.getRole()) ? "用户" : "AI";
+            String roleLabel = msg.isUserMessage() ? "用户" : "AI";
             history.add(roleLabel + "：" + msg.getContent());
         }
         return history;

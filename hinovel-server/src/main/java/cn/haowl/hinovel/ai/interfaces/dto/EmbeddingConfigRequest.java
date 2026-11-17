@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.ai.interfaces.dto;
 
+import cn.haowl.hinovel.ai.constant.EmbeddingModelTypeEnum;
 import lombok.Data;
 
 /**
@@ -20,7 +21,9 @@ public class EmbeddingConfigRequest {
     private String name;
 
     /**
-     * 模型类型（openai/onnx）。
+     * 模型类型编码。
+     *
+     * @see EmbeddingModelTypeEnum
      */
     private String modelType;
 

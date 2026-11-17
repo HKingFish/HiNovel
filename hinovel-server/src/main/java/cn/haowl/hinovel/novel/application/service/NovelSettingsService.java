@@ -10,9 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 小说配置服务。
  *
- * <p>提供小说级别和用户级别的 AI 功能配置管理，
+ * 提供小说级别和用户级别的 AI 功能配置管理，
  * 通过 {@link NovelSettings#merge(NovelSettings, NovelSettings)} 实现两级配置合并，
- * 小说级别配置优先于用户默认配置。</p>
+ * 小说级别配置优先于用户默认配置。
  *
  * @author haowl
  */
@@ -52,8 +52,8 @@ public class NovelSettingsService {
     /**
      * 获取用户级别默认配置。
      *
-     * <p>若用户未保存过配置，返回系统默认配置（{@link NovelSettings#createDefault()}），
-     * 保证前端始终拿到一份完整的默认值，无需在前端硬编码兜底。</p>
+     * 若用户未保存过配置，返回系统默认配置（{@link NovelSettings#createDefault()}），
+     * 保证前端始终拿到一份完整的默认值，无需在前端硬编码兜底。
      *
      * @param userId 用户 ID
      * @return 用户默认配置（未保存过时返回系统默认配置，不返回 null）
@@ -66,7 +66,7 @@ public class NovelSettingsService {
     /**
      * 获取系统默认配置（不查数据库）。
      *
-     * <p>供前端「恢复默认」按钮调用，确保默认值的唯一权威来源在后端。</p>
+     * 供前端「恢复默认」按钮调用，确保默认值的唯一权威来源在后端。
      *
      * @return 系统默认配置
      */
@@ -88,11 +88,11 @@ public class NovelSettingsService {
         if (existing == null) {
             settings.setNovelId(novelId);
             novelSettingsMapper.insert(settings);
-            log.info("创建小说配置成功，novelId={}", novelId);
+            log.info("[saveNovelSettings][已创建小说配置，novelId={}]", novelId);
         } else {
             copySettingsFields(settings, existing);
             novelSettingsMapper.updateById(existing);
-            log.info("更新小说配置成功，novelId={}", novelId);
+            log.info("[saveNovelSettings][已更新小说配置，novelId={}]", novelId);
             return existing;
         }
         return settings;
@@ -113,11 +113,11 @@ public class NovelSettingsService {
             settings.setNovelId(NovelSettings.USER_DEFAULT_NOVEL_ID);
             settings.setUserId(userId);
             novelSettingsMapper.insert(settings);
-            log.info("创建用户默认配置成功，userId={}", userId);
+            log.info("[saveUserDefaultSettings][已创建用户默认配置，userId={}]", userId);
         } else {
             copySettingsFields(settings, existing);
             novelSettingsMapper.updateById(existing);
-            log.info("更新用户默认配置成功，userId={}", userId);
+            log.info("[saveUserDefaultSettings][已更新用户默认配置，userId={}]", userId);
             return existing;
         }
         return settings;

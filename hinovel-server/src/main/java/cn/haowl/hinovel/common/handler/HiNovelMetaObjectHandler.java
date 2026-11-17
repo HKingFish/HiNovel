@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 /**
  * MyBatis-Plus 审计字段自动填充处理器。
  *
- * <p>自动填充 creator、updater、createTime、updateTime、deleted 字段。</p>
+ * 自动填充 creator、updater、createTime、updateTime、deleted 字段。
  *
  * @author haowl
  * @since 2024
@@ -43,7 +43,7 @@ public class HiNovelMetaObjectHandler implements MetaObjectHandler {
     /**
      * 获取当前登录用户 ID。
      *
-     * <p>未登录时返回系统默认 ID。</p>
+     * 未登录时返回系统默认 ID。
      *
      * @return 当前用户 ID 或系统默认 ID
      */
@@ -53,7 +53,7 @@ public class HiNovelMetaObjectHandler implements MetaObjectHandler {
                 return StpUtil.getLoginIdAsLong();
             }
         } catch (Exception e) {
-            log.debug("获取当前用户 ID 失败，使用系统默认 ID: {}", e.getMessage());
+            log.debug("[getCurrentUserId][获取当前用户 ID 失败，使用系统默认 ID，type={}]", e.getClass().getSimpleName());
         }
         return CommonConstants.SYSTEM_USER_ID;
     }

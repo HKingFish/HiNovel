@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.domain.service;
 
 import cn.haowl.hinovel.common.exception.BusinessException;
+import cn.haowl.hinovel.novel.constant.NovelStatusEnum;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
@@ -19,8 +20,8 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * 小说领域服务。
  *
- * <p>封装小说聚合根相关的核心业务逻辑，包括小说的创建、归属校验、
- * 状态变更、统计刷新以及大纲管理。</p>
+ * 封装小说聚合根相关的核心业务逻辑，包括小说的创建、归属校验、
+ * 状态变更、统计刷新以及大纲管理。
  *
  * @author haowl
  */
@@ -56,8 +57,7 @@ public class NovelDomainService {
      * @return 持久化后的小说实体
      */
     public Novel createNovel(Long userId, String title, String description) {
-        Novel novel = Novel.create(userId, title, description);
-        return novelRepository.save(novel);
+        return novelRepository.save(Novel.create(userId, title, description));
     }
 
     /**
@@ -80,7 +80,7 @@ public class NovelDomainService {
     /**
      * 更新小说基本信息（标题、简介、封面）。
      *
-     * <p>通过实体的充血方法完成字段更新，确保业务规则在实体内部校验。</p>
+     * 通过实体的充血方法完成字段更新，确保业务规则在实体内部校验。
      *
      * @param novel       小说实体（已通过归属校验）
      * @param title       新标题（为 null 时不更新）
@@ -105,11 +105,11 @@ public class NovelDomainService {
      * 变更小说状态。
      *
      * @param novel  小说实体
-     * @param status 目标状态字符串
+     * @param status 目标状态
      * @return 更新后的小说实体
      */
-    public Novel changeStatus(Novel novel, String status) {
-        switch (Novel.NovelStatus.valueOf(status)) {
+    public Novel changeStatus(Novel novel, NovelStatusEnum status) {
+        switch (status) {
             case COMPLETED -> novel.complete();
             case PAUSED -> novel.pause();
             case ONGOING -> novel.resume();
@@ -156,7 +156,7 @@ public class NovelDomainService {
     /**
      * 刷新小说统计信息（字数、章节数）。
      *
-     * <p>从章节仓储重新统计，通过聚合根方法更新冗余字段。</p>
+     * 从章节仓储重新统计，通过聚合根方法更新冗余字段。
      *
      * @param novelId 小说 ID
      */
@@ -186,8 +186,7 @@ public class NovelDomainService {
     public NovelOutline getOrCreateOutline(Long novelId) {
         return novelOutlineRepository.findByNovelId(novelId)
                 .orElseGet(() -> {
-                    NovelOutline empty = NovelOutline.createEmpty(novelId);
-                    return novelOutlineRepository.save(empty);
+                    return novelOutlineRepository.save(NovelOutline.createEmpty(novelId));
                 });
     }
 

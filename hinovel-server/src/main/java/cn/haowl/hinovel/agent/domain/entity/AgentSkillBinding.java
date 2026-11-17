@@ -12,9 +12,13 @@ import lombok.Data;
 @TableName("agent_skill_binding")
 public class AgentSkillBinding {
 
-    /** Agent ID，复合主键第一列。 */
+    /**
+     * Agent ID，复合主键第一列。
+     */
     private Long agentId;
 
-    /** 内置 Skill ID，复合主键第二列。 */
+    /**
+     * 内置 Skill ID，复合主键第二列。
+     */
     private Long skillId;
 }

@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AgentSkillPromptsTest {
 
+    /**
+     * 验证提示词包含挂载信息与读取说明。
+     */
     @Test
     void exposesMountedMetadataAndReadInstructions() {
         AgentSkill skill = new AgentSkill();
@@ -27,6 +30,9 @@ class AgentSkillPromptsTest {
         assertFalse(section.contains("未解决的事实"));
     }
 
+    /**
+     * 验证无挂载时依然提供回退说明。
+     */
     @Test
     void requestsAFallbackEvenWithoutAnyMountedSkills() {
         String section = AgentSkillPrompts.buildSkillSection(List.of());

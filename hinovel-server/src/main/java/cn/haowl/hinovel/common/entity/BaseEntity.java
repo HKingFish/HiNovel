@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 /**
  * 实体基类。
  *
- * <p>包含通用审计字段：id、creator、updater、createTime、updateTime、deleted、version。</p>
+ * 包含通用审计字段：id、creator、updater、createTime、updateTime、deleted、version。
  *
  * @author haowl
  * @since 2024
@@ -49,7 +49,7 @@ public abstract class BaseEntity {
     /**
      * 逻辑删除标志。
      *
-     * <p>0-正常, 1-已删除。</p>
+     * 0-正常, 1-已删除。
      */
     @TableLogic
     private Integer deleted;

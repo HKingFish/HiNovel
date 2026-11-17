@@ -23,17 +23,22 @@ import java.util.List;
 @RequestMapping("/api/agent/skills")
 public class SkillController {
 
-    /** 内置 Skill 目录。 */
+    /**
+     * 内置 Skill 目录。
+     */
     @Autowired
     private SkillService skillService;
 
-    /** 查询内置 Skill 元数据。 */
+    /**
+     * 查询内置 Skill 元数据。
+     */
     @Operation(summary = "查询内置 Skill 目录")
     @GetMapping
     public ApiResponse<List<SkillListItemResponse>> list() {
         StpUtil.checkLogin();
         return ApiResponse.success(skillService.listBuiltin().stream()
-                .map(skill -> new SkillListItemResponse(skill.getId().intValue(), skill.getName(), skill.getDescription()))
+            .map(skill -> new SkillListItemResponse(
+                skill.getId().intValue(), skill.getName(), skill.getDescription()))
                 .toList());
     }
 }

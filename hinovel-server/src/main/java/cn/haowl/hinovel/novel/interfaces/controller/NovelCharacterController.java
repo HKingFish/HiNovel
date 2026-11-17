@@ -34,58 +34,76 @@ public class NovelCharacterController {
 
     // ==================== 人物管理 ====================
 
+    /**
+     * 创建小说人物。
+     */
     @Operation(summary = "创建人物", description = "为小说创建一个新人物")
     @PostMapping("/characters")
-    public ApiResponse<NovelCharacter> createCharacter(@Valid @RequestBody CharacterCreateRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(characterService.createCharacter(userId, request));
+    public ApiResponse<NovelCharacter> createCharacter(
+        @Valid @RequestBody CharacterCreateRequest request) {
+        return ApiResponse.success(characterService.createCharacter(StpUtil.getLoginIdAsLong(), request));
     }
 
+    /**
+     * 更新小说人物。
+     */
     @Operation(summary = "更新人物", description = "更新人物信息和人设")
     @PutMapping("/characters/{characterId}")
     public ApiResponse<NovelCharacter> updateCharacter(
             @PathVariable Long characterId,
             @Valid @RequestBody CharacterUpdateRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(characterService.updateCharacter(userId, characterId, request));
+        return ApiResponse.success(
+            characterService.updateCharacter(StpUtil.getLoginIdAsLong(), characterId, request));
     }
 
+    /**
+     * 删除小说人物。
+     */
     @Operation(summary = "删除人物", description = "删除人物及其所有关系")
     @DeleteMapping("/characters/{characterId}")
     public ApiResponse<Void> deleteCharacter(@PathVariable Long characterId) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        characterService.deleteCharacter(userId, characterId);
+        characterService.deleteCharacter(StpUtil.getLoginIdAsLong(), characterId);
         return ApiResponse.success();
     }
 
     // ==================== 关系管理 ====================
 
+    /**
+     * 创建人物关系。
+     */
     @Operation(summary = "创建人物关系", description = "建立两个人物之间的关系")
     @PostMapping("/character-relations")
-    public ApiResponse<NovelCharacterRelation> createRelation(@Valid @RequestBody CharacterRelationCreateRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(characterService.createRelation(userId, request));
+    public ApiResponse<NovelCharacterRelation> createRelation(
+        @Valid @RequestBody CharacterRelationCreateRequest request) {
+        return ApiResponse.success(characterService.createRelation(StpUtil.getLoginIdAsLong(), request));
     }
 
+    /**
+     * 删除人物关系。
+     */
     @Operation(summary = "删除人物关系", description = "删除指定的人物关系")
     @DeleteMapping("/character-relations/{relationId}")
     public ApiResponse<Void> deleteRelation(@PathVariable Long relationId) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        characterService.deleteRelation(userId, relationId);
+        characterService.deleteRelation(StpUtil.getLoginIdAsLong(), relationId);
         return ApiResponse.success();
     }
 
+    /**
+     * 查询人物的出向关系。
+     */
     @Operation(summary = "获取人物关系", description = "获取某个人物的所有关系")
     @GetMapping("/characters/{characterId}/relations")
     public ApiResponse<List<NovelCharacterRelation>> listCharacterRelations(@PathVariable Long characterId) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(characterService.listRelationsByCharacter(userId, characterId));
+        return ApiResponse.success(
+            characterService.listRelationsByCharacter(StpUtil.getLoginIdAsLong(), characterId));
     }
 
+    /**
+     * 查询小说人物及其关系图谱。
+     */
     @Operation(summary = "获取小说关系图谱", description = "获取小说的完整关系图谱数据")
     @GetMapping("/novels/{novelId}/character-graph")
     public ApiResponse<CharacterGraphVO> getCharacterGraph(@PathVariable Long novelId) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(characterService.getCharacterGraph(userId, novelId));
+        return ApiResponse.success(characterService.getCharacterGraph(StpUtil.getLoginIdAsLong(), novelId));
     }
 }

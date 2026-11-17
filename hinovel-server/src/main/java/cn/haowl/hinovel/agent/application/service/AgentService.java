@@ -2,6 +2,7 @@ package cn.haowl.hinovel.agent.application.service;
 
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
+import cn.haowl.hinovel.agent.domain.entity.AgentSkillBinding;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
 import static cn.haowl.hinovel.agent.constant.SkillConstants.WRITING_TEMPLATE_ID;
@@ -24,8 +26,8 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * Agent 管理应用服务。
  *
- * <p>协调领域层完成 Agent 的创建、更新、删除、查询及缓存管理，
- * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。</p>
+ * 协调领域层完成 Agent 的创建、更新、删除、查询及缓存管理，
+ * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。
  */
 @Slf4j
 @Service
@@ -81,7 +83,7 @@ public class AgentService {
             skillIds = List.of(DE_AI_SKILL_ID);
         }
         applySkillBindings(agent, skillIds);
-        log.info("Agent 创建成功: id={}, userId={}", agent.getId(), userId);
+        log.info("[create][Agent 创建成功: id={}, userId={}]", agent.getId(), userId);
         return agent;
     }
 
@@ -176,7 +178,7 @@ public class AgentService {
 
         // 主动失效 Redis 缓存
         evictCache(agentId);
-        log.info("Agent 更新成功: id={}", agentId);
+        log.info("[update][Agent 更新成功: id={}]", agentId);
         return agent;
     }
 
@@ -199,7 +201,7 @@ public class AgentService {
         agentRepository.deleteById(agentId);
         skillService.replaceAgentBindings(agentId, Collections.emptyList());
         evictCache(agentId);
-        log.info("Agent 删除成功: id={}", agentId);
+        log.info("[delete][Agent 删除成功: id={}]", agentId);
     }
 
     /**
@@ -272,9 +274,11 @@ public class AgentService {
             return;
         }
         List<Long> agentIds = agents.stream().map(Agent::getId).toList();
-        Map<Long, List<Long>> bindings = skillService.listBoundSkillIds(agentIds);
+        Map<Long, List<Integer>> skillIdsByAgent = skillService.listBindings(agentIds).stream()
+            .collect(Collectors.groupingBy(AgentSkillBinding::getAgentId,
+                Collectors.mapping(binding -> binding.getSkillId().intValue(), Collectors.toList())));
         for (Agent agent : agents) {
-            agent.setSkillIds(bindings.getOrDefault(agent.getId(), List.of()).stream().map(Long::intValue).toList());
+            agent.setSkillIds(List.copyOf(skillIdsByAgent.getOrDefault(agent.getId(), List.of())));
         }
     }
 }

@@ -12,8 +12,8 @@ import java.util.List;
 /**
  * 小说章节历史版本 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现章节版本的数据访问操作，
- * 复杂 SQL（如清理旧版本）定义在对应的 XML 映射文件中。</p>
+ * 基于 MyBatis-Plus 实现章节版本的数据访问操作，
+ * 复杂 SQL（如清理旧版本）定义在对应的 XML 映射文件中。
  *
  * @author haowl
  */
@@ -49,7 +49,7 @@ public interface NovelChapterVersionMapper extends BaseMapper<NovelChapterVersio
     /**
      * 清理章节超过指定数量的旧版本（保留最新的 N 个，已发布版本不删除）。
      *
-     * <p>SQL 定义在 XML 映射文件中。</p>
+     * SQL 定义在 XML 映射文件中。
      *
      * @param chapterId 章节 ID
      * @param keepCount 保留的版本数量

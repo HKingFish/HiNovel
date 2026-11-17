@@ -1,8 +1,10 @@
 package cn.haowl.hinovel.agent.application.service;
 
+import cn.haowl.hinovel.agent.constant.ChapterVectorContentTypeEnum;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
 import cn.haowl.hinovel.ai.application.vector.VectorStorePort;
 import cn.haowl.hinovel.common.constant.CommonConstants;
+import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import dev.langchain4j.data.segment.TextSegment;
 import lombok.extern.slf4j.Slf4j;
@@ -16,8 +18,8 @@ import java.util.List;
 /**
  * 章节向量存储服务。
  *
- * <p>负责将章节内容和大纲切片后存入 Qdrant 向量数据库，
- * 每本小说对应独立的向量集合（collection），实现数据隔离。</p>
+ * 负责将章节内容和大纲切片后存入 Qdrant 向量数据库，
+ * 每本小说对应独立的向量集合（collection），实现数据隔离。
  *
  * @author haowl
  */
@@ -43,16 +45,6 @@ public class ChapterVectorService {
     private static final String COLLECTION_PREFIX = "novel_";
 
     /**
-     * 内容类型：章节正文
-     */
-    public static final String CONTENT_TYPE_CHAPTER = "CHAPTER";
-
-    /**
-     * 内容类型：章节大纲
-     */
-    public static final String CONTENT_TYPE_OUTLINE = "OUTLINE";
-
-    /**
      * Embedding 接口单次批量上限
      */
     private static final int EMBEDDING_BATCH_SIZE = 10;
@@ -70,60 +62,51 @@ public class ChapterVectorService {
     /**
      * 异步存储章节内容和大纲到向量数据库。
      *
-     * @param novelId        小说 ID
-     * @param chapterId      章节 ID
-     * @param chapterTitle   章节标题
-     * @param chapterContent 章节正文内容
+     * @param chapter        章节和正文
      * @param outlineContent 章节大纲内容（可为空）
      * @param userId         用户 ID（用于选择 Embedding 模型）
      */
     @Async
-    public void storeChapterVectors(Long novelId, Long chapterId,
-                                    String chapterTitle, String chapterContent,
-                                    String outlineContent, Long userId) {
+    public void storeChapterVectors(NovelChapter chapter, String outlineContent, Long userId) {
+        Long novelId = chapter.getNovelId();
+        Long chapterId = chapter.getId();
         String collectionName = COLLECTION_PREFIX + novelId;
-        log.info("开始存储章节向量，小说ID={}，章节ID={}，集合={}", novelId, chapterId, collectionName);
+        log.info("[storeChapterVectors][开始存储章节向量，小说ID={}，章节ID={}，集合={}]", novelId, chapterId, collectionName);
 
         try {
             VectorStorePort vectorStore = vectorStoreFactory.getByCollection(collectionName, userId);
             // 用户未配置 Embedding 模型时，跳过向量存储（不启用 RAG）
             if (vectorStore == null) {
-                log.info("用户 {} 未配置 Embedding 模型，跳过章节向量存储，小说ID={}，章节ID={}",
+                log.info("[storeChapterVectors][用户 {} 未配置 Embedding 模型，跳过章节向量存储，小说ID={}，章节ID={}]",
                     userId, novelId, chapterId);
                 return;
             }
             List<TextSegment> segments = new ArrayList<>();
 
-            // 切片并存储章节正文
-            if (chapterContent != null && !chapterContent.isBlank()) {
-                List<TextSegment> contentSegments = splitAndCreateSegments(
-                        chapterContent, novelId, chapterId, chapterTitle, CONTENT_TYPE_CHAPTER);
-                segments.addAll(contentSegments);
+            if (chapter.getContent() != null && !chapter.getContent().isBlank()) {
+                segments.addAll(splitAndCreateSegments(
+                    chapter.getContent(), chapter, ChapterVectorContentTypeEnum.CHAPTER));
             }
-
-            // 切片并存储章节大纲
             if (outlineContent != null && !outlineContent.isBlank()) {
-                List<TextSegment> outlineSegments = splitAndCreateSegments(
-                        outlineContent, novelId, chapterId, chapterTitle, CONTENT_TYPE_OUTLINE);
-                segments.addAll(outlineSegments);
+                segments.addAll(splitAndCreateSegments(outlineContent, chapter, ChapterVectorContentTypeEnum.OUTLINE));
             }
 
             if (!segments.isEmpty()) {
                 // 先删除该章节已有的向量数据（根据 chapterId 筛选）
                 vectorStore.deleteByMetadata("chapterId", String.valueOf(chapterId));
-                log.info("已删除章节旧向量数据，小说ID={}，章节ID={}", novelId, chapterId);
+                log.info("[storeChapterVectors][已删除章节旧向量数据，小说ID={}，章节ID={}]", novelId, chapterId);
 
                 // 分批存储向量数据（Embedding 接口单次批量上限为 10 条）
                 storeBatch(vectorStore, segments);
 
                 // 向量存储成功后，更新章节的向量存储标记
                 markVectorStored(chapterId);
-                log.info("章节向量存储完成，小说ID={}，章节ID={}，切片数={}",
+                log.info("[storeChapterVectors][章节向量存储完成，小说ID={}，章节ID={}，切片数={}]",
                         novelId, chapterId, segments.size());
             }
         } catch (Exception e) {
-            log.error("章节向量存储失败，小说ID={}，章节ID={}，异常信息：{}",
-                    novelId, chapterId, e.getMessage(), e);
+            log.error("[storeChapterVectors][章节向量存储失败，小说ID={}，章节ID={}，异常类型={}]",
+                novelId, chapterId, e.getClass().getSimpleName());
         }
     }
 
@@ -131,25 +114,22 @@ public class ChapterVectorService {
      * 将文本按固定长度切片，并为每个切片附加 metadata。
      *
      * @param text         原始文本
-     * @param novelId      小说 ID
-     * @param chapterId    章节 ID
-     * @param chapterTitle 章节标题
+     * @param chapter      章节元数据
      * @param contentType  内容类型（CHAPTER / OUTLINE）
      * @return 文本切片列表
      */
-    private List<TextSegment> splitAndCreateSegments(String text, Long novelId,
-                                                     Long chapterId, String chapterTitle,
-                                                     String contentType) {
+    private List<TextSegment> splitAndCreateSegments(
+        String text, NovelChapter chapter, ChapterVectorContentTypeEnum contentType) {
         List<TextSegment> segments = new ArrayList<>();
         List<String> chunks = splitText(text);
 
         for (int i = 0; i < chunks.size(); i++) {
             TextSegment segment = TextSegment.from(
                     chunks.get(i),
-                    dev.langchain4j.data.document.Metadata.from("novelId", String.valueOf(novelId))
-                            .put("chapterId", String.valueOf(chapterId))
-                            .put("chapterTitle", chapterTitle)
-                            .put("contentType", contentType)
+                dev.langchain4j.data.document.Metadata.from("novelId", String.valueOf(chapter.getNovelId()))
+                    .put("chapterId", String.valueOf(chapter.getId()))
+                    .put("chapterTitle", chapter.getTitle())
+                    .put("contentType", contentType.name())
                             .put("segmentIndex", String.valueOf(i))
             );
             segments.add(segment);
@@ -179,9 +159,7 @@ public class ChapterVectorService {
                 break;
             }
             // 下一个切片起始位置带重叠，保证上下文连贯
-            int nextStart = end - SEGMENT_OVERLAP;
-            // 确保 start 严格前进，避免死循环
-            start = Math.max(nextStart, start + 1);
+            start = Math.max(end - SEGMENT_OVERLAP, start + 1);
         }
         return chunks;
     }
@@ -195,8 +173,7 @@ public class ChapterVectorService {
     private void storeBatch(VectorStorePort vectorStore, List<TextSegment> segments) {
         for (int i = 0; i < segments.size(); i += EMBEDDING_BATCH_SIZE) {
             int end = Math.min(i + EMBEDDING_BATCH_SIZE, segments.size());
-            List<TextSegment> batch = segments.subList(i, end);
-            vectorStore.store(batch);
+            vectorStore.store(segments.subList(i, end));
         }
     }
 
@@ -212,7 +189,7 @@ public class ChapterVectorService {
                 chapterRepository.save(chapter);
             });
         } catch (Exception e) {
-            log.error("更新章节向量存储标记失败，章节ID={}，异常信息：{}", chapterId, e.getMessage(), e);
+            log.error("[markVectorStored][更新章节向量存储标记失败，章节ID={}，异常类型={}]", chapterId, e.getClass().getSimpleName());
         }
     }
 

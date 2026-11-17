@@ -31,7 +31,7 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
     /**
      * 根据会话 ID 分页查询消息（游标分页，按时间倒序取最近的，返回时正序排列）。
      *
-     * <p>首次加载传 cursorId=null，加载更早消息时传当前最早消息的 ID。</p>
+     * 首次加载传 cursorId=null，加载更早消息时传当前最早消息的 ID。
      *
      * @param sessionId 会话 ID
      * @param cursorId  游标消息 ID（加载该 ID 之前的消息，null 表示从最新开始）
@@ -54,7 +54,7 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
     /**
      * 根据会话 ID 查询最近 N 条未撤回消息（用于构建 LLM 上下文）。
      *
-     * <p>已撤回的消息不会发送给 LLM，确保撤回功能生效。</p>
+     * 已撤回的消息不会发送给 LLM，确保撤回功能生效。
      *
      * @param sessionId 会话 ID
      * @param limit     最大条数

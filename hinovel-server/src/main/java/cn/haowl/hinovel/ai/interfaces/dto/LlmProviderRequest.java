@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.ai.interfaces.dto;
 
+import cn.haowl.hinovel.ai.constant.LlmProviderTypeEnum;
 import lombok.Data;
 
 import java.util.List;
@@ -22,7 +23,9 @@ public class LlmProviderRequest {
     private String name;
 
     /**
-     * 提供方类型（OPENAI / QWEN / DEEPSEEK）。
+     * 提供方类型编码。
+     *
+     * @see LlmProviderTypeEnum
      */
     private String providerType;
 

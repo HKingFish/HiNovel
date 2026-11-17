@@ -17,7 +17,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * LLM 提供方应用服务。
  *
- * <p>处理 LLM 提供方的增删改查、激活与停用，密钥加密落库，面向展示的返回值做脱敏。</p>
+ * 处理 LLM 提供方的增删改查、激活与停用，密钥加密落库，面向展示的返回值做脱敏。
  *
  * @author haowl
  * @date 2026/11/12 15:10
@@ -46,7 +46,7 @@ public class LlmProviderService {
      * @return LLM 提供方实体（apiKey 已脱敏）
      */
     public LlmProvider create(Long userId, LlmProviderRequest request) {
-        log.info("[create][创建 LLM 提供方，名称：{}，userId={}]", request.getName(), userId);
+        log.info("[create][创建 LLM 提供方，userId={}]", userId);
         if (llmProviderRepository.existsByNameAndUserId(request.getName(), userId)) {
             throw exception(PARAM_ERROR);
         }
@@ -96,7 +96,7 @@ public class LlmProviderService {
     /**
      * 更新 LLM 提供方。
      *
-     * <p>前端未修改 apiKey（传入空值或脱敏值）时保留原有加密密钥不变。</p>
+     * 前端未修改 apiKey（传入空值或脱敏值）时保留原有加密密钥不变。
      *
      * @param id      提供方 ID
      * @param userId  当前用户 ID
@@ -104,7 +104,7 @@ public class LlmProviderService {
      * @return 更新后的提供方实体（apiKey 已脱敏）
      */
     public LlmProvider update(Long id, Long userId, LlmProviderRequest request) {
-        log.info("[update][更新 LLM 提供方，id={}，名称：{}]", id, request.getName());
+        log.info("[update][更新 LLM 提供方，id={}，userId={}]", id, userId);
         LlmProvider provider = getOwnedProvider(id, userId);
         provider.setName(request.getName());
         provider.setProviderType(request.getProviderType());

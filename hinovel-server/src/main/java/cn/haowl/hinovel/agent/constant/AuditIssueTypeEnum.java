@@ -12,9 +12,21 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum AuditIssueTypeEnum {
+    /**
+     * 前后设定不一致。
+     */
     CONSISTENCY("consistency", "一致性"),
+    /**
+     * 情节逻辑问题。
+     */
     LOGIC("logic", "逻辑性"),
+    /**
+     * 人物塑造问题。
+     */
     CHARACTER("character", "人物"),
+    /**
+     * 情节发展问题。
+     */
     PLOT("plot", "剧情");
 
     /**

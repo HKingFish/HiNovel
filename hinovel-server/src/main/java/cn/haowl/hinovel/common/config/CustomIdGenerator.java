@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.common.config;
 
+import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -9,13 +10,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * 自定义 ID 生成器（16 位）。
  *
- * <p>生成规则：时间戳（秒级，10位） + 机器位（1位） + 序列号（5位）。
- * 使用自定义纪元（2024-01-01）减少时间戳位数，可支持到 2055 年左右。</p>
+ * 生成规则：时间戳（秒级，10位） + 机器位（1位） + 序列号（5位）。
+ * 使用自定义纪元（2024-01-01）减少时间戳位数，可支持到 2055 年左右。
  *
- * <p>机器位通过配置 hinovel.machine-id 指定（0-9），默认为 1，
- * 用于多实例部署时区分不同节点。</p>
+ * 机器位通过配置 hinovel.machine-id 指定（0-9），默认为 1，
+ * 用于多实例部署时区分不同节点。
  *
- * <p>单机每秒可生成 99999 个不重复 ID，满足当前业务需求。</p>
+ * 单机每秒可生成 99999 个不重复 ID，满足当前业务需求。
  *
  * @author haowl
  */
@@ -33,6 +34,11 @@ public class CustomIdGenerator implements IdentifierGenerator {
     private static final int SEQUENCE_MAX = 99999;
 
     /**
+     * ID 中预留五位序列号。
+     */
+    private static final long SEQUENCE_FACTOR = 100000L;
+
+    /**
      * 机器 ID（0-9，通过配置指定）
      */
     private final int machineId;
@@ -47,13 +53,16 @@ public class CustomIdGenerator implements IdentifierGenerator {
      */
     private volatile long lastSecond = -1L;
 
+    /**
+     * 按配置初始化 ID 生成器。
+     */
     public CustomIdGenerator(@Value("${hinovel.machine-id:1}") int machineId) {
         this.machineId = machineId;
     }
 
     @Override
     public Number nextId(Object entity) {
-        long currentSecond = System.currentTimeMillis() / 1000 - CUSTOM_EPOCH_SECONDS;
+        long currentSecond = System.currentTimeMillis() / CommonConstants.ONE_SECOND_MS - CUSTOM_EPOCH_SECONDS;
 
         synchronized (this) {
             if (currentSecond != lastSecond) {
@@ -63,14 +72,14 @@ public class CustomIdGenerator implements IdentifierGenerator {
             int seq = sequence.incrementAndGet();
             if (seq > SEQUENCE_MAX) {
                 while (currentSecond == lastSecond) {
-                    currentSecond = System.currentTimeMillis() / 1000 - CUSTOM_EPOCH_SECONDS;
+                    currentSecond = System.currentTimeMillis() / CommonConstants.ONE_SECOND_MS - CUSTOM_EPOCH_SECONDS;
                 }
                 lastSecond = currentSecond;
                 sequence.set(1);
                 seq = 1;
             }
             // 时间戳（10位） + 序列号（5位） = 15位
-            return currentSecond * 100000L + seq;
+            return currentSecond * SEQUENCE_FACTOR + seq;
         }
     }
 }

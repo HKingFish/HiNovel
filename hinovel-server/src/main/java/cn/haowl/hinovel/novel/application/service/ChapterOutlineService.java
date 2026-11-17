@@ -2,7 +2,6 @@ package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.repository.ChapterOutlineRepository;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,10 +12,9 @@ import java.util.Optional;
 /**
  * 章节大纲应用服务。
  *
- * <p>协调领域层完成章节大纲的查询、保存和删除功能，
- * 通过仓储接口访问数据，不再直接依赖 Mapper。</p>
+ * 协调领域层完成章节大纲的查询、保存和删除功能，
+ * 通过仓储接口访问数据，不再直接依赖 Mapper。
  */
-@Slf4j
 @Service
 public class ChapterOutlineService {
 
@@ -64,10 +62,7 @@ public class ChapterOutlineService {
             }
             if (outline.getPlotPoints() != null || outline.getInvolvedCharacters() != null
                     || outline.getEmotionTone() != null || outline.getSceneSetting() != null) {
-                current.updatePlotAnalysis(
-                        outline.getPlotPoints(), outline.getInvolvedCharacters(),
-                        outline.getEmotionTone(), outline.getSceneSetting()
-                );
+                current.updatePlotAnalysis(outline);
             }
             return chapterOutlineRepository.save(current);
         }

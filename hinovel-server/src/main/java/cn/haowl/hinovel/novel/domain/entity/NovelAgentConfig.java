@@ -9,8 +9,8 @@ import java.util.Objects;
 /**
  * 小说 Agent 配置实体。
  *
- * <p>为每本小说配置【作者】、【编辑】和【问答】角色使用的 Agent，
- * 不同角色的 Agent 负责不同的 AI 功能场景。</p>
+ * 为每本小说配置【作者】、【编辑】和【问答】角色使用的 Agent，
+ * 不同角色的 Agent 负责不同的 AI 功能场景。
  *
  * @author haowl
  */
@@ -90,18 +90,30 @@ public class NovelAgentConfig extends BaseEntity {
         return Objects.equals(this.novelId, novelId);
     }
 
+    /**
+     * 判断是否配置作者 Agent。
+     */
     public boolean hasAuthorAgent() {
         return authorAgentId != null;
     }
 
+    /**
+     * 判断是否配置编辑 Agent。
+     */
     public boolean hasEditorAgent() {
         return editorAgentId != null;
     }
 
+    /**
+     * 判断是否配置问答 Agent。
+     */
     public boolean hasQaAgent() {
         return qaAgentId != null;
     }
 
+    /**
+     * 判断三个 Agent 是否均已配置。
+     */
     public boolean isFullyConfigured() {
         return hasAuthorAgent() && hasEditorAgent() && hasQaAgent();
     }

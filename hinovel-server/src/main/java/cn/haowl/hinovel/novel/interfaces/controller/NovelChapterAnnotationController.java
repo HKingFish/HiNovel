@@ -2,12 +2,13 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
+import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
+import cn.haowl.hinovel.novel.domain.command.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.interfaces.dto.AiRewriteResultRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
-import cn.haowl.hinovel.novel.interfaces.dto.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.UpdateAnnotationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +24,7 @@ import java.util.List;
 /**
  * 章节批注管理接口。
  *
- * <p>提供批注的增删改查及状态流转操作。</p>
+ * 提供批注的增删改查及状态流转操作。
  *
  * @author haowl
  */
@@ -32,11 +33,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/novel/annotations")
 public class NovelChapterAnnotationController {
-
-    /**
-     * SSE 异常事件名。
-     */
-    private static final String SSE_EVENT_ERROR = "error";
 
     /**
      * 改写完成时发送的数据。
@@ -81,8 +77,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "创建批注")
     @PostMapping
     public ApiResponse<ChapterAnnotation> createAnnotation(@RequestBody CreateAnnotationRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        return ApiResponse.success(annotationService.createSelfAnnotation(request, userId));
+        return ApiResponse.success(annotationService.createSelfAnnotation(request, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -172,8 +167,8 @@ public class NovelChapterAnnotationController {
     /**
      * 批注 AI 改写（流式 SSE）。
      *
-     * <p>将整章内容 + 被批注原文 + 改写要求发送给作者 Agent，
-     * 流式返回改写结果，保证与上下文的连贯性。</p>
+     * 将整章内容 + 被批注原文 + 改写要求发送给作者 Agent，
+     * 流式返回改写结果，保证与上下文的连贯性。
      *
      * @param request 批注改写请求
      * @return SSE 流式响应
@@ -189,7 +184,7 @@ public class NovelChapterAnnotationController {
                 log.error("[annotationAiRewriteStream][批注改写流式异常，annotationId={}]",
                     request.getAnnotationId(), e);
                 return Flux.just(ServerSentEvent.<String>builder()
-                    .event(SSE_EVENT_ERROR)
+                    .event(ChatEventEnum.ERROR.getCode())
                     .data(e.getMessage() != null ? e.getMessage() : REWRITE_STREAM_ERROR_MESSAGE)
                     .build());
             });

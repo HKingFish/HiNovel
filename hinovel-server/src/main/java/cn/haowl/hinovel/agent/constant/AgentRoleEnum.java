@@ -1,14 +1,16 @@
-package cn.haowl.hinovel.agent.enums;
+package cn.haowl.hinovel.agent.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * Agent 角色枚举，用于从 NovelAgentConfig 中选取对应的 Agent ID。
+ * @author : haowl
+ * @date : 2026/11/17 21:03
+ * @desc : 小说 Agent 角色
  */
 @Getter
 @AllArgsConstructor
-public enum AgentRole {
+public enum AgentRoleEnum {
     /**
      * 作者 Agent
      */
@@ -22,5 +24,8 @@ public enum AgentRole {
      */
     QA("问答 Agent");
 
+    /**
+     * 角色显示名称。
+     */
     private final String name;
 }

@@ -1,8 +1,8 @@
 package cn.haowl.hinovel.infra.oss.application.service;
 
-import cn.haowl.hinovel.infra.oss.application.command.UploadCommand;
-import cn.haowl.hinovel.infra.oss.application.query.OssUploadLogQuery;
+import cn.haowl.hinovel.infra.oss.domain.command.UploadCommand;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
+import cn.haowl.hinovel.infra.oss.domain.query.OssUploadLogQuery;
 import cn.haowl.hinovel.infra.oss.domain.repository.OssUploadLogRepository;
 import cn.haowl.hinovel.infra.oss.domain.service.OssDomainService;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * OSS 应用服务。
  *
- * <p>协调文件上传相关的业务用例。</p>
+ * 协调文件上传相关的业务用例。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -44,17 +44,8 @@ public class OssApplicationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public String upload(UploadCommand command) {
-        log.info("上传文件: userId={}, bizType={}, filename={}",
-                command.getUserId(), command.getBizType(), command.getFile().getOriginalFilename());
-
-        OssUploadLog uploadLog = ossDomainService.upload(
-                command.getFile(),
-                command.getBizType(),
-                command.getBizId(),
-                command.getUserId()
-        );
-
-        log.info("文件上传成功: fileUrl={}", uploadLog.getFileUrl());
+        OssUploadLog uploadLog = ossDomainService.upload(command);
+        log.info("[upload][文件上传成功，uploadLogId={}，userId={}]", uploadLog.getId(), command.getUserId());
         return uploadLog.getFileUrl();
     }
 
@@ -65,9 +56,8 @@ public class OssApplicationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(String fileUrl) {
-        log.info("删除文件: fileUrl={}", fileUrl);
         ossDomainService.delete(fileUrl);
-        log.info("文件删除成功: fileUrl={}", fileUrl);
+        log.info("[delete][文件删除成功]");
     }
 
     /**
@@ -77,6 +67,6 @@ public class OssApplicationService {
      * @return 上传日志列表
      */
     public List<OssUploadLog> listUploadLogs(OssUploadLogQuery query) {
-        return ossUploadLogRepository.findByUserIdAndBizType(query.getUserId(), query.getBizType());
+        return ossUploadLogRepository.findActiveByCondition(query);
     }
 }

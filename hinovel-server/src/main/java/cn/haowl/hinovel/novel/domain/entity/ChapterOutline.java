@@ -10,8 +10,8 @@ import java.util.Objects;
 /**
  * 章节大纲实体。
  *
- * <p>存储每章的大纲内容、剧情要点、人物关联、情感基调等信息，
- * 支持用户手动编写和 AI 自动生成两种大纲来源。</p>
+ * 存储每章的大纲内容、剧情要点、人物关联、情感基调等信息，
+ * 支持用户手动编写和 AI 自动生成两种大纲来源。
  *
  * @author haowl
  */
@@ -45,12 +45,12 @@ public class ChapterOutline extends BaseEntity {
     private String chapterContent;
 
     /**
-     * 剧情要点（JSON 格式存储关键剧情点）。
+     * 剧情要点文本。
      */
     private String plotPoints;
 
     /**
-     * 涉及人物（JSON 格式存储人物 ID 列表）。
+     * 涉及人物的 ID 列表，由历史接口按 JSON 字符串传入。
      */
     private String involvedCharacters;
 
@@ -118,19 +118,15 @@ public class ChapterOutline extends BaseEntity {
     }
 
     /**
-     * 更新剧情分析信息。
+     * 从大纲更新剧情分析。
      *
-     * @param plotPoints         剧情要点（JSON）
-     * @param involvedCharacters 涉及人物（JSON）
-     * @param emotionTone        情感基调
-     * @param sceneSetting       场景设置
+     * @param outline 携带剧情分析字段的大纲
      */
-    public void updatePlotAnalysis(String plotPoints, String involvedCharacters,
-                                   String emotionTone, String sceneSetting) {
-        this.plotPoints = plotPoints;
-        this.involvedCharacters = involvedCharacters;
-        this.emotionTone = emotionTone;
-        this.sceneSetting = sceneSetting;
+    public void updatePlotAnalysis(ChapterOutline outline) {
+        this.plotPoints = outline.plotPoints;
+        this.involvedCharacters = outline.involvedCharacters;
+        this.emotionTone = outline.emotionTone;
+        this.sceneSetting = outline.sceneSetting;
     }
 
     // ==================== 状态判断 ====================

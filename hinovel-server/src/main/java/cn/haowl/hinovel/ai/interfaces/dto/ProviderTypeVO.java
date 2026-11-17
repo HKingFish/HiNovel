@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.ai.interfaces.dto;
 
+import cn.haowl.hinovel.ai.constant.LlmProviderTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -18,6 +19,8 @@ public class ProviderTypeVO {
 
     /**
      * 类型编码。
+     *
+     * @see LlmProviderTypeEnum
      */
     private String code;
 

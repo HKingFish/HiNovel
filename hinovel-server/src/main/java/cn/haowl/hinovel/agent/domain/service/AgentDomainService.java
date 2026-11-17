@@ -12,7 +12,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * Agent 领域服务。
  *
- * <p>处理 Agent 相关的业务逻辑。</p>
+ * 处理 Agent 相关的业务逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -36,8 +36,7 @@ public class AgentDomainService {
      * @return Agent 实体
      */
     public Agent createUserAgent(Long userId, String name, String description, String systemPrompt) {
-        Agent agent = Agent.createUserAgent(userId, name, description, systemPrompt);
-        return agentRepository.save(agent);
+        return agentRepository.save(Agent.createUserAgent(userId, name, description, systemPrompt));
     }
 
     /**

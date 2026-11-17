@@ -44,6 +44,7 @@ public class NovelAgentConfigController {
     public ApiResponse<NovelAgentConfigResponse> saveOrUpdateConfig(
             @PathVariable Long novelId,
             @Valid @RequestBody NovelAgentConfigRequest request) {
-        return ApiResponse.success(novelAgentConfigService.saveOrUpdateConfig(novelId, request, StpUtil.getLoginIdAsLong()));
+        return ApiResponse.success(
+            novelAgentConfigService.saveOrUpdateConfig(novelId, request, StpUtil.getLoginIdAsLong()));
     }
 }

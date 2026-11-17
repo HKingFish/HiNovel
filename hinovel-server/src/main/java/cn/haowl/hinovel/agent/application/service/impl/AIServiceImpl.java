@@ -16,7 +16,6 @@ import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -32,7 +31,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * AI 功能应用服务实现类。
  *
- * <p>封装 AI 改写、审核等业务逻辑，从 Controller 层下沉至此。</p>
+ * 封装 AI 改写、审核等业务逻辑，从 Controller 层下沉至此。
  *
  * @author haowl
  * @since 2024
@@ -83,7 +82,7 @@ public class AIServiceImpl implements AIService {
     private NovelChapterService novelChapterService;
 
     @Override
-    public Flux<ServerSentEvent<String>> aiRewrite(AIAuthorRequest request, Long userId) {
+    public Flux<String> aiRewrite(AIAuthorRequest request, Long userId) {
         Long chapterId = request.getChapterId();
         NovelChapter chapter = chapterService.getById(chapterId);
         if (chapter == null) {
@@ -111,16 +110,15 @@ public class AIServiceImpl implements AIService {
             Integer.valueOf(ENABLED).equals(settings.getRewriteIncludeOutline())
                 ? loadNovelOutlineContent(novelId) : null;
 
-        // 把正文片段写入 SSE 数据帧，避免 JSON 序列化给文本加引号。
         return authorAgentService.streamRewriteChapterByOutline(
-                chapter, outline, previousChapters, novelOutline,
-                request.getUserRequirement(), userId)
-            .map(token -> ServerSentEvent.<String>builder().data(token).build())
-            .onErrorResume(error -> {
-                log.error("[aiRewrite][流式改写失败，chapterId={}，原因={}]",
-                    chapterId, error.getMessage());
-                return Flux.just(rewriteErrorEvent(error));
-            });
+            ChapterRewriteCommand.builder()
+                .chapter(chapter)
+                .outline(outline)
+                .previousChapters(previousChapters)
+                .novelOutlineContent(novelOutline)
+                .userRequirement(request.getUserRequirement())
+                .build(),
+            userId);
     }
 
     @Override
@@ -214,17 +212,6 @@ public class AIServiceImpl implements AIService {
             outline.setChapterContent(request.getContent());
         }
         return outline;
-    }
-
-    /**
-     * 将流式改写异常转换为客户端识别的错误事件。
-     */
-    private ServerSentEvent<String> rewriteErrorEvent(Throwable error) {
-        String message = error.getMessage();
-        return ServerSentEvent.<String>builder()
-            .event("error")
-            .data(message == null ? "AI 改写异常" : message)
-            .build();
     }
 
     /**

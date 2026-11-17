@@ -12,8 +12,17 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum AuditSeverityEnum {
+    /**
+     * 低严重程度。
+     */
     LOW("low", "低"),
+    /**
+     * 中等严重程度。
+     */
     MEDIUM("medium", "中"),
+    /**
+     * 高严重程度。
+     */
     HIGH("high", "高");
 
     /**

@@ -3,13 +3,16 @@ package cn.haowl.hinovel.agent.constant;
 /**
  * Agent 模块常量类。
  *
- * <p>定义 Agent 模块相关的常量配置。</p>
+ * 定义 Agent 模块相关的常量配置。
  *
  * @author haowl
  * @since 2024
  */
 public final class AgentConstants {
 
+    /**
+     * 限制常量或工具类实例化。
+     */
     private AgentConstants() {
     }
 

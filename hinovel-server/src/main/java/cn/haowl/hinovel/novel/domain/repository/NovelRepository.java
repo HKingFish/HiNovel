@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * 小说仓储接口。
  *
- * <p>定义小说实体的存储和查询操作。</p>
+ * 定义小说实体的存储和查询操作。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30

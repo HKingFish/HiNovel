@@ -2,19 +2,25 @@ package cn.haowl.hinovel.user.interfaces.assembler;
 
 import cn.haowl.hinovel.user.application.command.LoginCommand;
 import cn.haowl.hinovel.user.application.command.RegisterCommand;
+import cn.haowl.hinovel.user.application.service.AuthApplicationService.LoginResult;
+import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.interfaces.dto.LoginRequest;
 import cn.haowl.hinovel.user.interfaces.dto.RegisterRequest;
+import cn.haowl.hinovel.user.interfaces.dto.TokenResponse;
 
 /**
  * 认证装配器。
  *
- * <p>负责 DTO 与领域对象之间的转换。</p>
+ * 负责 DTO 与领域对象之间的转换。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
  */
 public final class AuthAssembler {
 
+    /**
+     * 禁止实例化认证装配器。
+     */
     private AuthAssembler() {
     }
 
@@ -43,5 +49,20 @@ public final class AuthAssembler {
                 .account(request.getAccount())
                 .password(request.getPassword())
                 .build();
+    }
+
+    /**
+     * 将登录结果转换为响应。
+     */
+    public static TokenResponse toTokenResponse(LoginResult result) {
+        return new TokenResponse(result.getAccessToken(), result.getExpiresIn(), toUserInfo(result.getUser()));
+    }
+
+    /**
+     * 提取可对外展示的用户信息。
+     */
+    public static TokenResponse.UserInfo toUserInfo(User user) {
+        return new TokenResponse.UserInfo(
+            user.getId(), user.getUsername(), user.getEmail(), user.getRole(), user.getAvatarUrl());
     }
 }

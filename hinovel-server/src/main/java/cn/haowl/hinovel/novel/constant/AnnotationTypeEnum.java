@@ -1,13 +1,11 @@
 package cn.haowl.hinovel.novel.constant;
 
 /**
- * 批注类型枚举。
- *
- * <p>区分批注来源，用于控制不同角色的操作权限。</p>
- *
- * @author haowl
+ * @author : haowl
+ * @date : 2026/11/17 21:10
+ * @desc : 区分作者自批注和审阅者批注
  */
-public enum AnnotationType {
+public enum AnnotationTypeEnum {
 
     /**
      * 作者自批注（可触发 AI 改写）。

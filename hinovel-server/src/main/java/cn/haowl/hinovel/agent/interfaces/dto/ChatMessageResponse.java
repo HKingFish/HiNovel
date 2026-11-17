@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.agent.interfaces.dto;
 
+import cn.haowl.hinovel.agent.constant.ChatMessageRoleEnum;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import lombok.Data;
 
@@ -25,6 +26,8 @@ public class ChatMessageResponse {
 
     /**
      * 消息角色。
+     *
+     * @see ChatMessageRoleEnum
      */
     private String role;
 

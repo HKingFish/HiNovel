@@ -54,7 +54,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         String redisKey = RATE_LIMIT_KEY_PREFIX + userId;
 
         Long requestCount = redisTemplate.opsForValue().increment(redisKey);
-        if (requestCount != null && requestCount == AgentConstants.FIRST_REQUEST_COUNT) {
+        if (Long.valueOf(AgentConstants.FIRST_REQUEST_COUNT).equals(requestCount)) {
             // 首次请求时设置过期窗口
             redisTemplate.expire(redisKey, AgentConstants.RATE_LIMIT_WINDOW_MINUTES,
                     TimeUnit.MINUTES);
@@ -62,7 +62,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         int maxRequests = rateLimitProperties.getLlmPerMinute();
         if (requestCount != null && requestCount > maxRequests) {
-            log.warn("用户 {} 超过频率限制: {}/{} 次/分钟", userId, requestCount, maxRequests);
+            log.warn("[preHandle][用户 {} 超过频率限制: {}/{} 次/分钟]", userId, requestCount, maxRequests);
             throw exception(LLM_RATE_LIMIT_EXCEEDED);
         }
 

@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.user.interfaces.dto;
 
+import cn.haowl.hinovel.user.constant.UserRoleEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,7 +9,7 @@ import lombok.NoArgsConstructor;
 /**
  * 登录成功响应 DTO。
  *
- * <p>包含访问令牌和用户基本信息。</p>
+ * 包含访问令牌和用户基本信息。
  *
  * @author haowl
  * @since 2024
@@ -68,7 +69,9 @@ public class TokenResponse {
         private String email;
 
         /**
-         * 角色：USER/ADMIN。
+         * 用户角色。
+         *
+         * @see UserRoleEnum
          */
         @Schema(description = "角色：USER/ADMIN", example = "USER")
         private String role;

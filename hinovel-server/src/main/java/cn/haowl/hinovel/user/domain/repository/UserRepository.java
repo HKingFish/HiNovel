@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * 用户仓储接口。
  *
- * <p>定义用户实体的存储和查询操作，遵循 DDD 仓储模式。</p>
+ * 定义用户实体的存储和查询操作，遵循 DDD 仓储模式。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30

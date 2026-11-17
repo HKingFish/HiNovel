@@ -11,9 +11,9 @@ import lombok.EqualsAndHashCode;
 /**
  * 小说配置实体。
  *
- * <p>统一管理小说级别和用户级别的 AI 功能配置。
+ * 统一管理小说级别和用户级别的 AI 功能配置。
  * 当 novelId = 0 时表示用户级别默认配置，novelId > 0 时表示小说级别配置。
- * 小说级别配置优先级高于用户默认配置。</p>
+ * 小说级别配置优先级高于用户默认配置。
  *
  * @author haowl
  */
@@ -115,7 +115,7 @@ public class NovelSettings extends BaseEntity {
      */
     @JsonIgnore
     public boolean isUserDefault() {
-        return novelId != null && USER_DEFAULT_NOVEL_ID == novelId;
+        return Long.valueOf(USER_DEFAULT_NOVEL_ID).equals(novelId);
     }
 
     /**
@@ -140,7 +140,7 @@ public class NovelSettings extends BaseEntity {
     /**
      * 将小说级别配置与用户默认配置合并（小说级别优先）。
      *
-     * <p>如果小说级别某个字段为 null，则使用用户默认配置的值。</p>
+     * 如果小说级别某个字段为 null，则使用用户默认配置的值。
      *
      * @param novelLevel  小说级别配置（可为 null）
      * @param userDefault 用户默认配置（可为 null）

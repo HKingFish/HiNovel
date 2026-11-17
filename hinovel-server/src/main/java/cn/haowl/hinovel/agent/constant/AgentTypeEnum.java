@@ -1,14 +1,11 @@
 package cn.haowl.hinovel.agent.constant;
 
 /**
- * Agent 类型枚举。
- *
- * <p>定义 Agent 的类型。</p>
- *
- * @author haowl
- * @since 2024
+ * @author : haowl
+ * @date : 2026/11/17 21:03
+ * @desc : Agent 类型
  */
-public enum AgentType {
+public enum AgentTypeEnum {
 
     /**
      * 作者类型，负责创作内容。
@@ -20,18 +17,33 @@ public enum AgentType {
      */
     EDITOR("editor", "编辑");
 
+    /**
+     * 类型编码。
+     */
     private final String code;
+    /**
+     * 类型显示名称。
+     */
     private final String displayName;
 
-    AgentType(String code, String displayName) {
+    /**
+     * 声明类型编码及其显示名称。
+     */
+    AgentTypeEnum(String code, String displayName) {
         this.code = code;
         this.displayName = displayName;
     }
 
+    /**
+     * 返回类型编码。
+     */
     public String getCode() {
         return code;
     }
 
+    /**
+     * 返回类型显示名称。
+     */
     public String getDisplayName() {
         return displayName;
     }

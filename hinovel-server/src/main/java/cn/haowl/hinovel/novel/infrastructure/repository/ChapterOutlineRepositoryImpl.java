@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * 章节大纲仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现章节大纲仓储接口。</p>
+ * 基于 MyBatis-Plus 实现章节大纲仓储接口。
  *
  * @author haowl
  */

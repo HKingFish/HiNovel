@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * Agent 仓储接口。
  *
- * <p>定义 Agent 实体的存储和查询操作。</p>
+ * 定义 Agent 实体的存储和查询操作。
  *
  * @author haowl
  */
@@ -30,7 +30,9 @@ public interface AgentRepository {
      */
     Optional<Agent> findById(Long id);
 
-    /** 在修改事务中锁定 Agent，串行更新配置和挂载。 */
+    /**
+     * 在修改事务中锁定 Agent，串行更新配置和挂载。
+     */
     Optional<Agent> findByIdForUpdate(Long id);
 
     /**

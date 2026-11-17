@@ -13,7 +13,7 @@ import java.util.Optional;
 /**
  * 小说仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现小说仓储接口。</p>
+ * 基于 MyBatis-Plus 实现小说仓储接口。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30

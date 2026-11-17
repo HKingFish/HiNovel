@@ -1,8 +1,9 @@
 package cn.haowl.hinovel.agent.domain.repository;
 
+import cn.haowl.hinovel.agent.domain.entity.AgentSkillBinding;
+
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author : haowl
@@ -11,12 +12,18 @@ import java.util.Map;
  */
 public interface SkillRepository {
 
-    /** 查询 Agent 的 Skill ID。 */
+    /**
+     * 查询 Agent 的 Skill ID。
+     */
     List<Long> findSkillIdsByAgentId(Long agentId);
 
-    /** 批量查询 Agent 的 Skill ID。 */
-    Map<Long, List<Long>> findSkillIdsByAgentIds(Collection<Long> agentIds);
+    /**
+     * 批量查询 Agent 的 Skill 挂载。
+     */
+    List<AgentSkillBinding> findByAgentIds(Collection<Long> agentIds);
 
-    /** 整体替换挂载，空集合表示清空。 */
+    /**
+     * 整体替换挂载，空集合表示清空。
+     */
     void replaceBindings(Long agentId, Collection<Long> skillIds);
 }

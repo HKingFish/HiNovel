@@ -12,8 +12,17 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum AuditAssessmentEnum {
+    /**
+     * 审核通过。
+     */
     PASS("pass", "通过"),
+    /**
+     * 有问题需要关注。
+     */
     WARNING("warning", "有警告"),
+    /**
+     * 审核未通过。
+     */
     FAIL("fail", "未通过");
 
     /**

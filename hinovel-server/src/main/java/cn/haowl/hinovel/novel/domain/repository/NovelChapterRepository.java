@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.domain.repository;
 
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
+import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
 
 import java.util.List;
 import java.util.Optional;
@@ -8,7 +9,7 @@ import java.util.Optional;
 /**
  * 小说章节仓储接口。
  *
- * <p>定义小说章节实体的存储和查询操作。</p>
+ * 定义小说章节实体的存储和查询操作。
  *
  * @author haowl
  */
@@ -86,29 +87,14 @@ public interface NovelChapterRepository {
     Integer findMaxChapterNumber(Long novelId);
 
     /**
-     * 分页查询章节（支持筛选条件）。
-     *
-     * @param novelId      小说 ID
-     * @param pageNum      页码（从 1 开始）
-     * @param pageSize     每页大小
-     * @param status       发布状态筛选（可选）
-     * @param vectorStored 入库状态筛选（可选）
-     * @param title        标题关键词筛选（可选）
-     * @return 章节列表
+     * 按条件分页查询章节列表，不加载正文。
      */
-    List<NovelChapter> findByNovelIdPageWithoutContent(Long novelId, int pageNum, int pageSize,
-                                                       Integer status, Integer vectorStored, String title);
+    List<NovelChapter> findByNovelIdPageWithoutContent(ChapterPageQuery query);
 
     /**
-     * 统计章节数（支持筛选条件）。
-     *
-     * @param novelId      小说 ID
-     * @param status       发布状态筛选（可选）
-     * @param vectorStored 入库状态筛选（可选）
-     * @param title        标题关键词筛选（可选）
-     * @return 章节总数
+     * 按同一分页筛选条件统计章节总数。
      */
-    int countByNovelIdWithFilter(Long novelId, Integer status, Integer vectorStored, String title);
+    int countByNovelIdWithFilter(ChapterPageQuery query);
 
     /**
      * 查询指定章节之前的若干章。

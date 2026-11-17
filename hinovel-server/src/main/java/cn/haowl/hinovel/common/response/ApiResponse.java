@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * 统一 API 响应体。
  *
- * <p>所有接口返回值统一使用此结构。</p>
+ * 所有接口返回值统一使用此结构。
  *
  * @author haowl
  * @since 2024

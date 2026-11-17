@@ -1,18 +1,12 @@
 package cn.haowl.hinovel.agent.application.service;
 
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
-import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
-import org.springframework.http.codec.ServerSentEvent;
+import cn.haowl.hinovel.agent.interfaces.dto.*;
 import reactor.core.publisher.Flux;
 
 /**
  * AI 功能应用服务。
  *
- * <p>封装 AI 改写、审核等业务逻辑，将 Controller 层的业务逻辑下沉至此。</p>
+ * 封装 AI 改写、审核等业务逻辑，将 Controller 层的业务逻辑下沉至此。
  */
 public interface AIService {
 
@@ -21,9 +15,9 @@ public interface AIService {
      *
      * @param request 改写请求
      * @param userId  用户 ID
-     * @return SSE 流式响应
+     * @return 改写文本流
      */
-    Flux<ServerSentEvent<String>> aiRewrite(AIAuthorRequest request, Long userId);
+    Flux<String> aiRewrite(AIAuthorRequest request, Long userId);
 
     /**
      * AI 审核功能。

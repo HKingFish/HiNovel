@@ -1,7 +1,8 @@
 package cn.haowl.hinovel.infra.oss.domain.entity;
 
-import cn.haowl.hinovel.infra.oss.constant.OssConstants;
-import cn.haowl.hinovel.infra.oss.constant.OssStorageType;
+import cn.haowl.hinovel.infra.oss.constant.OssStorageTypeEnum;
+import cn.haowl.hinovel.infra.oss.constant.OssUploadStatusEnum;
+import cn.haowl.hinovel.infra.oss.util.OssFileUtils;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -9,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -16,7 +18,7 @@ import java.util.Objects;
 /**
  * OSS 上传日志实体。
  *
- * <p>记录每次文件上传的元数据，支持按用户和业务类型查询。</p>
+ * 记录每次文件上传的元数据，支持按用户和业务类型查询。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -70,12 +72,16 @@ public class OssUploadLog {
     private String fileUrl;
 
     /**
-     * 存储类型：LOCAL/ALIYUN。
+     * 文件存储类型。
+     *
+     * @see OssStorageTypeEnum
      */
     private String storageType;
 
     /**
-     * 状态：ACTIVE（正常）/DELETED（已删除）。
+     * 上传记录状态。
+     *
+     * @see OssUploadStatusEnum
      */
     private String status;
 
@@ -90,43 +96,10 @@ public class OssUploadLog {
     private LocalDateTime updateTime;
 
     /**
-     * 创建上传日志。
-     *
-     * @param userId           用户ID
-     * @param bizType          业务类型
-     * @param bizId            业务ID
-     * @param originalFilename 原始文件名
-     * @param fileSize         文件大小
-     * @param contentType      内容类型
-     * @param fileUrl          文件URL
-     * @param storageType      存储类型
-     * @return 上传日志实体
-     */
-    public static OssUploadLog create(Long userId, String bizType, Long bizId,
-                                      String originalFilename, Long fileSize,
-                                      String contentType, String fileUrl,
-                                      String storageType) {
-        OssUploadLog log = new OssUploadLog();
-        log.setUserId(userId);
-        log.setBizType(bizType);
-        log.setBizId(bizId);
-        log.setOriginalFilename(originalFilename);
-        log.setFileSize(fileSize);
-        log.setContentType(contentType);
-        log.setFileUrl(fileUrl);
-        log.setStorageType(storageType);
-        log.setStatus(OssConstants.STATUS_ACTIVE);
-        LocalDateTime now = LocalDateTime.now();
-        log.setCreateTime(now);
-        log.setUpdateTime(now);
-        return log;
-    }
-
-    /**
      * 标记为已删除。
      */
     public void markAsDeleted() {
-        this.status = OssConstants.STATUS_DELETED;
+        this.status = OssUploadStatusEnum.DELETED.name();
         this.updateTime = LocalDateTime.now();
     }
 
@@ -136,7 +109,7 @@ public class OssUploadLog {
      * @return 是否已删除
      */
     public boolean isDeleted() {
-        return OssConstants.STATUS_DELETED.equals(this.status);
+        return OssUploadStatusEnum.DELETED == EnumUtils.getEnum(OssUploadStatusEnum.class, this.status);
     }
 
     /**
@@ -145,7 +118,7 @@ public class OssUploadLog {
      * @return 是否激活
      */
     public boolean isActive() {
-        return OssConstants.STATUS_ACTIVE.equals(this.status);
+        return OssUploadStatusEnum.ACTIVE == EnumUtils.getEnum(OssUploadStatusEnum.class, this.status);
     }
 
     /**
@@ -154,7 +127,7 @@ public class OssUploadLog {
      * @return 是否为本地存储
      */
     public boolean isLocalStorage() {
-        return OssStorageType.LOCAL.name().equals(this.storageType);
+        return OssStorageTypeEnum.LOCAL == EnumUtils.getEnum(OssStorageTypeEnum.class, this.storageType);
     }
 
     /**
@@ -163,7 +136,7 @@ public class OssUploadLog {
      * @return 是否为阿里云存储
      */
     public boolean isAliyunStorage() {
-        return OssStorageType.ALIYUN.name().equals(this.storageType);
+        return OssStorageTypeEnum.ALIYUN == EnumUtils.getEnum(OssStorageTypeEnum.class, this.storageType);
     }
 
     /**
@@ -172,10 +145,7 @@ public class OssUploadLog {
      * @return 文件扩展名
      */
     public String getFileExtension() {
-        if (originalFilename == null || !originalFilename.contains(".")) {
-            return "";
-        }
-        return originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
+        return OssFileUtils.getExtension(originalFilename, "");
     }
 
     /**

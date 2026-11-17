@@ -10,12 +10,18 @@ import lombok.Data;
 @Data
 public class AgentSkill {
 
-    /** 随资源发布的稳定 ID。 */
+    /**
+     * 随资源发布的稳定 ID。
+     */
     private Long id;
 
-    /** 配置与执行时显示的名称。 */
+    /**
+     * 配置与执行时显示的名称。
+     */
     private String name;
 
-    /** 帮助模型判断何时读取正文。 */
+    /**
+     * 帮助模型判断何时读取正文。
+     */
     private String description;
 }
