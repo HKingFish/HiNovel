@@ -1,10 +1,15 @@
 <template>
-    <div class="novel-editor-page">
+    <div :class="{ focused: isFocusMode }" class="novel-editor-page">
         <!-- 顶部标题栏 -->
         <header class="editor-header">
             <div class="header-left">
                 <el-button :icon="ArrowLeft" type="primary" plain class="back-btn" @click="goBack"> 返回 </el-button>
-                <el-input v-model="chapterTitle" placeholder="请输入章节标题" class="chapter-title-input" />
+                <el-input
+                    v-model="chapterTitle"
+                    :disabled="!currentChapterId"
+                    class="chapter-title-input"
+                    placeholder="请输入章节标题"
+                />
             </div>
             <div class="header-center">
                 <span class="novel-title-badge">{{ novelDisplayTitle || '加载中...' }}</span>
@@ -26,12 +31,25 @@
                 >
                     {{ isFocusMode ? '退出专注' : '专注模式' }}
                 </el-button>
-                <el-button type="primary" :icon="Upload" @click="publishChapter"> 发布 </el-button>
+                <el-button :disabled="!currentChapterId" :icon="Upload" type="primary" @click="publishChapter">
+                    发布
+                </el-button>
             </div>
         </header>
 
         <!-- 编辑器主体 -->
-        <div class="editor-body">
+        <nav v-if="!isFocusMode" aria-label="编辑区域" class="editor-sections">
+            <button
+                v-for="section in editorSections"
+                :key="section.id"
+                :aria-pressed="editorSection === section.id"
+                type="button"
+                @click="openEditorSection(section.id)"
+            >
+                {{ section.label }}
+            </button>
+        </nav>
+        <div :data-section="editorSection" class="editor-body">
             <!-- 左侧边栏 - 章节列表（支持收起/展开） -->
             <aside class="editor-sidebar" :class="{ collapsed: isSidebarCollapsed }">
                 <div class="sidebar-main">
@@ -161,7 +179,10 @@
                                 <div
                                     class="chapter-item"
                                     :class="{ active: currentChapterId === chapter.id }"
-                                    @click="selectChapter(chapter.id)"
+                                    @click="
+                                        selectChapter(chapter.id)
+                                        editorSection = 'content'
+                                    "
                                 >
                                     <div class="chapter-content">
                                         <div class="chapter-header-row">
@@ -350,105 +371,123 @@
 
             <!-- 中间内容编辑区 -->
             <div class="content-panel">
-                <div class="content-header">
-                    <span class="content-title">
-                        <el-icon><EditPen /></el-icon>
-                        正文内容
-                    </span>
-                    <div class="content-actions">
-                        <span class="word-count">字数：{{ wordCount }}</span>
-                        <el-tooltip content="选择背景色" placement="bottom" :show-after="300">
-                            <div class="bg-color-picker">
-                                <div
-                                    class="bg-color-btn"
-                                    :style="{ backgroundColor: editorBgColor }"
-                                    @click="showBgColorPicker = !showBgColorPicker"
-                                >
-                                    <el-icon :size="14">
-                                        <Palette />
-                                    </el-icon>
-                                </div>
-                                <div v-if="showBgColorPicker" class="bg-color-options">
+                <div v-if="!currentChapterId" class="no-chapter" role="status">
+                    <el-skeleton v-if="isLoadingChapters" :rows="3" animated />
+                    <template v-else-if="chapterListFailed">
+                        <h2>章节加载失败</h2>
+                        <el-button @click="loadChapters">重新加载</el-button>
+                    </template>
+                    <template v-else>
+                        <h2>{{ chapters.length ? '选择要写的章节' : '还没有可编辑的章节' }}</h2>
+                        <el-button :icon="Plus" type="primary" @click="openCreateChapterDialog">新建章节</el-button>
+                    </template>
+                </div>
+                <template v-else>
+                    <div class="content-header">
+                        <span class="content-title">
+                            <el-icon><EditPen /></el-icon>
+                            正文内容
+                        </span>
+                        <div class="content-actions">
+                            <span class="word-count">字数：{{ wordCount }}</span>
+                            <el-tooltip :show-after="300" content="选择背景色" placement="bottom">
+                                <div class="bg-color-picker">
                                     <div
-                                        v-for="color in bgColorOptions"
-                                        :key="color.value"
-                                        class="bg-color-option"
-                                        :class="{ active: editorBgColor === color.value }"
-                                        :style="{ backgroundColor: color.value }"
-                                        @click="selectBgColor(color.value)"
+                                        :style="{ backgroundColor: editorBgColor }"
+                                        aria-label="选择背景色"
+                                        class="bg-color-btn"
+                                        role="button"
+                                        tabindex="0"
+                                        @click="showBgColorPicker = !showBgColorPicker"
+                                        @keydown.enter.prevent="showBgColorPicker = !showBgColorPicker"
+                                        @keydown.space.prevent="showBgColorPicker = !showBgColorPicker"
                                     >
-                                        <span v-if="editorBgColor === color.value" class="check-icon">✓</span>
+                                        <el-icon :size="14">
+                                            <Brush />
+                                        </el-icon>
+                                    </div>
+                                    <div v-if="showBgColorPicker" class="bg-color-options">
+                                        <div
+                                            v-for="color in bgColorOptions"
+                                            :key="color.value"
+                                            :class="{ active: editorBgColor === color.value }"
+                                            :style="{ backgroundColor: color.value }"
+                                            class="bg-color-option"
+                                            @click="selectBgColor(color.value)"
+                                        >
+                                            <span v-if="editorBgColor === color.value" class="check-icon">✓</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </el-tooltip>
-                        <el-tooltip content="清除多余空白行" placement="bottom" :show-after="300">
-                            <el-button size="small" text class="clean-blank-btn" @click="cleanBlankLines">
-                                <el-icon :size="14">
-                                    <Delete />
-                                </el-icon>
-                                清除空行
+                            </el-tooltip>
+                            <el-tooltip :show-after="300" content="清除多余空白行" placement="bottom">
+                                <el-button class="clean-blank-btn" size="small" text @click="cleanBlankLines">
+                                    <el-icon :size="14">
+                                        <Delete />
+                                    </el-icon>
+                                    清除空行
+                                </el-button>
+                            </el-tooltip>
+                            <el-button
+                                :class="[
+                                    'save-btn',
+                                    hasUnsavedChanges ? 'save-btn-unsaved' : 'save-btn-saved',
+                                    { 'save-btn-pulse': hasUnsavedChanges },
+                                ]"
+                                :icon="hasUnsavedChanges ? Warning : Check"
+                                :loading="isSaving"
+                                size="default"
+                                @click="manualSave"
+                            >
+                                {{ hasUnsavedChanges ? '未保存' : '已保存' }}
                             </el-button>
-                        </el-tooltip>
-                        <el-button
-                            size="default"
-                            :icon="hasUnsavedChanges ? Warning : Check"
-                            :loading="isSaving"
-                            :class="[
-                                'save-btn',
-                                hasUnsavedChanges ? 'save-btn-unsaved' : 'save-btn-saved',
-                                { 'save-btn-pulse': hasUnsavedChanges },
-                            ]"
-                            @click="manualSave"
-                        >
-                            {{ hasUnsavedChanges ? '未保存' : '已保存' }}
-                        </el-button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="content-body">
-                    <TiptapEditor
-                        ref="contentEditorRef"
-                        v-model="chapterContent"
-                        placeholder="开始你的创作之旅..."
-                        :annotations="chapterAnnotations"
-                        :background-color="editorBgColor"
-                        @blur="handleEditorBlur"
-                        @stats-change="handleStatsChange"
-                        @create-annotation="handleCreateAnnotation"
-                        @delete-annotation="handleDeleteAnnotation"
-                        @ai-rewrite-annotation="handleAiRewriteAnnotation"
-                        @accept-rewrite="handleAcceptRewrite"
-                        @view-annotation="handleViewAnnotation"
-                        @quick-rewrite="handleQuickRewrite"
-                        @accept-quick-rewrite="handleAcceptQuickRewrite"
-                    />
-                </div>
+                    <div class="content-body">
+                        <TiptapEditor
+                            ref="contentEditorRef"
+                            v-model="chapterContent"
+                            :annotations="chapterAnnotations"
+                            :background-color="editorBgColor"
+                            placeholder="写下这一章的正文…"
+                            @blur="handleEditorBlur"
+                            @stats-change="handleStatsChange"
+                            @create-annotation="handleCreateAnnotation"
+                            @delete-annotation="handleDeleteAnnotation"
+                            @ai-rewrite-annotation="handleAiRewriteAnnotation"
+                            @accept-rewrite="handleAcceptRewrite"
+                            @view-annotation="handleViewAnnotation"
+                            @quick-rewrite="handleQuickRewrite"
+                            @accept-quick-rewrite="handleAcceptQuickRewrite"
+                        />
+                    </div>
 
-                <div class="content-footer">
-                    <div class="footer-left">
-                        <el-icon><Document /></el-icon>
-                        <span>字数 {{ wordCount }}</span>
-                        <el-divider direction="vertical" />
-                        <span>行数 {{ lineCount }}</span>
-                        <el-divider direction="vertical" />
-                        <span>段落 {{ paragraphCount }}</span>
+                    <div class="content-footer">
+                        <div class="footer-left">
+                            <el-icon><Document /></el-icon>
+                            <span>字数 {{ wordCount }}</span>
+                            <el-divider direction="vertical" />
+                            <span>行数 {{ lineCount }}</span>
+                            <el-divider direction="vertical" />
+                            <span>段落 {{ paragraphCount }}</span>
+                        </div>
+                        <div class="footer-right">
+                            <el-button class="footer-action-btn" size="small" @click="copyChapterContent">
+                                <el-icon :size="13">
+                                    <DocumentCopy />
+                                </el-icon>
+                                复制
+                            </el-button>
+                            <el-button class="footer-action-btn" size="small" @click="exportChapterContent">
+                                <el-icon :size="13">
+                                    <Download />
+                                </el-icon>
+                                导出
+                            </el-button>
+                        </div>
                     </div>
-                    <div class="footer-right">
-                        <el-button size="small" class="footer-action-btn" @click="copyChapterContent">
-                            <el-icon :size="13">
-                                <DocumentCopy />
-                            </el-icon>
-                            复制
-                        </el-button>
-                        <el-button size="small" class="footer-action-btn" @click="exportChapterContent">
-                            <el-icon :size="13">
-                                <Download />
-                            </el-icon>
-                            导出
-                        </el-button>
-                    </div>
-                </div>
+                </template>
             </div>
 
             <!-- 正文面板与功能区之间的拖拽手柄 -->
@@ -847,7 +886,12 @@
                                                     class="message-skills"
                                                 >
                                                     <span>已加载 Skill</span>
-                                                    <el-tag v-for="name in msg.loadedSkillNames" :key="name" size="small" effect="plain">
+                                                    <el-tag
+                                                        v-for="name in msg.loadedSkillNames"
+                                                        :key="name"
+                                                        effect="plain"
+                                                        size="small"
+                                                    >
                                                         {{ name }}
                                                     </el-tag>
                                                 </div>
@@ -1048,7 +1092,11 @@
 
                     <!-- 小说设置面板 -->
                     <div v-show="activeFunctionTab === 'settings'" class="function-tab-content">
-                        <div v-loading="isLoadingSettings" class="tab-panel-body settings-panel-body">
+                        <div v-if="!isLoadingSettings && !settingsReady" class="no-chapter" role="status">
+                            <p>设置尚未加载</p>
+                            <el-button @click="loadSettingsPanel">重新加载</el-button>
+                        </div>
+                        <div v-else v-loading="isLoadingSettings" class="tab-panel-body settings-panel-body">
                             <div class="settings-tab-bar">
                                 <div
                                     class="settings-tab-item"
@@ -1076,7 +1124,7 @@
                             <div v-show="settingsActiveTab === 'agent'" class="settings-scroll-area">
                                 <div class="settings-card">
                                     <div class="settings-card-header">
-                                        <el-icon :size="15" color="#667eea">
+                                        <el-icon :size="15" color="var(--pine)">
                                             <UserFilled />
                                         </el-icon>
                                         <span>作者 Agent</span>
@@ -1156,6 +1204,7 @@
                             <el-button
                                 type="primary"
                                 :loading="isSavingSettings"
+                                :disabled="!settingsReady"
                                 class="settings-save-btn"
                                 @click="saveSettingsPanel"
                             >
@@ -1171,7 +1220,9 @@
                 <!-- 活动栏（竖排图标） -->
                 <div class="activity-bar">
                     <el-tooltip content="小说大纲" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="小说大纲"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'outline' }"
                             @click="switchFunctionTab('outline')"
@@ -1179,10 +1230,12 @@
                             <el-icon :size="20">
                                 <Document />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="人物图谱" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="人物图谱"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'character' }"
                             @click="switchFunctionTab('character')"
@@ -1190,10 +1243,12 @@
                             <el-icon :size="20">
                                 <Share />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="历史版本" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="历史版本"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'history' }"
                             @click="switchFunctionTab('history')"
@@ -1201,10 +1256,12 @@
                             <el-icon :size="20">
                                 <Clock />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="AI 问答" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="AI 问答"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'chat' }"
                             @click="switchFunctionTab('chat')"
@@ -1212,10 +1269,12 @@
                             <el-icon :size="20">
                                 <ChatDotRound />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="批注列表" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="批注"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'annotations' }"
                             @click="switchFunctionTab('annotations')"
@@ -1227,10 +1286,12 @@
                             <span v-if="unreadAnnotationCount > 0" class="activity-badge">
                                 {{ unreadAnnotationCount > 9 ? '9+' : unreadAnnotationCount }}
                             </span>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="创作手记" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="备忘录"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'memo' }"
                             @click="switchFunctionTab('memo')"
@@ -1238,10 +1299,12 @@
                             <el-icon :size="20">
                                 <Notebook />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="小说设置" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="小说设置"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'settings' }"
                             @click="switchFunctionTab('settings')"
@@ -1249,7 +1312,7 @@
                             <el-icon :size="20">
                                 <Setting />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                 </div>
             </div>
@@ -1553,7 +1616,7 @@ import {
     WarningFilled,
 } from '@element-plus/icons-vue'
 import { ElIcon, ElInput, ElMessage, ElMessageBox } from 'element-plus'
-import * as echarts from 'echarts'
+import { type ECharts, type EChartsOption, initCharacterChart } from '@/utils/character-chart'
 import { renderMarkdown } from '@/utils/render-markdown'
 import draggable from 'vuedraggable'
 import {
@@ -1742,8 +1805,10 @@ const loadDraftFromLocal = (): boolean => {
         if (draftStr) {
             const draft = JSON.parse(draftStr)
             // 检查是否是对应当前章节
-            if (String(draft.chapterId) === currentChapterId.value &&
-                (String(draft.novelId) === novelId || draft.novelId === Number(novelId))) {
+            if (
+                String(draft.chapterId) === currentChapterId.value &&
+                (String(draft.novelId) === novelId || draft.novelId === Number(novelId))
+            ) {
                 if (!savedDraft && legacyDraftKey !== draftKey) {
                     localStorage.setItem(draftKey, draftStr)
                     localStorage.removeItem(legacyDraftKey)
@@ -1825,6 +1890,7 @@ const clearDraft = () => {
 // 章节列表
 const chapters = ref<Chapter[]>([])
 const isLoadingChapters = ref(false)
+const chapterListFailed = ref(false)
 const chapterListRef = ref<HTMLDivElement>()
 
 // 分页相关
@@ -2130,7 +2196,7 @@ let activeChatStream: {
 
 // 人物图谱
 const miniGraphRef = ref<HTMLDivElement>()
-let miniChartInstance: echarts.ECharts | null = null
+let miniChartInstance: ECharts | null = null
 
 // 历史版本
 const historyVersions = ref<ChapterVersion[]>([])
@@ -2162,6 +2228,8 @@ const settingsActiveTab = ref('agent')
 const isLoadingSettings = ref(false)
 const isSavingSettings = ref(false)
 const hasOwnSettings = ref(false)
+const settingsReady = ref(false)
+let settingsLoadRequest = 0
 const agents = ref<AgentConfig[]>([])
 const agentConfig = ref<NovelAgentConfig>({
     novelId: '',
@@ -2172,6 +2240,20 @@ const agentConfig = ref<NovelAgentConfig>({
 const novelSettingsForm = ref<NovelSettings>(createDefaultSettings())
 
 // 专注模式（从布局缓存恢复）
+const editorSections = [
+    { id: 'chapters', label: '章节' },
+    { id: 'outline', label: '本章大纲' },
+    { id: 'content', label: '正文' },
+    { id: 'tools', label: '工具' },
+] as const
+type EditorSection = (typeof editorSections)[number]['id']
+const editorSection = ref<EditorSection>('content')
+const openEditorSection = (section: EditorSection) => {
+    editorSection.value = section
+    if (section === 'chapters') isSidebarCollapsed.value = false
+    if (section === 'tools' && !activeFunctionTab.value) switchFunctionTab('outline')
+    if (section === 'tools') nextTick(() => miniChartInstance?.resize())
+}
 const isFocusMode = toRef(layoutStore, 'isFocusMode')
 
 // 左侧章节菜单收起状态（从布局缓存恢复）
@@ -2340,7 +2422,7 @@ const handleAiRewriteAnnotation = (
             onComplete: async (fullText: string) => {
                 await saveAiRewriteResultApi(data.annotationId, fullText)
                 if (signal.aborted) return
-                const annotation = chapterAnnotations.value.find(item => item.id === data.annotationId)
+                const annotation = chapterAnnotations.value.find((item) => item.id === data.annotationId)
                 if (annotation) annotation.aiRewriteResult = fullText
                 callbacks.onComplete(fullText)
             },
@@ -2700,6 +2782,7 @@ const goBack = () => {
 // 加载章节列表（第一页）
 const loadChapters = async () => {
     isLoadingChapters.value = true
+    chapterListFailed.value = false
     chapterPageNum.value = 1
     hasMoreChapters.value = true
     try {
@@ -2719,6 +2802,7 @@ const loadChapters = async () => {
             await selectChapter(chapters.value[0].id)
         }
     } catch (error) {
+        chapterListFailed.value = true
         ElMessage.error('加载章节列表失败')
     } finally {
         isLoadingChapters.value = false
@@ -3016,6 +3100,8 @@ const addChapter = async () => {
             }
             // 新创建的章节插入到列表头部（倒序排列）
             chapters.value.unshift(res.data)
+            chapterTotal.value++
+            editorSection.value = 'content'
             showCreateChapter.value = false
             await selectChapter(res.data.id)
             ElMessage.success('章节创建成功')
@@ -3133,6 +3219,7 @@ const confirmDeleteChapter = (chapter: Chapter) => {
                 const index = chapters.value.findIndex((c) => c.id === chapter.id)
                 if (index !== -1) {
                     chapters.value.splice(index, 1)
+                    chapterTotal.value = Math.max(0, chapterTotal.value - 1)
                 }
                 if (currentChapterId.value === chapter.id) {
                     // 如果删除的是当前章节，切换到其他章节
@@ -3140,6 +3227,7 @@ const confirmDeleteChapter = (chapter: Chapter) => {
                         await selectChapter(chapters.value[0].id)
                     } else {
                         currentChapterId.value = ''
+                        chapterTitle.value = ''
                         chapterContent.value = ''
                         chapterOutline.value = ''
                     }
@@ -3300,7 +3388,8 @@ const regenerateContent = async () => {
 const toggleFocusMode = () => {
     isFocusMode.value = !isFocusMode.value
     if (isFocusMode.value) {
-        ElMessage.success('已进入专注模式，本章大纲已收起')
+        editorSection.value = 'content'
+        ElMessage.success('已进入专注模式')
     } else {
         ElMessage.info('已退出专注模式')
     }
@@ -3614,7 +3703,7 @@ const sortedChatSessions = computed(() => {
  */
 const handleStopChat = async () => {
     if (!activeChatStream) return
-    const {controller, sessionId, reply} = activeChatStream
+    const { controller, sessionId, reply } = activeChatStream
     const partialContent = reply.content
 
     // 中断 SSE 流
@@ -3731,7 +3820,7 @@ const sendChatMessage = async () => {
             },
         },
     )
-    activeChatStream = {controller, sessionId, reply, messages: chatMessages.value, hasMore: chatHasMore.value}
+    activeChatStream = { controller, sessionId, reply, messages: chatMessages.value, hasMore: chatHasMore.value }
 }
 
 // ==================== 工具执行事件相关常量 ====================
@@ -3894,7 +3983,7 @@ const getCharacterRelations = (characterId: string): NovelCharacterRelation[] =>
 const initMiniGraph = () => {
     if (!miniGraphRef.value) return
 
-    miniChartInstance = echarts.init(miniGraphRef.value)
+    miniChartInstance = initCharacterChart(miniGraphRef.value)
 
     const nodes = characterData.value.map((char) => ({
         id: String(char.id),
@@ -3927,7 +4016,7 @@ const initMiniGraph = () => {
         }
     })
 
-    const option: echarts.EChartsOption = {
+    const option: EChartsOption = {
         tooltip: {
             trigger: 'item',
             renderMode: 'richText',
@@ -3935,7 +4024,7 @@ const initMiniGraph = () => {
                 if (Array.isArray(params) || !params.data || typeof params.data !== 'object') return ''
                 if (params.dataType === 'node' && 'id' in params.data) {
                     const charId = params.data.id
-                    const character = characterData.value.find(item => item.id === charId)
+                    const character = characterData.value.find((item) => item.id === charId)
                     if (!character) return params.name
                     return [character.name, getRoleLabel(character.roleType), character.identity, '点击查看详情']
                         .filter(Boolean)
@@ -4631,6 +4720,7 @@ watch(selectedCharacters, handleOutlineChange, { deep: true })
  * 如果正在流式输出，中断请求（后端 doOnCancel 会自动保存已生成内容）
  */
 const handleBeforeUnload = () => {
+    if (currentChapterId.value && (hasUnsavedChanges.value || hasOutlineUnsavedChanges.value)) saveDraftToLocal()
     if (activeChatStream) {
         activeChatStream.controller.abort()
         activeChatStream = null
@@ -4716,7 +4806,9 @@ const userAgentList = computed(() => {
  * 加载设置面板数据（Agent 列表 + Agent 配置 + 小说设置）
  */
 const loadSettingsPanel = async () => {
+    const request = ++settingsLoadRequest
     isLoadingSettings.value = true
+    settingsReady.value = false
     try {
         // 并行加载 Agent 列表、Agent 配置和小说级别配置
         const [agentList, agentRes, settingsRes] = await Promise.all([
@@ -4724,29 +4816,18 @@ const loadSettingsPanel = async () => {
             getNovelAgentConfig(novelId),
             getNovelLevelSettings(novelId),
         ])
+        const settings = settingsRes.data ?? (await getEffectiveSettings(novelId)).data
+        if (request !== settingsLoadRequest) return
         agents.value = agentList
-        if (agentRes.data) {
-            agentConfig.value = agentRes.data
-        }
-        if (settingsRes.data) {
-            // 小说有自身配置，直接使用
-            novelSettingsForm.value = settingsRes.data
-            hasOwnSettings.value = true
-        } else {
-            // 小说没有自身配置，加载有效配置（合并后的结果）展示
-            hasOwnSettings.value = false
-            try {
-                const effectiveRes = await getEffectiveSettings(novelId)
-                novelSettingsForm.value = effectiveRes.data
-            } catch {
-                novelSettingsForm.value = createDefaultSettings()
-            }
-        }
+        agentConfig.value = agentRes.data ?? { novelId }
+        novelSettingsForm.value = settings
+        hasOwnSettings.value = !!settingsRes.data
+        settingsReady.value = true
     } catch (error) {
         console.error('加载设置面板数据失败:', error)
         ElMessage.error('加载设置失败')
     } finally {
-        isLoadingSettings.value = false
+        if (request === settingsLoadRequest) isLoadingSettings.value = false
     }
 }
 
@@ -4754,6 +4835,7 @@ const loadSettingsPanel = async () => {
  * 保存设置面板数据（Agent 配置 + AI 功能配置）
  */
 const saveSettingsPanel = async () => {
+    if (!settingsReady.value || isSavingSettings.value) return
     isSavingSettings.value = true
     try {
         const agentRequest: NovelAgentConfigRequest = {
@@ -4778,13 +4860,6 @@ const saveSettingsPanel = async () => {
     }
 }
 
-// 页面关闭前保存草稿（含正文和大纲）
-window.addEventListener('beforeunload', () => {
-    if (currentChapterId.value && (hasUnsavedChanges.value || hasOutlineUnsavedChanges.value)) {
-        saveDraftToLocal()
-    }
-})
-
 /**
  * 监听编辑器失焦事件，失焦时立即保存草稿
  */
@@ -4801,12 +4876,12 @@ const handleEditorBlur = () => {
 
 <style scoped>
 .novel-editor-page {
-    height: calc(100vh - 64px);
+    height: auto;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+    background: var(--paper);
     position: fixed;
-    top: 64px;
+    top: var(--shell-height);
     left: 0;
     right: 0;
     bottom: 0;
@@ -4848,7 +4923,7 @@ const handleEditorBlur = () => {
 .novel-title-badge {
     font-size: 15px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     max-width: 260px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4868,13 +4943,13 @@ const handleEditorBlur = () => {
 }
 
 .novel-word-count-badge {
-    background: rgba(26, 115, 232, 0.08);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.08);
+    color: var(--pine);
 }
 
 .novel-chapter-count-badge {
-    background: rgba(102, 126, 234, 0.08);
-    color: #667eea;
+    background: rgba(40, 85, 69, 0.08);
+    color: var(--pine);
 }
 
 /* 右侧：操作按钮 */
@@ -4887,7 +4962,7 @@ const handleEditorBlur = () => {
 
 .back-btn {
     font-size: 16px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 600;
     background: transparent !important;
     border: none !important;
@@ -4895,7 +4970,7 @@ const handleEditorBlur = () => {
 }
 
 .back-btn:hover {
-    color: #1557b0;
+    color: var(--pine-deep);
     background: transparent !important;
 }
 
@@ -4915,7 +4990,7 @@ const handleEditorBlur = () => {
 .chapter-title-input :deep(.el-input__inner) {
     font-size: 14px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
 }
 
 .focus-mode-btn {
@@ -4940,7 +5015,7 @@ const handleEditorBlur = () => {
 
 /* 左侧边栏 */
 .editor-sidebar {
-    width: 280px;
+    width: clamp(200px, 17vw, 280px);
     min-width: 48px;
     flex-shrink: 0;
     background: #fff;
@@ -4988,8 +5063,8 @@ const handleEditorBlur = () => {
 }
 
 .sidebar-expand-btn:hover {
-    color: #1a73e8;
-    background: rgba(26, 115, 232, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 收起状态下的整体容器 */
@@ -5005,8 +5080,8 @@ const handleEditorBlur = () => {
 }
 
 .sidebar-collapsed-content:hover .sidebar-expand-btn {
-    color: #1a73e8;
-    background: rgba(26, 115, 232, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 收起状态下的章节信息区 */
@@ -5047,7 +5122,7 @@ const handleEditorBlur = () => {
     text-orientation: mixed;
     font-size: 11px;
     font-weight: 600;
-    color: #1a73e8;
+    color: var(--pine);
     letter-spacing: 1px;
     line-height: 1.2;
     max-height: 60px;
@@ -5094,7 +5169,7 @@ const handleEditorBlur = () => {
     padding: 0 20px;
     height: 56px;
     border-bottom: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 /* 收起状态下 header 撑满整个侧边栏，作为点击区域 */
@@ -5111,24 +5186,24 @@ const handleEditorBlur = () => {
 .sidebar-title {
     font-size: 15px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
 .sidebar-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
 .tab-item:hover {
-    color: #1a73e8;
+    color: var(--pine);
 }
 
 .tab-item.active {
-    color: #1a73e8;
-    border-bottom: 2px solid #1a73e8;
+    color: var(--pine);
+    border-bottom: 2px solid var(--pine);
 }
 
 .sidebar-content {
@@ -5191,7 +5266,7 @@ const handleEditorBlur = () => {
     align-items: center;
     justify-content: center;
     border-left: 1px solid #ebeef5;
-    background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
     padding: 8px 0;
     overflow: hidden;
     gap: 4px;
@@ -5272,24 +5347,24 @@ const handleEditorBlur = () => {
     border-left: 3px solid transparent;
     margin: 8px 12px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #f0f4f8 100%);
+    background: var(--paper);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     border: 1px solid #e8eaed;
     overflow: hidden;
 }
 
 .chapter-item:hover {
-    background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+    background: var(--surface);
     transform: translateX(3px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-color: #d0d7de;
 }
 
 .chapter-item.active {
-    background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
-    border-left-color: #1a73e8;
+    background: var(--sage);
+    border-left-color: var(--pine);
     border-color: #aecbfa;
-    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.2);
 }
 
 /* 拖拽排序样式 */
@@ -5301,7 +5376,7 @@ const handleEditorBlur = () => {
 }
 
 .drag-handle:hover {
-    color: #1a73e8;
+    color: var(--pine);
 }
 
 .drag-handle:active {
@@ -5310,12 +5385,12 @@ const handleEditorBlur = () => {
 
 .chapter-drag-ghost {
     opacity: 0.4;
-    background: #e8f0fe;
+    background: var(--sage);
 }
 
 .chapter-drag-chosen {
-    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.3);
-    border-color: #1a73e8;
+    box-shadow: 0 6px 20px rgba(40, 85, 69, 0.3);
+    border-color: var(--pine);
 }
 
 .chapter-content {
@@ -5343,7 +5418,7 @@ const handleEditorBlur = () => {
     font-size: 13px;
     color: #5f6368;
     font-weight: 600;
-    background: rgba(26, 115, 232, 0.1);
+    background: rgba(40, 85, 69, 0.1);
     padding: 2px 8px;
     border-radius: 4px;
     white-space: nowrap;
@@ -5352,7 +5427,7 @@ const handleEditorBlur = () => {
 
 .chapter-name {
     font-size: 15px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -5413,8 +5488,8 @@ const handleEditorBlur = () => {
 
 /* 向量已入库 */
 .status-vector-done {
-    background: rgba(26, 115, 232, 0.12);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.12);
+    color: var(--pine);
 }
 
 /* 向量未入库 */
@@ -5430,8 +5505,8 @@ const handleEditorBlur = () => {
 }
 
 .status-clickable:hover {
-    background: rgba(26, 115, 232, 0.15);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.15);
+    color: var(--pine);
     transform: scale(1.05);
 }
 
@@ -5500,7 +5575,8 @@ const handleEditorBlur = () => {
 
 /* 中间大纲面板 */
 .outline-panel {
-    min-width: 300px;
+    max-width: 26vw;
+    min-width: 220px;
     max-width: 700px;
     flex-shrink: 1;
     background: #fff;
@@ -5522,12 +5598,12 @@ const handleEditorBlur = () => {
     border-bottom: 1px solid #f0f0f0;
     font-size: 15px;
     font-weight: 600;
-    color: #202124;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    color: var(--ink);
+    background: var(--paper);
 }
 
 .outline-header .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -5578,7 +5654,7 @@ const handleEditorBlur = () => {
 }
 
 .section-label .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 16px;
 }
 
@@ -5604,9 +5680,9 @@ const handleEditorBlur = () => {
 }
 
 .outline-textarea :deep(.el-textarea__inner:focus) {
-    border-color: #1a73e8;
+    border-color: var(--pine);
     background: #fff;
-    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+    box-shadow: 0 0 0 2px rgba(40, 85, 69, 0.1);
 }
 
 .full-width {
@@ -5678,7 +5754,7 @@ const handleEditorBlur = () => {
 }
 
 .collapse-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 16px;
 }
 
@@ -5713,18 +5789,18 @@ const handleEditorBlur = () => {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     border: none;
     height: 40px;
     border-radius: 8px;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
     transition: all 0.3s;
 }
 
 .ai-continue-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
 }
 
 .ai-icon {
@@ -5761,20 +5837,20 @@ const handleEditorBlur = () => {
     padding: 0 24px;
     height: 56px;
     border-bottom: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 .content-title {
     font-size: 16px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .content-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -5800,8 +5876,8 @@ const handleEditorBlur = () => {
 }
 
 .clean-blank-btn:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.06);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.06);
 }
 
 /* 背景色选择器 */
@@ -5824,8 +5900,8 @@ const handleEditorBlur = () => {
 }
 
 .bg-color-btn:hover {
-    border-color: #1a73e8;
-    box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
+    border-color: var(--pine);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.2);
 }
 
 .bg-color-options {
@@ -5861,12 +5937,12 @@ const handleEditorBlur = () => {
 }
 
 .bg-color-option.active {
-    border-color: #1a73e8;
+    border-color: var(--pine);
 }
 
 .check-icon {
     font-size: 12px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: bold;
 }
 
@@ -5878,25 +5954,25 @@ const handleEditorBlur = () => {
 }
 
 .save-btn-saved {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
 }
 
 .save-btn-saved:hover {
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+    background: var(--pine-deep);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
 }
 
 .save-btn-unsaved {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: var(--el-color-danger);
     color: #fff;
     box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
 }
 
 .save-btn-unsaved:hover {
-    background: linear-gradient(135deg, #e082e0 0%, #e04660 100%);
+    background: #87392e;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
 }
@@ -5928,7 +6004,7 @@ const handleEditorBlur = () => {
     justify-content: space-between;
     padding: 14px 24px;
     border-top: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 .footer-left {
@@ -5964,9 +6040,9 @@ const handleEditorBlur = () => {
 }
 
 .footer-action-btn:hover {
-    color: #667eea;
-    border-color: #667eea;
-    background: rgba(102, 126, 234, 0.04);
+    color: var(--pine);
+    border-color: var(--pine);
+    background: rgba(40, 85, 69, 0.04);
 }
 
 /* 右侧功能区（活动栏 + 内容面板） */
@@ -5976,7 +6052,7 @@ const handleEditorBlur = () => {
     min-width: 48px;
     background: #fff;
     border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 12px rgba(40, 85, 69, 0.06);
     border: 1px solid #eef0f8;
     overflow: hidden;
 }
@@ -5990,7 +6066,7 @@ const handleEditorBlur = () => {
     padding: 12px 0;
     gap: 4px;
     border-left: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #f5f6fc 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
@@ -6007,17 +6083,18 @@ const handleEditorBlur = () => {
 }
 
 .activity-icon:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 .activity-icon.active {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.12);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.12);
 }
 
 /* 内容面板（去掉独立边框，融入 function-area） */
 .function-panel {
+    max-width: 28vw;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -6032,14 +6109,14 @@ const handleEditorBlur = () => {
     padding: 0 12px 0 16px;
     height: 44px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
 .panel-title-text {
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     letter-spacing: 0.3px;
 }
 
@@ -6125,13 +6202,13 @@ const handleEditorBlur = () => {
 .inline-history-item:hover {
     border-color: #d8ddf5;
     background: #f8f9fe;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
 }
 
 .inline-history-item.active {
-    border-color: rgba(102, 126, 234, 0.3);
-    background: rgba(102, 126, 234, 0.06);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    border-color: rgba(40, 85, 69, 0.3);
+    background: rgba(40, 85, 69, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.1);
 }
 
 /* 发布标记 */
@@ -6170,8 +6247,8 @@ const handleEditorBlur = () => {
     border-bottom: 1px solid #f0f0f5;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    color: var(--ink);
+    background: var(--paper);
 }
 
 .inline-version-preview .preview-content {
@@ -6188,7 +6265,7 @@ const handleEditorBlur = () => {
     font-family: inherit;
     font-size: 13px;
     line-height: 1.6;
-    color: #303133;
+    color: var(--ink);
 }
 
 /* AI 问答内嵌面板 */
@@ -6198,7 +6275,7 @@ const handleEditorBlur = () => {
     gap: 4px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
     min-height: 48px;
 }
@@ -6271,14 +6348,14 @@ const handleEditorBlur = () => {
     justify-content: center;
     cursor: pointer;
     z-index: 10;
-    color: #667eea;
+    color: var(--pine);
     transition: all 0.2s ease;
     border: 1px solid #e8e8f0;
 
     &:hover {
-        background: #667eea;
+        background: var(--pine);
         color: #fff;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        box-shadow: 0 4px 12px rgba(40, 85, 69, 0.35);
     }
 }
 
@@ -6310,7 +6387,7 @@ const handleEditorBlur = () => {
 }
 
 .chat-message.user .message-text {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border-radius: 12px 12px 2px 12px;
 }
@@ -6338,7 +6415,7 @@ const handleEditorBlur = () => {
     font-size: 13px;
     line-height: 1.6;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-    color: #303133;
+    color: var(--ink);
 }
 
 /* AI 回复 Markdown 渲染样式 */
@@ -6419,7 +6496,7 @@ const handleEditorBlur = () => {
 }
 
 .ai-markdown-content :deep(blockquote) {
-    border-left: 3px solid #667eea;
+    border-left: 3px solid var(--pine);
     padding: 4px 12px;
     margin: 6px 0;
     color: #6b7280;
@@ -6469,7 +6546,7 @@ const handleEditorBlur = () => {
 }
 
 .copy-message-btn:hover {
-    color: #667eea;
+    color: var(--pine);
     background: #f0f1ff;
 }
 
@@ -6489,8 +6566,8 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-btn:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 微信风格撤回提示（居中灰色小字） */
@@ -6655,7 +6732,7 @@ const handleEditorBlur = () => {
 }
 
 .restore-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border: none;
     font-size: 12px;
@@ -6686,8 +6763,8 @@ const handleEditorBlur = () => {
     gap: 10px;
     font-size: 18px;
     font-weight: 600;
-    color: #1a73e8;
-    background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
+    color: var(--pine);
+    background: var(--sage);
     padding: 10px 28px;
     border-radius: 10px;
     border: 1px solid #aecbfa;
@@ -6736,7 +6813,7 @@ const handleEditorBlur = () => {
     z-index: 5;
     background: #fff;
     border-bottom: 1px solid #eef0f8;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 4px 16px rgba(40, 85, 69, 0.1);
     max-height: 50%;
     overflow-y: auto;
 }
@@ -6747,7 +6824,7 @@ const handleEditorBlur = () => {
     justify-content: space-between;
     padding: 12px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
 }
 
 .inline-detail-avatar {
@@ -6765,7 +6842,7 @@ const handleEditorBlur = () => {
 .detail-name-text {
     font-size: 16px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
 }
 
 .inline-detail-body {
@@ -6797,12 +6874,12 @@ const handleEditorBlur = () => {
     transition: background 0.2s ease;
 
     &:hover {
-        background: rgba(102, 126, 234, 0.06);
+        background: rgba(40, 85, 69, 0.06);
     }
 }
 
 .inline-relation-name {
-    color: #303133;
+    color: var(--ink);
     font-weight: 500;
 }
 
@@ -6823,7 +6900,7 @@ const handleEditorBlur = () => {
 }
 
 .goto-edit-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -6871,7 +6948,7 @@ const handleEditorBlur = () => {
 .inline-info-value {
     font-size: 13px;
     font-weight: 500;
-    color: #303133;
+    color: var(--ink);
 }
 
 /* 详情分区 */
@@ -6888,7 +6965,7 @@ const handleEditorBlur = () => {
 
 .inline-section-text {
     font-size: 13px;
-    color: #303133;
+    color: var(--ink);
     line-height: 1.6;
     padding: 6px 10px;
     background: #f8f9fe;
@@ -6928,7 +7005,7 @@ const handleEditorBlur = () => {
     background: #f0f7ff;
     border-radius: 8px;
     font-size: 13px;
-    color: #1a73e8;
+    color: var(--pine);
     line-height: 1.5;
 }
 
@@ -6943,7 +7020,7 @@ const handleEditorBlur = () => {
     border-radius: 8px;
     font-size: 14px;
     line-height: 1.8;
-    color: #202124;
+    color: var(--ink);
 }
 
 /* AI 审核结果弹窗 */
@@ -6983,7 +7060,7 @@ const handleEditorBlur = () => {
 .issues-title {
     margin: 0 0 16px 0;
     font-size: 16px;
-    color: #202124;
+    color: var(--ink);
     font-weight: 600;
 }
 
@@ -7032,7 +7109,7 @@ const handleEditorBlur = () => {
 }
 
 .config-section .section-label .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -7063,7 +7140,7 @@ const handleEditorBlur = () => {
 .slider-value {
     text-align: center;
     font-size: 14px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 500;
     margin-top: 4px;
 }
@@ -7131,7 +7208,7 @@ const handleEditorBlur = () => {
 .suggestion-content {
     flex: 1;
     line-height: 1.6;
-    color: #202124;
+    color: var(--ink);
 }
 
 .audit-actions {
@@ -7156,7 +7233,7 @@ const handleEditorBlur = () => {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+    background: #f3ecd9;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7165,7 +7242,7 @@ const handleEditorBlur = () => {
 .resync-chapter-title {
     font-size: 17px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
 }
 
 .resync-desc {
@@ -7273,7 +7350,7 @@ const handleEditorBlur = () => {
 }
 
 .markdown-rendered-content :deep(blockquote) {
-    border-left: 3px solid #667eea;
+    border-left: 3px solid var(--pine);
     padding: 4px 12px;
     margin: 8px 0;
     background: #f8f9fe;
@@ -7323,15 +7400,15 @@ const handleEditorBlur = () => {
         background-color: #818cf8;
         height: 36px;
         margin-top: -18px;
-        box-shadow: 0 0 4px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 0 4px rgba(40, 85, 69, 0.3);
     }
 
     &:active::before,
     &:active::after {
-        background-color: #6366f1;
+        background-color: var(--pine);
         height: 40px;
         margin-top: -20px;
-        box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+        box-shadow: 0 0 6px rgba(40, 85, 69, 0.5);
     }
 }
 
@@ -7349,7 +7426,7 @@ const handleEditorBlur = () => {
     gap: 6px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
@@ -7369,14 +7446,14 @@ const handleEditorBlur = () => {
     user-select: none;
 
     &:hover {
-        color: #667eea;
-        background: rgba(102, 126, 234, 0.06);
+        color: var(--pine);
+        background: rgba(40, 85, 69, 0.06);
     }
 
     &.active {
-        color: #667eea;
-        background: rgba(102, 126, 234, 0.1);
-        border-color: rgba(102, 126, 234, 0.2);
+        color: var(--pine);
+        background: rgba(40, 85, 69, 0.1);
+        border-color: rgba(40, 85, 69, 0.2);
     }
 }
 
@@ -7416,7 +7493,7 @@ const handleEditorBlur = () => {
 
     &:hover {
         border-color: #d8ddf5;
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+        box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
     }
 
     &:last-child {
@@ -7430,7 +7507,7 @@ const handleEditorBlur = () => {
     gap: 6px;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     margin-bottom: 10px;
 }
 
@@ -7473,7 +7550,7 @@ const handleEditorBlur = () => {
     gap: 7px;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid #f0f0f5;
@@ -7516,7 +7593,7 @@ const handleEditorBlur = () => {
 
 .setting-label {
     font-size: 13px;
-    color: #303133;
+    color: var(--ink);
     font-weight: 500;
 }
 
@@ -7574,7 +7651,7 @@ const handleEditorBlur = () => {
     height: 16px;
     padding: 0 4px;
     border-radius: 8px;
-    background: #667eea;
+    background: var(--pine);
     color: #fff;
     font-size: 10px;
     font-weight: 600;
@@ -7609,7 +7686,7 @@ const handleEditorBlur = () => {
     border-color: #d8ddf5;
     border-left-color: #f59e0b;
     background: #f8f9fe;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
 }
 
 /* 已采纳卡片：绿色竖条 */
@@ -7645,7 +7722,7 @@ const handleEditorBlur = () => {
 
 /* 未读卡片：紫蓝色竖条覆盖 */
 .annotation-list-item.is-unread {
-    border-left-color: #667eea;
+    border-left-color: var(--pine);
     background: #f8f9fe;
 }
 
@@ -7665,7 +7742,7 @@ const handleEditorBlur = () => {
 .annotation-list-author {
     font-size: 12px;
     font-weight: 600;
-    color: #667eea;
+    color: var(--pine);
 }
 
 .annotation-list-time {
@@ -7735,7 +7812,7 @@ const handleEditorBlur = () => {
 
 .annotation-list-content {
     font-size: 12px;
-    color: #303133;
+    color: var(--ink);
     line-height: 1.5;
     margin-bottom: 6px;
     display: -webkit-box;
@@ -7757,7 +7834,7 @@ const handleEditorBlur = () => {
     border: 1px solid #d8ddf5;
     border-radius: 4px;
     background: #eef0ff;
-    color: #667eea;
+    color: var(--pine);
     font-size: 11px;
     cursor: pointer;
     transition: all 0.15s;
@@ -7798,6 +7875,157 @@ const handleEditorBlur = () => {
 .ignore-btn:hover {
     background: #e8e8e8;
     border-color: #d0d0d0;
+}
+
+/* 窄屏一次呈现一个编辑区域，保留各面板的本地编辑状态。 */
+.no-chapter {
+    margin: auto;
+    text-align: center;
+    padding: 20px;
+}
+
+.no-chapter h2 {
+    font: 600 23px/1.5 var(--display-font);
+    margin-bottom: 18px;
+}
+
+.editor-sections {
+    display: none;
+}
+
+.activity-icon {
+    border: 0;
+    background: transparent;
+}
+
+.focused .editor-sidebar,
+.focused .function-area,
+.focused .panel-divider-handle {
+    display: none;
+}
+
+.focused .content-panel {
+    width: min(100%, 980px);
+    flex: 0 1 980px;
+    margin-inline: auto;
+}
+
+@media (max-width: 1100px) {
+    .editor-sections {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        padding: 5px;
+        background: var(--surface);
+    }
+
+    .editor-sections button {
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        padding: 6px 14px;
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .editor-sections button[aria-pressed='true'] {
+        background: var(--sage);
+        color: var(--pine);
+        font-weight: 650;
+    }
+
+    .editor-body {
+        padding: 8px;
+        min-height: 0;
+    }
+
+    .editor-body .panel-divider-handle,
+    .editor-body:not([data-section='chapters']) .editor-sidebar,
+    .editor-body:not([data-section='outline']) .outline-panel,
+    .novel-editor-page:not(.focused) .editor-body:not([data-section='content']) .content-panel,
+    .editor-body:not([data-section='tools']) .function-area {
+        display: none;
+    }
+
+    .editor-body > .editor-sidebar,
+    .editor-body > .outline-panel,
+    .editor-body > .function-area {
+        flex: 1 1 0;
+        max-width: none;
+        min-width: 0;
+    }
+
+    .function-panel {
+        flex: 1;
+        max-width: none;
+        min-width: 0;
+    }
+
+    .activity-bar {
+        margin-left: auto;
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 700px) {
+    .editor-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .header-center {
+        grid-area: 1 / 1;
+        min-width: 0;
+    }
+
+    .novel-word-count-badge,
+    .novel-chapter-count-badge {
+        display: none;
+    }
+
+    .header-left {
+        grid-area: 2 / 1 / 3 / 3;
+        gap: 8px;
+    }
+
+    .header-right {
+        grid-area: 1 / 2;
+        gap: 4px;
+    }
+
+    .header-right .el-button + .el-button {
+        margin-left: 0;
+    }
+
+    .chapter-title-input {
+        flex: 1;
+        max-width: none;
+    }
+
+    .content-header,
+    .content-footer {
+        padding: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .content-header {
+        height: auto;
+        min-height: 52px;
+    }
+
+    .content-actions,
+    .footer-left {
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .content-body {
+        padding: 4px;
+    }
 }
 </style>
 
@@ -7847,13 +8075,13 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-box .revoke-confirm-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background: var(--pine) !important;
     border: none !important;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
 }
 
 .revoke-message-box .revoke-confirm-btn:hover {
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
     transform: translateY(-1px);
 }
 
@@ -7862,6 +8090,6 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-box .revoke-cancel-btn:hover {
-    color: #1a73e8 !important;
+    color: var(--pine) !important;
 }
 </style>
