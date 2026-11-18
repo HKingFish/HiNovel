@@ -24,12 +24,13 @@ public interface LlmProviderQueryPort {
     LlmProvider getWithDecryptedKey(Long id);
 
     /**
-     * 查询所有已激活的 LLM 提供方（包含解密的 API Key）。
+     * 查询指定用户已激活的 LLM 提供方（包含解密的 API Key）。
      *
      * 用于 failover 场景，当首选 Provider 不可用时，
      * 从激活列表中选择备选 Provider。
      *
+     * @param userId 所属用户 ID
      * @return 已激活的提供方列表
      */
-    List<LlmProvider> listActiveProviders();
+    List<LlmProvider> listActiveProviders(Long userId);
 }

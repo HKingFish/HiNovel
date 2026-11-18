@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.novel.domain.entity.NovelMemo;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelMemoMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,12 @@ public class NovelMemoService {
     private NovelMemoMapper novelMemoMapper;
 
     /**
+     * 小说归属校验。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
+
+    /**
      * 获取指定用户的小说创作手记。
      *
      * @param novelId 小说 ID
@@ -32,6 +39,7 @@ public class NovelMemoService {
      * @return 手记，不存在时返回 null
      */
     public NovelMemo getMemo(Long novelId, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
         return novelMemoMapper.selectByNovelIdAndUserId(novelId, userId);
     }
 
@@ -44,13 +52,13 @@ public class NovelMemoService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void saveMemo(Long novelId, Long userId, String content) {
-        NovelMemo memo = novelMemoMapper.selectByNovelIdAndUserId(novelId, userId);
+        NovelMemo memo = getMemo(novelId, userId);
         if (memo == null) {
             memo = NovelMemo.builder()
-                    .novelId(novelId)
-                    .userId(userId)
-                    .content(content)
-                    .build();
+                .novelId(novelId)
+                .userId(userId)
+                .content(content)
+                .build();
             novelMemoMapper.insert(memo);
         } else {
             memo.setContent(content);

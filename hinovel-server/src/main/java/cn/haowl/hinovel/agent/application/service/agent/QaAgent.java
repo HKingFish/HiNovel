@@ -15,10 +15,19 @@ import cn.haowl.hinovel.agent.infrastructure.tool.NovelCharacterTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelContentRetrievalTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.NovelCreationTool;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
-import cn.haowl.hinovel.agent.interfaces.dto.*;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
 import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
-import cn.haowl.hinovel.novel.application.service.*;
+import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
+import cn.haowl.hinovel.novel.application.service.ChapterService;
+import cn.haowl.hinovel.novel.application.service.NovelChapterService;
+import cn.haowl.hinovel.novel.application.service.NovelCharacterService;
+import cn.haowl.hinovel.novel.application.service.NovelService;
+import cn.haowl.hinovel.novel.application.service.NovelSettingsService;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -28,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
@@ -39,6 +49,9 @@ import java.util.regex.Pattern;
 
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.CHAT_SESSION_NOT_EXISTS;
 import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
+import static cn.haowl.hinovel.common.constant.CommonConstants.MAX_PAGE_SIZE;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_INVALID;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
@@ -92,6 +105,11 @@ public class QaAgent {
     @Autowired
     private ChatMessageMapper chatMessageMapper;
     /**
+     * 流式回调独立执行，写入消息时开启短事务。
+     */
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+    /**
      * 小说有效配置。
      */
     @Autowired
@@ -102,6 +120,12 @@ public class QaAgent {
      */
     @Autowired
     private NovelChapterService novelChapterService;
+
+    /**
+     * 共享章节创建和查询用例。
+     */
+    @Autowired
+    private ChapterService chapterService;
     /**
      * 章节大纲查询。
      */
@@ -129,9 +153,11 @@ public class QaAgent {
      * 获取小说的会话列表。
      *
      * @param novelId 小说 ID
+     * @param userId 当前用户 ID
      * @return 会话列表（按创建时间倒序）
      */
-    public List<ChatSession> listSessions(Long novelId) {
+    public List<ChatSession> listSessions(Long novelId, Long userId) {
+        novelService.getNovelById(userId, novelId);
         return chatSessionMapper.selectByNovelId(novelId);
     }
 
@@ -140,13 +166,13 @@ public class QaAgent {
      *
      * @param novelId 小说 ID
      * @param title   会话标题
+     * @param userId 当前用户 ID
      * @return 新创建的会话
      */
     @Transactional(rollbackFor = Exception.class)
-    public ChatSession createSession(Long novelId, String title) {
-        ChatSession session = new ChatSession();
-        session.setNovelId(novelId);
-        session.setTitle(title != null && !title.isBlank() ? title : "新对话");
+    public ChatSession createSession(Long novelId, String title, Long userId) {
+        novelService.getNovelById(userId, novelId);
+        ChatSession session = ChatSession.create(novelId, title);
         chatSessionMapper.insert(session);
         log.info("[createSession][创建问答会话，小说ID={}，会话ID={}]", novelId, session.getId());
         return session;
@@ -156,9 +182,12 @@ public class QaAgent {
      * 删除会话及其所有消息。
      *
      * @param sessionId 会话 ID
+     * @param userId 当前用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteSession(Long sessionId) {
+    public void deleteSession(Long sessionId, Long userId) {
+        lockSession(sessionId, userId);
+        chatMessageMapper.deleteBySessionId(sessionId);
         chatSessionMapper.deleteById(sessionId);
         log.info("[deleteSession][删除问答会话，会话ID={}]", sessionId);
     }
@@ -168,13 +197,11 @@ public class QaAgent {
      *
      * @param sessionId 会话 ID
      * @param title     新标题
+     * @param userId 当前用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void renameSession(Long sessionId, String title) {
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null) {
-            throw new IllegalArgumentException("会话不存在，ID=" + sessionId);
-        }
+    public void renameSession(Long sessionId, String title, Long userId) {
+        ChatSession session = lockSession(sessionId, userId);
         session.updateTitle(title);
         chatSessionMapper.updateById(session);
         log.info("[renameSession][重命名问答会话，会话ID={}]", sessionId);
@@ -184,18 +211,17 @@ public class QaAgent {
      * 切换会话收藏状态。
      *
      * @param sessionId 会话 ID
+     * @param userId 当前用户 ID
      * @return 切换后的收藏状态（true=已收藏）
      */
     @Transactional(rollbackFor = Exception.class)
-    public boolean toggleFavorite(Long sessionId) {
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null) {
-            throw new IllegalArgumentException("会话不存在，ID=" + sessionId);
-        }
+    public boolean toggleFavorite(Long sessionId, Long userId) {
+        ChatSession session = lockSession(sessionId, userId);
         session.toggleFavorite();
         chatSessionMapper.updateById(session);
-        log.info("[toggleFavorite][切换问答会话收藏状态，会话ID={}，收藏={}]", sessionId, session.hasFavorited());
-        return session.hasFavorited();
+        boolean favorited = session.hasFavorited();
+        log.info("[toggleFavorite][切换问答会话收藏状态，会话ID={}，收藏={}]", sessionId, favorited);
+        return favorited;
     }
 
     /**
@@ -235,14 +261,18 @@ public class QaAgent {
         requireSession(sessionId, null, query.getUserId());
 
         int pageSize = query.getPageSize();
-        List<ChatMessage> messages = chatMessageMapper.selectPageByCursor(
-            sessionId, query.getCursorId(), pageSize);
+        if (pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+            throw exception(PARAM_INVALID, "pageSize");
+        }
+        List<ChatMessage> messages =
+            chatMessageMapper.selectPageByCursor(sessionId, query.getCursorId(), pageSize + 1);
+
+        // 多取的一条在最前面，用于区分恰好取满最后一页和仍有更早消息。
+        boolean hasMore = messages.size() > pageSize;
         List<ChatMessageResponse> responseList = messages.stream()
+            .skip(hasMore ? 1 : 0)
             .map(ChatMessageResponse::fromEntity)
             .toList();
-
-        // 取满一页时，允许客户端继续请求更早的消息。
-        boolean hasMore = messages.size() >= pageSize;
         return new ChatMessagePageResponse(responseList, hasMore);
     }
 
@@ -252,13 +282,16 @@ public class QaAgent {
      * 将指定消息标记为已撤回，撤回后的消息在后续问答中不会发送给 LLM。
      *
      * @param messageId 消息 ID
+     * @param userId 当前用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void revokeMessage(Long messageId) {
+    public void revokeMessage(Long messageId, Long userId) {
         ChatMessage message = chatMessageMapper.selectById(messageId);
         if (message == null) {
-            throw new IllegalArgumentException("消息不存在，ID=" + messageId);
+            throw exception(NOT_FOUND);
         }
+        requireSession(
+            chatSessionMapper.selectByIdForUpdate(message.getSessionId()), message.getNovelId(), userId);
         message.revoke();
         chatMessageMapper.updateById(message);
         log.info("[revokeMessage][撤回问答消息，消息ID={}，会话ID={}]", messageId, message.getSessionId());
@@ -304,11 +337,14 @@ public class QaAgent {
                     callContext,
                     true,
                     NovelContentRetrievalTool.create(vectorStoreFactory, novelId, userId),
-                    NovelCreationTool.create(novelId, novelChapterService, chapterOutlineService),
+                    new NovelCreationTool(
+                        novelId, userId, novelChapterService, chapterService, chapterOutlineService),
                     NovelCharacterTool.create(novelId, novelCharacterService));
 
             // 先保存用户消息，回复流中途中断时也能在会话中看到原问题。
-            saveMessage(ChatMessage.createUserMessage(sessionId, novelId, question), userId, null);
+            if (!saveMessage(ChatMessage.createUserMessage(sessionId, novelId, question), userId, null)) {
+                throw exception(CHAT_SESSION_NOT_EXISTS);
+            }
             String modelPrompt = needsDefaultSkill(callContext, question, chatHistory)
                 ? aiServiceFactory.writingPrompt(callContext, userPrompt) : userPrompt;
             ChatEvent<SkillLoadedData> defaultLoad = skillLoadedEvent(skillTool);
@@ -416,22 +452,44 @@ public class QaAgent {
     /**
      * 校验会话属于当前用户可访问的小说。
      */
-    private void requireSession(Long sessionId, Long novelId, Long userId) {
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null || (novelId != null && !novelId.equals(session.getNovelId()))) {
+    private ChatSession requireSession(Long sessionId, Long novelId, Long userId) {
+        return requireSession(chatSessionMapper.selectById(sessionId), novelId, userId);
+    }
+
+    /**
+     * 校验已读取会话的小说关联与归属。
+     */
+    private ChatSession requireSession(ChatSession session, Long novelId, Long userId) {
+        if (session == null || (novelId != null && !session.belongsToNovel(novelId))) {
             throw exception(CHAT_SESSION_NOT_EXISTS);
         }
         novelService.getNovelById(userId, session.getNovelId());
+        return session;
+    }
+
+    /**
+     * 校验写入权限并持有会话锁直到当前事务结束。
+     */
+    private ChatSession lockSession(Long sessionId, Long userId) {
+        return requireSession(chatSessionMapper.selectByIdForUpdate(sessionId), null, userId);
     }
 
     /**
      * 保存消息正文和该次回复的成功读取快照。
      */
-    private void saveMessage(ChatMessage message, Long userId, List<String> loadedSkillNames) {
-        message.setCreator(userId);
-        message.setUpdater(userId);
-        message.setLoadedSkillNames(loadedSkillNames);
-        chatMessageMapper.insert(message);
+    private boolean saveMessage(ChatMessage message, Long userId, List<String> loadedSkillNames) {
+        return transactionTemplate.execute(status -> {
+            // 会话可能已在生成期间删除，复用会话行锁确保删除后没有迟到消息。
+            ChatSession session = chatSessionMapper.selectByIdForUpdate(message.getSessionId());
+            if (session == null) {
+                return false;
+            }
+            message.setCreator(userId);
+            message.setUpdater(userId);
+            message.setLoadedSkillNames(loadedSkillNames);
+            chatMessageMapper.insert(message);
+            return true;
+        });
     }
 
     /**
@@ -463,11 +521,7 @@ public class QaAgent {
      */
     private String loadNovelOutlineContent(Long novelId) {
         NovelOutline novelOutline = novelChapterService.getNovelOutline(novelId);
-        if (novelOutline == null || novelOutline.getOutlineContent() == null
-            || novelOutline.getOutlineContent().isBlank()) {
-            return null;
-        }
-        return novelOutline.getOutlineContent();
+        return novelOutline.isEmpty() ? null : novelOutline.getOutlineContent();
     }
 
     /**

@@ -3,16 +3,31 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.ChapterPublishService;
 import cn.haowl.hinovel.common.response.ApiResponse;
+import cn.haowl.hinovel.novel.application.service.ChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
-import cn.haowl.hinovel.novel.interfaces.dto.*;
+import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
+import cn.haowl.hinovel.novel.interfaces.dto.BatchSortRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageResponse;
+import cn.haowl.hinovel.novel.interfaces.dto.PublishChapterResponse;
+import cn.haowl.hinovel.novel.interfaces.dto.UpdateChapterNumberRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.UpdateRemarkRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -33,7 +48,13 @@ public class NovelChapterController {
      * 章节应用服务。
      */
     @Autowired
-    private NovelChapterService chapterService;
+    private NovelChapterService novelChapterService;
+
+    /**
+     * 共享章节创建、查询、删除和恢复用例。
+     */
+    @Autowired
+    private ChapterService chapterService;
 
     /**
      * 章节发布服务。
@@ -50,7 +71,7 @@ public class NovelChapterController {
     @Operation(summary = "获取小说章节列表")
     @GetMapping("/novel/{novelId}")
     public ApiResponse<List<NovelChapter>> getNovelChapters(@PathVariable Long novelId) {
-        return ApiResponse.success(chapterService.getNovelChapters(novelId));
+        return ApiResponse.success(chapterService.listChaptersByNovel(StpUtil.getLoginIdAsLong(), novelId));
     }
 
     /**
@@ -64,9 +85,9 @@ public class NovelChapterController {
     @GetMapping("/novel/{novelId}/page")
     public ApiResponse<ChapterPageResponse> getNovelChaptersPage(
             @PathVariable Long novelId,
-            ChapterPageQuery query) {
+            @Valid ChapterPageQuery query) {
         query.setNovelId(novelId);
-        return ApiResponse.success(chapterService.getNovelChaptersPage(query));
+        return ApiResponse.success(novelChapterService.getNovelChaptersPage(query, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -78,7 +99,7 @@ public class NovelChapterController {
     @Operation(summary = "获取章节详情")
     @GetMapping("/{chapterId}")
     public ApiResponse<NovelChapter> getChapter(@PathVariable Long chapterId) {
-        return ApiResponse.success(chapterService.getChapter(chapterId));
+        return ApiResponse.success(chapterService.getChapterById(StpUtil.getLoginIdAsLong(), chapterId));
     }
 
     /**
@@ -90,7 +111,15 @@ public class NovelChapterController {
     @Operation(summary = "创建章节")
     @PostMapping
     public ApiResponse<NovelChapter> createChapter(@RequestBody NovelChapter chapter) {
-        return ApiResponse.success(chapterService.createChapter(chapter));
+        return ApiResponse.success(
+            chapterService.createChapter(
+                StpUtil.getLoginIdAsLong(),
+                CreateChapterCommand.builder()
+                    .novelId(chapter.getNovelId())
+                    .title(chapter.getTitle())
+                    .content(chapter.getContent())
+                    .sortOrder(chapter.getSortOrder())
+                    .build()));
     }
 
     /**
@@ -105,8 +134,8 @@ public class NovelChapterController {
     public ApiResponse<NovelChapter> updateChapter(
             @PathVariable Long chapterId,
             @RequestBody NovelChapter chapter) {
-        chapter.setId(chapterId);
-        return ApiResponse.success(chapterService.updateChapter(chapter));
+        return ApiResponse.success(
+            novelChapterService.updateChapter(StpUtil.getLoginIdAsLong(), chapterId, chapter));
     }
 
     /**
@@ -118,7 +147,7 @@ public class NovelChapterController {
     @Operation(summary = "删除章节")
     @DeleteMapping("/{chapterId}")
     public ApiResponse<Void> deleteChapter(@PathVariable Long chapterId) {
-        chapterService.deleteChapter(chapterId);
+        chapterService.deleteChapter(StpUtil.getLoginIdAsLong(), chapterId);
         return ApiResponse.success();
     }
 
@@ -161,7 +190,7 @@ public class NovelChapterController {
     @Operation(summary = "获取AI生成的章节大纲")
     @GetMapping("/{chapterId}/ai-outline")
     public ApiResponse<AiOutlineResponse> getAiOutline(@PathVariable Long chapterId) {
-        return ApiResponse.success(chapterService.getAiOutline(chapterId));
+        return ApiResponse.success(novelChapterService.getAiOutline(chapterId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -175,7 +204,7 @@ public class NovelChapterController {
     @Operation(summary = "用AI大纲替换用户大纲")
     @PostMapping("/{chapterId}/replace-outline")
     public ApiResponse<Void> replaceOutlineWithAi(@PathVariable Long chapterId) {
-        chapterService.replaceOutlineWithAi(chapterId);
+        novelChapterService.replaceOutlineWithAi(chapterId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -188,7 +217,7 @@ public class NovelChapterController {
     @Operation(summary = "获取章节历史版本")
     @GetMapping("/{chapterId}/versions")
     public ApiResponse<List<NovelChapterVersion>> getChapterVersions(@PathVariable Long chapterId) {
-        return ApiResponse.success(chapterService.getChapterVersions(chapterId));
+        return ApiResponse.success(novelChapterService.getChapterVersions(chapterId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -203,7 +232,8 @@ public class NovelChapterController {
     public ApiResponse<NovelChapter> restoreChapterVersion(
             @PathVariable Long chapterId,
             @PathVariable Long versionId) {
-        return ApiResponse.success(chapterService.restoreChapterVersion(chapterId, versionId));
+        return ApiResponse.success(
+            chapterService.restoreVersion(StpUtil.getLoginIdAsLong(), chapterId, versionId));
     }
 
     /**
@@ -220,7 +250,8 @@ public class NovelChapterController {
             @PathVariable Long chapterId,
             @PathVariable Long versionId,
             @RequestBody UpdateRemarkRequest request) {
-        chapterService.updateVersionRemark(chapterId, versionId, request.getRemark());
+        novelChapterService.updateVersionRemark(
+            chapterId, versionId, request.getRemark(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -233,7 +264,7 @@ public class NovelChapterController {
     @Operation(summary = "获取小说大纲")
     @GetMapping("/outline/novel/{novelId}")
     public ApiResponse<NovelOutline> getNovelOutline(@PathVariable Long novelId) {
-        return ApiResponse.success(chapterService.getNovelOutline(novelId));
+        return ApiResponse.success(novelChapterService.getNovelOutline(novelId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -245,7 +276,9 @@ public class NovelChapterController {
     @Operation(summary = "保存小说大纲")
     @PostMapping("/outline")
     public ApiResponse<NovelOutline> saveNovelOutline(@RequestBody NovelOutline outline) {
-        return ApiResponse.success(chapterService.saveNovelOutline(outline));
+        return ApiResponse.success(
+            novelChapterService.saveNovelOutline(
+                outline.getNovelId(), outline.getOutlineContent(), StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -260,7 +293,9 @@ public class NovelChapterController {
     public ApiResponse<NovelChapter> updateChapterNumber(
             @PathVariable Long chapterId,
             @RequestBody UpdateChapterNumberRequest request) {
-        return ApiResponse.success(chapterService.updateChapterNumber(chapterId, request.getChapterNumber()));
+        return ApiResponse.success(
+            novelChapterService.updateChapterNumber(
+                chapterId, request.getChapterNumber(), StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -272,7 +307,7 @@ public class NovelChapterController {
     @Operation(summary = "一键重排章节号")
     @PostMapping("/novel/{novelId}/reorder")
     public ApiResponse<Void> reorderChapters(@PathVariable Long novelId) {
-        chapterService.reorderChapters(novelId);
+        novelChapterService.reorderChapters(novelId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -288,7 +323,7 @@ public class NovelChapterController {
     public ApiResponse<Void> batchUpdateSort(
             @PathVariable Long novelId,
             @RequestBody BatchSortRequest request) {
-        chapterService.batchUpdateSort(novelId, request.getChapterIds());
+        novelChapterService.batchUpdateSort(novelId, request.getChapterIds(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 }

@@ -5,6 +5,9 @@ import cn.haowl.hinovel.novel.constant.NovelStatusEnum;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_INVALID;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
 /**
  * 更新小说请求
  */
@@ -34,4 +37,18 @@ public class NovelUpdateRequest {
      * @see NovelStatusEnum
      */
     private String status;
+
+    /**
+     * 将可选的状态编码转换为小说状态。
+     */
+    public NovelStatusEnum parseStatus() {
+        if (status == null) {
+            return null;
+        }
+        try {
+            return NovelStatusEnum.valueOf(status);
+        } catch (IllegalArgumentException ignored) {
+            throw exception(PARAM_INVALID, "小说状态");
+        }
+    }
 }

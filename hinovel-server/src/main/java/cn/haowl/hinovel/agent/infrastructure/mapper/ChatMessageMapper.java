@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -15,6 +16,14 @@ import java.util.List;
  */
 @Mapper
 public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
+
+    /**
+     * 删除指定会话的所有消息。
+     */
+    default void deleteBySessionId(Long sessionId) {
+        delete(new LambdaQueryWrapper<ChatMessage>()
+            .eq(ChatMessage::getSessionId, sessionId));
+    }
 
     /**
      * 根据会话 ID 查询所有消息（含撤回标记，前端展示用，按创建时间正序）。
@@ -47,7 +56,7 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
         wrapper.orderByDesc(ChatMessage::getId)
                 .last(CommonConstants.limitOf(pageSize));
         List<ChatMessage> messages = selectList(wrapper);
-        java.util.Collections.reverse(messages);
+        Collections.reverse(messages);
         return messages;
     }
 
@@ -67,9 +76,10 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
                 .and(w -> w.eq(ChatMessage::getRevoked, CommonConstants.DISABLED)
                         .or().isNull(ChatMessage::getRevoked))
                 .orderByDesc(ChatMessage::getCreateTime)
+                .orderByDesc(ChatMessage::getId)
                 .last(CommonConstants.limitOf(limit)));
         // 反转为正序
-        java.util.Collections.reverse(messages);
+        Collections.reverse(messages);
         return messages;
     }
 }

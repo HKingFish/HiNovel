@@ -11,11 +11,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_ACCESS_DENIED;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_DELETE_FAILED;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_UPLOAD_FAILED;
 
@@ -41,8 +41,7 @@ public class LocalOssProvider implements OssProvider {
         String extension = OssFileUtils.getExtension(file.getOriginalFilename(), OssConstants.DEFAULT_FILE_EXTENSION);
         // 使用 UUID 避免文件名冲突
         String objectKey = bizType + "/" + UUID.randomUUID() + "." + extension;
-        // 转为绝对路径，避免 Windows 下 /data/... 被解析为相对路径
-        Path absolutePath = Paths.get(ossProperties.getLocal().getBasePath(), objectKey).toAbsolutePath();
+        Path absolutePath = resolveStoragePath(objectKey);
         try {
             Files.createDirectories(absolutePath.getParent());
             // 使用 Files.copy 替代 transferTo，避免 Tomcat 工作目录干扰
@@ -60,10 +59,11 @@ public class LocalOssProvider implements OssProvider {
 
     @Override
     public void delete(String fileUrl) {
-        String prefix = ossProperties.getLocal().getAccessUrlPrefix();
-        // 从访问 URL 中提取相对路径
-        String objectKey = fileUrl.replace(prefix + "/", "");
-        Path targetPath = Paths.get(ossProperties.getLocal().getBasePath(), objectKey).toAbsolutePath();
+        String prefix = getAccessUrl("");
+        if (!fileUrl.startsWith(prefix)) {
+            throw exception(OSS_ACCESS_DENIED);
+        }
+        Path targetPath = resolveStoragePath(fileUrl.substring(prefix.length()));
 
         try {
             if (Files.deleteIfExists(targetPath)) {
@@ -80,5 +80,17 @@ public class LocalOssProvider implements OssProvider {
     @Override
     public String getAccessUrl(String objectKey) {
         return ossProperties.getLocal().getAccessUrlPrefix() + "/" + objectKey;
+    }
+
+    /**
+     * 将对象键解析为存储目录下的文件路径。
+     */
+    private Path resolveStoragePath(String objectKey) {
+        Path basePath = Path.of(ossProperties.getLocal().getBasePath()).toAbsolutePath().normalize();
+        Path targetPath = basePath.resolve(objectKey).normalize();
+        if (!targetPath.startsWith(basePath) || basePath.equals(targetPath)) {
+            throw exception(OSS_ACCESS_DENIED);
+        }
+        return targetPath;
     }
 }

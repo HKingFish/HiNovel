@@ -20,6 +20,19 @@ import java.util.List;
 public interface ChapterOutlineMapper extends BaseMapper<ChapterOutline> {
 
     /**
+     * 更新 AI 大纲，并推进版本号以阻止旧快照覆盖。
+     *
+     * @param outlineId 大纲 ID
+     * @param content AI 大纲内容
+     */
+    default void updateAiOutlineContent(Long outlineId, String content) {
+        update(null, new LambdaUpdateWrapper<ChapterOutline>()
+            .eq(ChapterOutline::getId, outlineId)
+            .set(ChapterOutline::getAiOutlineContent, content)
+            .setIncrBy(ChapterOutline::getVersion, 1));
+    }
+
+    /**
      * 根据章节 ID 查询大纲。
      *
      * @param chapterId 章节 ID

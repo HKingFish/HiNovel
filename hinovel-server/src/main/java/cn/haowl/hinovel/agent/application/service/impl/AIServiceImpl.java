@@ -3,9 +3,14 @@ package cn.haowl.hinovel.agent.application.service.impl;
 import cn.haowl.hinovel.agent.application.service.AIService;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
 import cn.haowl.hinovel.agent.application.service.agent.EditorAgent;
-import cn.haowl.hinovel.agent.constant.AgentConstants;
-import cn.haowl.hinovel.agent.constant.AuditAssessmentEnum;
-import cn.haowl.hinovel.agent.interfaces.dto.*;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChapterAuditCommand;
+import cn.haowl.hinovel.agent.interfaces.dto.ChapterRewriteCommand;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
 import cn.haowl.hinovel.novel.application.service.ChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
@@ -14,6 +19,7 @@ import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,12 +27,14 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.UUID;
 
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AUDIT_BATCH_UNAVAILABLE;
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AUDIT_CHAPTER_NOT_EXISTS;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AUDIT_CONTENT_EMPTY;
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.REWRITE_CHAPTER_NOT_EXISTS;
 import static cn.haowl.hinovel.common.constant.CommonConstants.ENABLED;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
 
 /**
  * AI 功能应用服务实现类。
@@ -39,11 +47,6 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 @Slf4j
 @Service
 public class AIServiceImpl implements AIService {
-
-    /**
-     * 章节不存在的统一提示。
-     */
-    private static final String CHAPTER_NOT_EXISTS_MESSAGE = "章节不存在";
 
     /**
      * 作者 Agent。
@@ -81,22 +84,48 @@ public class AIServiceImpl implements AIService {
     @Autowired
     private NovelChapterService novelChapterService;
 
+    /**
+     * 校验 AI 操作所用小说的归属。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
+
     @Override
     public Flux<String> aiRewrite(AIAuthorRequest request, Long userId) {
+        return authorAgentService.streamRewriteChapterByOutline(buildRewriteCommand(request, userId), userId);
+    }
+
+    @Override
+    public AIAuthorResponse aiRegenerate(AIAuthorRequest request, Long userId) {
+        long startTime = System.currentTimeMillis();
+        String content = authorAgentService.rewriteChapterByOutline(buildRewriteCommand(request, userId), userId);
+        AIAuthorResponse response = new AIAuthorResponse();
+        response.setId(UUID.randomUUID().toString());
+        response.setContent(content);
+        response.setWordCount(content.length());
+        response.setProcessingTime(System.currentTimeMillis() - startTime);
+        return response;
+    }
+
+    /**
+     * 加载改写和重新生成共用的章节上下文。
+     */
+    private ChapterRewriteCommand buildRewriteCommand(AIAuthorRequest request, Long userId) {
         Long chapterId = request.getChapterId();
+        if (chapterId == null) {
+            throw exception(REWRITE_CHAPTER_NOT_EXISTS);
+        }
         NovelChapter chapter = chapterService.getById(chapterId);
         if (chapter == null) {
-            log.warn("[aiRewrite][章节不存在，chapterId={}]", chapterId);
+            log.warn("[buildRewriteCommand][章节不存在，chapterId={}]", chapterId);
             throw exception(REWRITE_CHAPTER_NOT_EXISTS);
         }
 
         Long novelId = chapter.getNovelId();
+        novelDomainService.validateOwnership(novelId, userId);
         ChapterOutline outline = buildRewriteOutline(request, chapterId, novelId);
 
-        // 改写的上下文范围使用章节创建者的小说配置。
-        NovelSettings settings =
-            novelSettingsService.getEffectiveSettings(
-                novelId, chapter.getCreator());
+        NovelSettings settings = novelSettingsService.getEffectiveSettings(novelId, userId);
 
         Integer contextChapters = settings.getRewriteContextChapters();
         List<NovelChapter> previousChapters = List.of();
@@ -110,33 +139,38 @@ public class AIServiceImpl implements AIService {
             Integer.valueOf(ENABLED).equals(settings.getRewriteIncludeOutline())
                 ? loadNovelOutlineContent(novelId) : null;
 
-        return authorAgentService.streamRewriteChapterByOutline(
-            ChapterRewriteCommand.builder()
-                .chapter(chapter)
-                .outline(outline)
-                .previousChapters(previousChapters)
-                .novelOutlineContent(novelOutline)
-                .userRequirement(request.getUserRequirement())
-                .build(),
-            userId);
+        return ChapterRewriteCommand.builder()
+            .chapter(chapter)
+            .outline(outline)
+            .previousChapters(previousChapters)
+            .novelOutlineContent(novelOutline)
+            .userRequirement(request.getUserRequirement())
+            .build();
     }
 
     @Override
     public AIAuditorResponse aiAudit(AIAuditorRequest request, Long userId) {
+        if (request.getChapterId() == null) {
+            throw exception(AUDIT_CHAPTER_NOT_EXISTS);
+        }
         NovelChapter chapter = chapterService.getById(request.getChapterId());
         if (chapter == null) {
             throw exception(AUDIT_CHAPTER_NOT_EXISTS);
         }
+        novelDomainService.validateOwnership(chapter.getNovelId(), userId);
 
         // 编辑器传来非空白正文时，审核这份尚未保存的版本。
         if (StringUtils.hasText(request.getContent())) {
             chapter.setContent(request.getContent());
         }
+        if (!StringUtils.hasText(chapter.getContent())) {
+            throw exception(AUDIT_CONTENT_EMPTY);
+        }
 
         ChapterOutline outline = chapterOutlineService.getByChapterId(request.getChapterId());
         NovelSettings settings =
             novelSettingsService.getEffectiveSettings(
-                chapter.getNovelId(), chapter.getCreator());
+                chapter.getNovelId(), userId);
 
         // 开启全文大纲后，优先审核编辑器传来的版本，缺省时读取小说已保存的大纲。
         String novelOutline = null;
@@ -155,31 +189,12 @@ public class AIServiceImpl implements AIService {
     }
 
     @Override
-    public AIAuditBatchResponse aiBatchAudit(AIAuditBatchRequest request) {
+    public AIAuditBatchResponse aiBatchAudit(AIAuditBatchRequest request, Long userId) {
         if (request.getChapterId() == null) {
-            throw exception0(AUDIT_CHAPTER_NOT_EXISTS.getCode(), CHAPTER_NOT_EXISTS_MESSAGE);
+            throw exception(AUDIT_CHAPTER_NOT_EXISTS);
         }
-
-        AIAuditBatchResponse response = new AIAuditBatchResponse();
-        response.setId(AgentConstants.MOCK_BATCH_AUDIT_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
-        response.setOverallAssessment(AuditAssessmentEnum.PASS);
-        response.setSummary(AgentConstants.MOCK_BATCH_AUDIT_SUMMARY);
-        response.setAudits(List.of());
-        return response;
-    }
-
-    @Override
-    public AIAuthorResponse aiRegenerate(AIAuthorRequest request) {
-        if (request.getChapterId() == null) {
-            throw exception0(REWRITE_CHAPTER_NOT_EXISTS.getCode(), CHAPTER_NOT_EXISTS_MESSAGE);
-        }
-
-        AIAuthorResponse response = new AIAuthorResponse();
-        response.setId(AgentConstants.MOCK_REGENERATE_ID_PREFIX + AgentConstants.MOCK_RESPONSE_ID_START);
-        response.setContent(AgentConstants.MOCK_REGENERATE_CONTENT);
-        response.setWordCount(response.getContent().length());
-        response.setProcessingTime(AgentConstants.MOCK_REGENERATE_PROCESSING_TIME_MS);
-        return response;
+        chapterService.getChapterById(userId, request.getChapterId());
+        throw exception(AUDIT_BATCH_UNAVAILABLE);
     }
 
     /**
@@ -222,10 +237,6 @@ public class AIServiceImpl implements AIService {
      */
     private String loadNovelOutlineContent(Long novelId) {
         NovelOutline novelOutline = novelChapterService.getNovelOutline(novelId);
-        if (novelOutline == null || novelOutline.getOutlineContent() == null
-            || novelOutline.getOutlineContent().isBlank()) {
-            return null;
-        }
-        return novelOutline.getOutlineContent();
+        return novelOutline.isEmpty() ? null : novelOutline.getOutlineContent();
     }
 }

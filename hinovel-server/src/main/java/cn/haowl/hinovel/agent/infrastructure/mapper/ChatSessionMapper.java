@@ -16,6 +16,15 @@ import java.util.List;
 public interface ChatSessionMapper extends BaseMapper<ChatSession> {
 
     /**
+     * 在写入事务内锁定会话，协调会话修改、删除和消息落库。
+     */
+    default ChatSession selectByIdForUpdate(Long sessionId) {
+        return selectOne(new LambdaQueryWrapper<ChatSession>()
+            .eq(ChatSession::getId, sessionId)
+            .last("FOR UPDATE"));
+    }
+
+    /**
      * 根据小说 ID 查询会话列表（按创建时间倒序）。
      *
      * @param novelId 小说 ID

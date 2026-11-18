@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.interfaces.dto;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -34,4 +35,18 @@ public class ChapterCreateRequest {
      * 排序号。
      */
     private Integer sortOrder;
+
+    /**
+     * 转换为章节创建参数。
+     *
+     * @return 章节创建命令
+     */
+    public CreateChapterCommand toCommand() {
+        return CreateChapterCommand.builder()
+            .novelId(novelId)
+            .title(title)
+            .content(content)
+            .sortOrder(sortOrder)
+            .build();
+    }
 }

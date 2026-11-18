@@ -11,11 +11,13 @@ import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_INVALID;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
@@ -47,9 +49,10 @@ public class ChapterDomainService {
     private NovelChapterVersionRepository versionRepository;
 
     /**
-     * 版本保留上限。
+     * 小说归属校验。
      */
-    private static final int MAX_VERSION_KEEP_COUNT = 50;
+    @Autowired
+    private NovelDomainService novelDomainService;
 
     // ==================== 章节核心操作 ====================
 
@@ -85,7 +88,7 @@ public class ChapterDomainService {
         chapter = chapterRepository.save(chapter);
 
         // 创建初始版本
-        createVersionRecord(chapter, null, NovelChapterVersion.UNPUBLISHED);
+        createVersionRecord(chapter, null, NovelChapterVersion.UNPUBLISHED, null);
 
         return chapter;
     }
@@ -103,6 +106,36 @@ public class ChapterDomainService {
     }
 
     /**
+     * 获取当前用户有权操作的章节。
+     *
+     * @param chapterId 章节 ID
+     * @param userId 操作者 ID
+     * @return 已校验小说归属的章节
+     * @throws BusinessException 章节或小说不存在，或小说不属于该用户
+     */
+    public NovelChapter getOwnedChapter(Long chapterId, Long userId) {
+        NovelChapter chapter = getChapter(chapterId);
+        novelDomainService.validateOwnership(chapter.getNovelId(), userId);
+        return chapter;
+    }
+
+    /**
+     * 获取指定小说中的章节。
+     *
+     * @param novelId 目标小说 ID
+     * @param chapterId 章节 ID
+     * @return 属于目标小说的章节
+     * @throws BusinessException 章节不存在或不属于目标小说
+     */
+    public NovelChapter getChapterInNovel(Long novelId, Long chapterId) {
+        NovelChapter chapter = getChapter(chapterId);
+        if (!chapter.belongsToNovel(novelId)) {
+            throw exception(FORBIDDEN);
+        }
+        return chapter;
+    }
+
+    /**
      * 更新章节内容。
      *
      * 通过实体充血方法更新，自动处理已发布状态下的重新发布标记。
@@ -113,23 +146,37 @@ public class ChapterDomainService {
      * @return 更新后的章节
      */
     public NovelChapter updateChapter(NovelChapter chapter, String title, String content) {
-        boolean contentChanged = false;
+        return updateChapter(chapter, title, content, true);
+    }
+
+    /**
+     * 更新章节，可由调用方控制是否保留正文快照。
+     */
+    public NovelChapter updateChapter(NovelChapter chapter, String title, String content, boolean createVersion) {
+        boolean contentChanged = content != null && !content.equals(chapter.getContent());
 
         if (title != null) {
             chapter.updateTitle(title);
         }
-        if (content != null && !content.equals(chapter.getContent())) {
+        if (contentChanged) {
             chapter.updateContent(content);
-            contentChanged = true;
         }
 
         chapter = chapterRepository.save(chapter);
 
-        // 正文发生变化时保存历史版本
-        if (contentChanged) {
-            createVersionRecord(chapter, null, NovelChapterVersion.UNPUBLISHED);
+        if (createVersion && contentChanged) {
+            createVersionRecord(chapter, null, NovelChapterVersion.UNPUBLISHED, null);
         }
 
+        return chapter;
+    }
+
+    /**
+     * 保存自动保存后的章节与差异快照。
+     */
+    public NovelChapter saveChapterWithDiff(NovelChapter chapter, String diff) {
+        chapter = chapterRepository.save(chapter);
+        createVersionRecord(chapter, null, NovelChapterVersion.UNPUBLISHED, diff);
         return chapter;
     }
 
@@ -138,16 +185,15 @@ public class ChapterDomainService {
      *
      * 通过实体充血方法执行发布，创建带发布标记的版本。
      *
-     * @param chapterId 章节 ID
+     * @param chapter 已校验归属的章节
      * @return 发布后的章节
      */
-    public NovelChapter publishChapter(Long chapterId) {
-        NovelChapter chapter = getChapter(chapterId);
+    public NovelChapter publishChapter(NovelChapter chapter) {
         chapter.publish();
         chapter = chapterRepository.save(chapter);
 
         // 创建发布版本
-        createVersionRecord(chapter, "章节发布", NovelChapterVersion.PUBLISHED);
+        createVersionRecord(chapter, "章节发布", NovelChapterVersion.PUBLISHED, null);
 
         return chapter;
     }
@@ -155,11 +201,10 @@ public class ChapterDomainService {
     /**
      * 删除章节。
      *
-     * @param chapterId 章节 ID
+     * @param chapter 已校验归属的章节
      */
-    public void deleteChapter(Long chapterId) {
-        getChapter(chapterId);
-        chapterRepository.deleteById(chapterId);
+    public void deleteChapter(NovelChapter chapter) {
+        chapterRepository.deleteById(chapter.getId());
     }
 
     // ==================== 查询操作 ====================
@@ -208,22 +253,20 @@ public class ChapterDomainService {
      *
      * 校验目标章节号在该小说中不重复，然后更新。
      *
-     * @param chapterId     章节 ID
+     * @param chapter       已校验归属的章节
      * @param chapterNumber 新章节号（必须 >= 1）
      * @return 更新后的章节
      */
-    public NovelChapter updateChapterNumber(Long chapterId, Integer chapterNumber) {
+    public NovelChapter updateChapterNumber(NovelChapter chapter, Integer chapterNumber) {
         if (chapterNumber == null || chapterNumber < 1) {
             throw exception(PARAM_INVALID, "章节号");
         }
-        NovelChapter chapter = getChapter(chapterId);
         // 检查同一小说中是否已存在该章节号（排除自身）
         chapterRepository.findByNovelIdAndChapterNumber(chapter.getNovelId(), chapterNumber)
-                .ifPresent(existing -> {
-                    if (!existing.getId().equals(chapterId)) {
-                        throw exception(CHAPTER_NUMBER_EXISTS);
-                    }
-                });
+            .filter(existing -> !chapter.getId().equals(existing.getId()))
+            .ifPresent(existing -> {
+                throw exception(CHAPTER_NUMBER_EXISTS);
+            });
         chapter.setChapterNumber(chapterNumber);
         return chapterRepository.save(chapter);
     }
@@ -252,35 +295,40 @@ public class ChapterDomainService {
     /**
      * 批量更新章节排序（拖拽排序场景）。
      *
-     * 按传入的章节 ID 顺序更新 sortOrder 和 chapterNumber，
-     * 使章节号与排序顺序保持一致。
+     * 按列表展示顺序重新分配所选章节占用的排序号与章节号。
      *
      * @param novelId    小说 ID
      * @param chapterIds 按期望顺序排列的章节 ID 列表
+     * @throws BusinessException 任一章节不存在或不属于目标小说
      */
     public void batchUpdateSort(Long novelId, List<Long> chapterIds) {
         if (chapterIds == null || chapterIds.isEmpty()) {
             return;
         }
-        log.info("[batchUpdateSort][开始更新章节排序，novelId={}，chapterCount={}]", novelId, chapterIds.size());
-        for (int i = 0; i < chapterIds.size(); i++) {
-            Long chapterId = chapterIds.get(i);
-            int newOrder = i + 1;
-            NovelChapter chapter = getChapter(chapterId);
-            boolean changed = false;
-            if (!Integer.valueOf(newOrder).equals(chapter.getSortOrder())) {
-                chapter.setSortOrder(newOrder);
-                changed = true;
-            }
-            if (!Integer.valueOf(newOrder).equals(chapter.getChapterNumber())) {
-                chapter.setChapterNumber(newOrder);
-                changed = true;
-            }
-            if (changed) {
+        Set<Long> uniqueIds = new HashSet<>(chapterIds);
+        if (uniqueIds.contains(null) || uniqueIds.size() != chapterIds.size()) {
+            throw exception(PARAM_INVALID, "章节 ID 列表");
+        }
+        List<NovelChapter> chapters = chapterIds.stream()
+            .map(chapterId -> getChapterInNovel(novelId, chapterId))
+            .toList();
+
+        // 分页或筛选结果只交换当前列表占用的位置。
+        List<NovelChapter> originalOrder = chapters.stream()
+            .sorted(Comparator.comparing(NovelChapter::getSortOrder)
+                .thenComparing(NovelChapter::getChapterNumber)
+                .thenComparing(NovelChapter::getId)
+                .reversed())
+            .toList();
+        List<Integer> sortOrders = originalOrder.stream().map(NovelChapter::getSortOrder).toList();
+        List<Integer> chapterNumbers = originalOrder.stream().map(NovelChapter::getChapterNumber).toList();
+        for (int i = 0; i < chapters.size(); i++) {
+            NovelChapter chapter = chapters.get(i);
+            if (chapter.applySortOrder(sortOrders.get(i), chapterNumbers.get(i))) {
                 chapterRepository.save(chapter);
             }
         }
-        log.info("[batchUpdateSort][章节排序更新完成，novelId={}]", novelId);
+        log.info("[batchUpdateSort][章节排序更新完成，novelId={}，chapterCount={}]", novelId, chapters.size());
     }
 
     // ==================== 版本管理 ====================
@@ -311,30 +359,54 @@ public class ChapterDomainService {
      *
      * 将章节内容恢复为指定版本的内容，并创建一条新的版本记录。
      *
-     * @param chapterId 章节 ID
+     * @param chapter   已校验归属的章节
      * @param versionId 目标版本 ID
      * @return 恢复后的章节
      */
-    public NovelChapter restoreVersion(Long chapterId, Long versionId) {
-        NovelChapter chapter = getChapter(chapterId);
-        NovelChapterVersion targetVersion = versionRepository.findById(versionId)
-            .orElseThrow(() -> exception(NOT_FOUND));
-
-        if (!targetVersion.belongsToChapter(chapterId)) {
-            throw exception(VERSION_NOT_BELONG_TO_CHAPTER);
-        }
+    public NovelChapter restoreVersion(NovelChapter chapter, Long versionId) {
+        NovelChapterVersion targetVersion = getChapterVersion(chapter.getId(), versionId);
 
         chapter.updateContent(targetVersion.getContent());
         chapter = chapterRepository.save(chapter);
 
         // 创建恢复版本记录
-        createVersionRecord(chapter, "从版本 [" + versionId + "] 恢复",
-                NovelChapterVersion.UNPUBLISHED);
+        createVersionRecord(chapter, "从版本 [" + versionId + "] 恢复", NovelChapterVersion.UNPUBLISHED, null);
 
         return chapter;
     }
 
+    /**
+     * 修改指定章节的版本备注。
+     *
+     * @param chapterId 章节 ID
+     * @param versionId 版本 ID
+     * @param remark 新备注
+     * @throws BusinessException 版本不存在或不属于该章节
+     */
+    public void updateVersionRemark(Long chapterId, Long versionId, String remark) {
+        NovelChapterVersion version = getChapterVersion(chapterId, versionId);
+        version.updateRemark(remark);
+        versionRepository.save(version);
+    }
+
     // ==================== 内部方法 ====================
+
+    /**
+     * 查询版本并校验章节归属。
+     *
+     * @param chapterId 章节 ID
+     * @param versionId 版本 ID
+     * @return 属于指定章节的版本
+     * @throws BusinessException 版本不存在或不属于该章节
+     */
+    private NovelChapterVersion getChapterVersion(Long chapterId, Long versionId) {
+        NovelChapterVersion version = versionRepository.findById(versionId)
+            .orElseThrow(() -> exception(NOT_FOUND));
+        if (!version.belongsToChapter(chapterId)) {
+            throw exception(VERSION_NOT_BELONG_TO_CHAPTER);
+        }
+        return version;
+    }
 
     /**
      * 创建版本记录。
@@ -344,26 +416,23 @@ public class ChapterDomainService {
      * @param chapter   章节实体
      * @param remark    版本备注（可为 null）
      * @param published 是否为发布版本
+     * @param diff 自动保存传入的正文差异
      * @see NovelChapterVersion#UNPUBLISHED
      * @see NovelChapterVersion#PUBLISHED
      */
-    private void createVersionRecord(NovelChapter chapter, String remark, int published) {
-        String content = chapter.getContent() != null ? chapter.getContent() : "";
-        String contentMd5 = DigestUtils.md5DigestAsHex(content.getBytes(StandardCharsets.UTF_8));
-
-        // 检查内容是否与最新版本相同，避免重复创建（仅非发布版本去重）
-        NovelChapterVersion latestVersion = versionRepository.findLatestByChapterId(chapter.getId());
-        if (latestVersion != null && contentMd5.equals(latestVersion.getContentMd5())
-            && NovelChapterVersion.UNPUBLISHED == published) {
-            return;
+    private void createVersionRecord(NovelChapter chapter, String remark, int published, String diff) {
+        NovelChapterVersion version =
+            NovelChapterVersion.createFromChapter(chapter.getId(), chapter.getContent(), remark, published);
+        if (NovelChapterVersion.UNPUBLISHED == published && diff == null && remark == null) {
+            NovelChapterVersion latestVersion = versionRepository.findLatestByChapterId(chapter.getId());
+            if (latestVersion != null && latestVersion.contentEquals(version.getContentMd5())) {
+                return;
+            }
         }
-
-        NovelChapterVersion version = NovelChapterVersion.createFromChapter(
-                chapter.getId(), content, remark, published
-        );
+        version.setChangeDiff(diff);
         versionRepository.save(version);
 
         // 清理超出上限的旧版本
-        versionRepository.cleanupOldVersions(chapter.getId(), MAX_VERSION_KEEP_COUNT);
+        versionRepository.cleanupOldVersions(chapter.getId(), NovelConstants.MAX_CHAPTER_VERSION_KEEP_COUNT);
     }
 }

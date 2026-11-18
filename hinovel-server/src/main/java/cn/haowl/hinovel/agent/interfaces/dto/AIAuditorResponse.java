@@ -25,7 +25,7 @@ public class AIAuditorResponse {
      *
      * @see AuditAssessmentEnum
      */
-    private AuditAssessmentEnum overallAssessment = AuditAssessmentEnum.PASS;
+    private AuditAssessmentEnum overallAssessment;
 
     /**
      * 问题列表。

@@ -2,6 +2,8 @@ package cn.haowl.hinovel.novel.domain.query;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 /**
@@ -20,11 +22,14 @@ public class ChapterPageQuery {
     /**
      * 页码（从 1 开始）
      */
+    @Min(CommonConstants.DEFAULT_PAGE_NUM)
     private int pageNum = CommonConstants.DEFAULT_PAGE_NUM;
 
     /**
      * 每页大小
      */
+    @Min(1)
+    @Max(CommonConstants.MAX_PAGE_SIZE)
     private int pageSize = NovelConstants.DEFAULT_CHAPTER_PAGE_SIZE;
 
     /**

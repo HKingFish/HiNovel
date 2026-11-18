@@ -25,9 +25,14 @@ public class NovelSettingsRepositoryImpl implements NovelSettingsRepository {
     private NovelSettingsMapper settingsMapper;
 
     @Override
+    public void insert(NovelSettings settings) {
+        settingsMapper.insert(settings);
+    }
+
+    @Override
     public NovelSettings save(NovelSettings settings) {
         if (settings.getId() == null) {
-            settingsMapper.insert(settings);
+            insert(settings);
         } else {
             settingsMapper.updateById(settings);
         }

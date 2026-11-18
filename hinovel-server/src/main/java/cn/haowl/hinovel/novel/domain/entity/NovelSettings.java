@@ -2,6 +2,7 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import cn.haowl.hinovel.common.util.ObjectUtil;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -119,6 +120,23 @@ public class NovelSettings extends BaseEntity {
     }
 
     /**
+     * 仅覆盖已提供的功能配置。
+     *
+     * @param source 新配置，值为 null 的字段沿用原值
+     */
+    public void updateOptions(NovelSettings source) {
+        ObjectUtil.doIfNonNull(source.getAutoAuditAfterRewrite(), this::setAutoAuditAfterRewrite);
+        ObjectUtil.doIfNonNull(source.getAutoOutlineAfterPublish(), this::setAutoOutlineAfterPublish);
+        ObjectUtil.doIfNonNull(source.getAutoVectorAfterPublish(), this::setAutoVectorAfterPublish);
+        ObjectUtil.doIfNonNull(source.getRewriteContextChapters(), this::setRewriteContextChapters);
+        ObjectUtil.doIfNonNull(source.getRewriteIncludeOutline(), this::setRewriteIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getAuditIncludeOutline(), this::setAuditIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getQaIncludeOutline(), this::setQaIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getQaContextLength(), this::setQaContextLength);
+        ObjectUtil.doIfNonNull(source.getAutoSaveContent(), this::setAutoSaveContent);
+    }
+
+    /**
      * 创建默认配置实例（所有配置项使用默认值）。
      *
      * @return 默认配置
@@ -151,45 +169,12 @@ public class NovelSettings extends BaseEntity {
 
         // 先用用户默认配置覆盖系统默认值
         if (userDefault != null) {
-            applyNonNull(base, userDefault);
+            base.updateOptions(userDefault);
         }
         // 再用小说级别配置覆盖
         if (novelLevel != null) {
-            applyNonNull(base, novelLevel);
+            base.updateOptions(novelLevel);
         }
         return base;
-    }
-
-    /**
-     * 将 source 中非 null 的字段覆盖到 target。
-     */
-    private static void applyNonNull(NovelSettings target, NovelSettings source) {
-        if (source.getAutoAuditAfterRewrite() != null) {
-            target.setAutoAuditAfterRewrite(source.getAutoAuditAfterRewrite());
-        }
-        if (source.getAutoOutlineAfterPublish() != null) {
-            target.setAutoOutlineAfterPublish(source.getAutoOutlineAfterPublish());
-        }
-        if (source.getAutoVectorAfterPublish() != null) {
-            target.setAutoVectorAfterPublish(source.getAutoVectorAfterPublish());
-        }
-        if (source.getRewriteContextChapters() != null) {
-            target.setRewriteContextChapters(source.getRewriteContextChapters());
-        }
-        if (source.getRewriteIncludeOutline() != null) {
-            target.setRewriteIncludeOutline(source.getRewriteIncludeOutline());
-        }
-        if (source.getAuditIncludeOutline() != null) {
-            target.setAuditIncludeOutline(source.getAuditIncludeOutline());
-        }
-        if (source.getQaIncludeOutline() != null) {
-            target.setQaIncludeOutline(source.getQaIncludeOutline());
-        }
-        if (source.getQaContextLength() != null) {
-            target.setQaContextLength(source.getQaContextLength());
-        }
-        if (source.getAutoSaveContent() != null) {
-            target.setAutoSaveContent(source.getAutoSaveContent());
-        }
     }
 }

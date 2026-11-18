@@ -9,12 +9,15 @@ import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import io.qdrant.client.QdrantClient;
 import io.qdrant.client.grpc.Collections;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Qdrant 向量存储工厂。
@@ -55,9 +58,9 @@ public class QdrantVectorStoreFactory implements VectorStoreFactory {
     private EmbeddingConfigService embeddingConfigService;
 
     /**
-     * 按集合和用户复用适配器，应用重启时清空。无激活配置时不缓存结果。
+     * 按集合和用户保留当前配置的适配器。
      */
-    private final ConcurrentHashMap<String, VectorStorePort> userStoreCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CachedStore> userStoreCache = new ConcurrentHashMap<>();
 
     @Override
     public VectorStorePort getByCollection(String collectionName, Long userId) {
@@ -65,15 +68,21 @@ public class QdrantVectorStoreFactory implements VectorStoreFactory {
             log.warn("[getByCollection][获取向量存储失败：userId 为空，集合：{}]", collectionName);
             return null;
         }
-        // 查询用户激活的 Embedding 配置
+        String cacheKey = collectionName + ":" + userId;
         EmbeddingConfig userConfig = embeddingConfigService.findActiveByUserId(userId);
         if (userConfig == null) {
+            userStoreCache.remove(cacheKey);
             log.info("[getByCollection][未配置 Embedding 模型，跳过 RAG，userId={}，集合={}]",
                 userId, collectionName);
             return null;
         }
-        return userStoreCache.computeIfAbsent(
-            collectionName + ":" + userId, key -> createAdapterWithUserConfig(collectionName, userConfig));
+        return userStoreCache.compute(cacheKey, (key, current) -> {
+            if (current != null && current.matches(userConfig)) {
+                return current;
+            }
+            return new CachedStore(
+                userConfig.getId(), userConfig.getVersion(), createAdapterWithUserConfig(collectionName, userConfig));
+        }).store;
     }
 
     /**
@@ -134,7 +143,10 @@ public class QdrantVectorStoreFactory implements VectorStoreFactory {
                         collectionName, dimensions);
                 }
                 return;
-            } catch (Exception e) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Qdrant 集合初始化被中断", e);
+            } catch (ExecutionException e) {
                 log.warn("[ensureCollectionExists][Qdrant 集合初始化失败（第 {}/{} 次），集合={}，异常类型={}]",
                     attempt, MAX_RETRY_TIMES, collectionName, e.getClass().getSimpleName());
                 if (attempt >= MAX_RETRY_TIMES) {
@@ -148,6 +160,35 @@ public class QdrantVectorStoreFactory implements VectorStoreFactory {
                     throw new RuntimeException("Qdrant 集合初始化被中断：" + collectionName, ie);
                 }
             }
+        }
+    }
+
+    /**
+     * 当前 Embedding 配置及对应的向量存储适配器。
+     */
+    @RequiredArgsConstructor
+    private static class CachedStore {
+
+        /**
+         * 配置 ID。
+         */
+        private final Long configId;
+
+        /**
+         * 适配器创建时的配置版本。
+         */
+        private final Integer version;
+
+        /**
+         * 当前配置对应的向量存储适配器。
+         */
+        private final VectorStorePort store;
+
+        /**
+         * 判断适配器是否对应当前配置和版本。
+         */
+        private boolean matches(EmbeddingConfig config) {
+            return Objects.equals(configId, config.getId()) && Objects.equals(version, config.getVersion());
         }
     }
 }

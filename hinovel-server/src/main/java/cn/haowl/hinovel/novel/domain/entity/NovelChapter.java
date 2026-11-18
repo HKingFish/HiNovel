@@ -130,7 +130,7 @@ public class NovelChapter extends BaseEntity {
      */
     public void updateContent(String content) {
         this.content = content;
-        this.wordCount = content == null ? 0 : content.length();
+        this.wordCount = countContentCharacters(content);
         this.setUpdateTime(LocalDateTime.now());
         this.vectorStored = CommonConstants.DISABLED;
         if (NovelChapterStatusEnum.PUBLISHED == this.status) {
@@ -146,6 +146,52 @@ public class NovelChapter extends BaseEntity {
     public void updateTitle(String title) {
         this.title = title;
         this.setUpdateTime(LocalDateTime.now());
+    }
+
+    /**
+     * 统计正文中除空白字符外的字数。
+     */
+    public static int countContentCharacters(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        return content.replaceAll("(?U)\\s+", "").length();
+    }
+
+    /**
+     * 更新编辑时提供的排序号和状态。
+     *
+     * @param sortOrder 新排序号，为 null 时保留原值
+     * @param status 新状态，为 null 时保留原值
+     * @return 是否提供了至少一个更新字段
+     */
+    public boolean updateMetadata(Integer sortOrder, NovelChapterStatusEnum status) {
+        if (sortOrder == null && status == null) {
+            return false;
+        }
+        if (sortOrder != null) {
+            this.sortOrder = sortOrder;
+        }
+        if (status != null) {
+            this.status = status;
+        }
+        return true;
+    }
+
+    /**
+     * 更新章节在列表中的排序号和章节号。
+     *
+     * @param order 新排序号
+     * @param number 新章节号
+     * @return 是否有字段发生变化
+     */
+    public boolean applySortOrder(Integer order, Integer number) {
+        if (Objects.equals(order, sortOrder) && Objects.equals(number, chapterNumber)) {
+            return false;
+        }
+        sortOrder = order;
+        chapterNumber = number;
+        return true;
     }
 
     /**

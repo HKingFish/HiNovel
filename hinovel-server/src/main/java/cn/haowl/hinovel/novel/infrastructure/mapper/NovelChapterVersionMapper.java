@@ -29,7 +29,8 @@ public interface NovelChapterVersionMapper extends BaseMapper<NovelChapterVersio
     default List<NovelChapterVersion> selectByChapterId(Long chapterId) {
         return selectList(new LambdaQueryWrapper<NovelChapterVersion>()
                 .eq(NovelChapterVersion::getChapterId, chapterId)
-                .orderByDesc(NovelChapterVersion::getCreateTime));
+                .orderByDesc(NovelChapterVersion::getCreateTime)
+                .orderByDesc(NovelChapterVersion::getId));
     }
 
     /**
@@ -43,6 +44,7 @@ public interface NovelChapterVersionMapper extends BaseMapper<NovelChapterVersio
         return selectList(new LambdaQueryWrapper<NovelChapterVersion>()
                 .eq(NovelChapterVersion::getChapterId, chapterId)
                 .orderByDesc(NovelChapterVersion::getCreateTime)
+                .orderByDesc(NovelChapterVersion::getId)
                 .last(CommonConstants.limitOf(limit)));
     }
 
@@ -79,6 +81,7 @@ public interface NovelChapterVersionMapper extends BaseMapper<NovelChapterVersio
         return selectOne(new LambdaQueryWrapper<NovelChapterVersion>()
                 .eq(NovelChapterVersion::getChapterId, chapterId)
                 .orderByDesc(NovelChapterVersion::getCreateTime)
+                .orderByDesc(NovelChapterVersion::getId)
                 .last(CommonConstants.LIMIT_ONE));
     }
 }

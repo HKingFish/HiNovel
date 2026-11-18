@@ -24,6 +24,11 @@ public interface NovelChapterRepository {
     NovelChapter save(NovelChapter chapter);
 
     /**
+     * 正文仍与入库快照一致时，标记章节已完成向量入库。
+     */
+    boolean markVectorStored(Long chapterId, String indexedContent);
+
+    /**
      * 根据 ID 查询章节。
      *
      * @param id 章节 ID

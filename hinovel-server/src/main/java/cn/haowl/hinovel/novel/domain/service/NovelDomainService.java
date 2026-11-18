@@ -198,7 +198,8 @@ public class NovelDomainService {
      * @return 更新后的大纲
      */
     public NovelOutline updateOutline(Long novelId, String content) {
-        NovelOutline outline = getOrCreateOutline(novelId);
+        NovelOutline outline = novelOutlineRepository.findByNovelId(novelId)
+            .orElseGet(() -> NovelOutline.createEmpty(novelId));
         outline.updateContent(content);
         return novelOutlineRepository.save(outline);
     }

@@ -10,6 +10,7 @@ import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.tool.SkillTool;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
+import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
 import cn.haowl.hinovel.ai.constant.LlmCallStatusEnum;
@@ -43,7 +44,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.*;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_ROLE_PROVIDER_NOT_CONFIGURED;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.NOVEL_AGENT_NOT_CONFIGURED;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
@@ -72,6 +75,12 @@ public class AiServiceFactory {
      */
     @Autowired
     private LlmProviderFactory llmProviderFactory;
+
+    /**
+     * 校验模型提供方归属。
+     */
+    @Autowired
+    private LlmProviderService llmProviderService;
 
     /**
      * 小说绑定的 Agent 配置。
@@ -174,11 +183,13 @@ public class AiServiceFactory {
         if (!agent.isAvailableTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
-        if (agent.getLlmProviderId() == null) {
+        Long providerId = agent.getLlmProviderId();
+        if (providerId == null) {
             throw exception(AGENT_ROLE_PROVIDER_NOT_CONFIGURED, role.getName());
         }
+        llmProviderService.validateOwnership(providerId, userId);
         List<AgentSkill> skills = skillService.listBoundSkills(agent.getId());
-        LlmProviderPort provider = llmProviderFactory.getByProviderId(agent.getLlmProviderId());
+        LlmProviderPort provider = llmProviderFactory.getByProviderId(providerId);
         String systemPrompt = agent.getSystemPrompt();
         String modelName = provider.getModelName();
         if (systemPrompt == null || systemPrompt.isBlank()) {
@@ -187,7 +198,7 @@ public class AiServiceFactory {
         return CallContext.builder()
                 .agentId(agent.getId())
                 .agentName(agent.getName())
-                .llmProviderId(agent.getLlmProviderId())
+                .llmProviderId(providerId)
                 .llmProviderName(provider.getProviderType())
                 .modelName(modelName == null ? agent.getModelName() : modelName)
                 .userId(userId)

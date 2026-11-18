@@ -14,6 +14,13 @@ import java.util.Optional;
 public interface NovelSettingsRepository {
 
     /**
+     * 插入新配置。
+     *
+     * @param settings 待插入的配置
+     */
+    void insert(NovelSettings settings);
+
+    /**
      * 保存配置。
      *
      * @param settings 配置实体

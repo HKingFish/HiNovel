@@ -3,12 +3,7 @@
 -- 适用：MySQL 8.0+，字符集 utf8mb4
 -- ========================================================
 
-CREATE DATABASE IF NOT EXISTS hinovel_platform
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE hinovel_platform;
-
+-- 通过 MySQL 客户端指定目标数据库后执行。
 SET NAMES utf8mb4;
 
 -- --------------------------------------------------------
@@ -183,15 +178,15 @@ CREATE TABLE IF NOT EXISTS novel_settings (
     id                         BIGINT  NOT NULL COMMENT '配置 ID',
     novel_id                   BIGINT  NOT NULL COMMENT '小说 ID，0 表示用户默认配置',
     user_id                    BIGINT           DEFAULT NULL COMMENT '用户 ID',
-    auto_audit_after_rewrite   TINYINT NOT NULL DEFAULT 1 COMMENT '改写后自动审核',
-    auto_outline_after_publish TINYINT NOT NULL DEFAULT 1 COMMENT '发布后自动生成大纲',
-    auto_vector_after_publish  TINYINT NOT NULL DEFAULT 1 COMMENT '发布后自动向量入库',
-    rewrite_context_chapters   INT     NOT NULL DEFAULT 2 COMMENT '改写携带前几章',
-    rewrite_include_outline    TINYINT NOT NULL DEFAULT 1 COMMENT '改写是否携带全文大纲',
-    audit_include_outline      TINYINT NOT NULL DEFAULT 1 COMMENT '审核是否携带全文大纲',
-    qa_include_outline         TINYINT NOT NULL DEFAULT 1 COMMENT '问答是否携带全文大纲',
-    qa_context_length          INT     NOT NULL DEFAULT 10 COMMENT '问答历史消息条数',
-    auto_save_content          TINYINT NOT NULL DEFAULT 1 COMMENT '是否自动保存编辑器内容',
+    auto_audit_after_rewrite   TINYINT          DEFAULT NULL COMMENT '改写后自动审核',
+    auto_outline_after_publish TINYINT          DEFAULT NULL COMMENT '发布后自动生成大纲',
+    auto_vector_after_publish  TINYINT          DEFAULT NULL COMMENT '发布后自动向量入库',
+    rewrite_context_chapters   INT              DEFAULT NULL COMMENT '改写携带前几章',
+    rewrite_include_outline    TINYINT          DEFAULT NULL COMMENT '改写是否携带全文大纲',
+    audit_include_outline      TINYINT          DEFAULT NULL COMMENT '审核是否携带全文大纲',
+    qa_include_outline         TINYINT          DEFAULT NULL COMMENT '问答是否携带全文大纲',
+    qa_context_length          INT              DEFAULT NULL COMMENT '问答历史消息条数',
+    auto_save_content          TINYINT          DEFAULT NULL COMMENT '是否自动保存编辑器内容',
     creator                    BIGINT           DEFAULT NULL COMMENT '创建人 ID',
     updater                    BIGINT           DEFAULT NULL COMMENT '更新人 ID',
     create_time                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -199,7 +194,9 @@ CREATE TABLE IF NOT EXISTS novel_settings (
     deleted                    TINYINT  NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     version                    INT      NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_novel_id (novel_id, deleted),
+    UNIQUE KEY uk_settings_scope (
+        novel_id, (CASE WHEN novel_id = 0 THEN COALESCE(user_id, 0) ELSE 0 END), deleted
+    ),
     KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='小说 AI 配置表';
 

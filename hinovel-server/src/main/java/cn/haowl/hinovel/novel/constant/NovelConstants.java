@@ -27,6 +27,11 @@ public final class NovelConstants {
     public static final int DEFAULT_VERSION_LIMIT = 50;
 
     /**
+     * 每章保留的历史版本上限。
+     */
+    public static final int MAX_CHAPTER_VERSION_KEEP_COUNT = 50;
+
+    /**
      * 章节列表默认每页条数。
      */
     public static final int DEFAULT_CHAPTER_PAGE_SIZE = 50;

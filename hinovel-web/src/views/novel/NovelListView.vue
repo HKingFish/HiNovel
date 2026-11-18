@@ -534,7 +534,7 @@ const showAgentConfigDialog = ref(false)
 const agentConfigLoading = ref(false)
 const currentNovelForConfig = ref<Novel | null>(null)
 const agentConfig = ref<NovelAgentConfig>({
-    novelId: 0,
+    novelId: '',
     authorAgentId: undefined,
     editorAgentId: undefined,
     qaAgentId: undefined,
@@ -687,11 +687,11 @@ const confirmDelete = async (novel: Novel) => {
     }
 }
 
-const goToNovel = (id: number) => {
+const goToNovel = (id: string) => {
     router.push(`/novel/${id}`)
 }
 
-const goToCharacters = (id: number) => {
+const goToCharacters = (id: string) => {
     router.push(`/novel/${id}/characters`)
 }
 

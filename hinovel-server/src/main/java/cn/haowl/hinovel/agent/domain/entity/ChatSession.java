@@ -98,6 +98,6 @@ public class ChatSession extends BaseEntity {
      * @return 已收藏返回 true
      */
     public boolean hasFavorited() {
-        return ENABLED == (this.favorite != null ? this.favorite : DISABLED);
+        return Integer.valueOf(ENABLED).equals(favorite);
     }
 }

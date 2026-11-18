@@ -39,6 +39,12 @@ public class LlmProviderService {
     private ApiKeyService apiKeyService;
 
     /**
+     * LLM 实例工厂，用于配置变更后清除缓存。
+     */
+    @Autowired
+    private LlmProviderFactory llmProviderFactory;
+
+    /**
      * 创建 LLM 提供方。
      *
      * @param userId  所属用户 ID
@@ -83,6 +89,13 @@ public class LlmProviderService {
     }
 
     /**
+     * 校验提供方归属。
+     */
+    public void validateOwnership(Long id, Long userId) {
+        getOwnedProvider(id, userId);
+    }
+
+    /**
      * 获取 LLM 提供方详情（apiKey 已脱敏，用于前端展示）。
      *
      * @param id     提供方 ID
@@ -114,7 +127,9 @@ public class LlmProviderService {
         if (apiKeyService.isNewApiKey(request.getApiKey())) {
             provider.updateApiKey(apiKeyService.encrypt(request.getApiKey()));
         }
-        return maskApiKey(llmProviderRepository.save(provider));
+        llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
+        return maskApiKey(provider);
     }
 
     /**
@@ -138,6 +153,7 @@ public class LlmProviderService {
         LlmProvider provider = getOwnedProvider(id, userId);
         provider.activate();
         llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
     }
 
     /**
@@ -151,6 +167,7 @@ public class LlmProviderService {
         LlmProvider provider = getOwnedProvider(id, userId);
         provider.deactivate();
         llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
     }
 
     /**
@@ -163,6 +180,7 @@ public class LlmProviderService {
         if (!llmProviderRepository.deleteByIdAndUserId(id, userId)) {
             throw exception(NOT_FOUND);
         }
+        llmProviderFactory.evict(id);
         log.info("[delete][已删除 LLM 提供方，id={}，userId={}]", id, userId);
     }
 

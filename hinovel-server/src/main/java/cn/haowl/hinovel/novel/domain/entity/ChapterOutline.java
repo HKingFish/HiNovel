@@ -3,7 +3,11 @@ package cn.haowl.hinovel.novel.domain.entity;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 
@@ -115,6 +119,22 @@ public class ChapterOutline extends BaseEntity {
      */
     public void updateChapterContent(String chapterContent) {
         this.chapterContent = chapterContent;
+    }
+
+    /**
+     * 更新大纲正文及本次提供的分析信息。
+     *
+     * @param outline 提供正文、AI 大纲和剧情分析的大纲
+     */
+    public void updateFrom(ChapterOutline outline) {
+        updateOutlineContent(outline.getOutlineContent());
+        if (outline.getAiOutlineContent() != null) {
+            updateAiOutlineContent(outline.getAiOutlineContent());
+        }
+        if (outline.getPlotPoints() != null || outline.getInvolvedCharacters() != null
+                || outline.getEmotionTone() != null || outline.getSceneSetting() != null) {
+            updatePlotAnalysis(outline);
+        }
     }
 
     /**

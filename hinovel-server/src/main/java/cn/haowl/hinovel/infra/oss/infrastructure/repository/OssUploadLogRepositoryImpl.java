@@ -45,9 +45,10 @@ public class OssUploadLogRepositoryImpl implements OssUploadLogRepository {
     }
 
     @Override
-    public Optional<OssUploadLog> findByFileUrl(String fileUrl) {
+    public Optional<OssUploadLog> findActiveByFileUrlAndUserId(String fileUrl, Long userId) {
         LambdaQueryWrapper<OssUploadLog> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(OssUploadLog::getFileUrl, fileUrl)
+            .eq(OssUploadLog::getUserId, userId)
             .eq(OssUploadLog::getStatus, OssUploadStatusEnum.ACTIVE.name());
         return Optional.ofNullable(ossUploadLogMapper.selectOne(wrapper));
     }
@@ -63,11 +64,11 @@ public class OssUploadLogRepositoryImpl implements OssUploadLogRepository {
     }
 
     @Override
-    public void updateStatusByFileUrl(String fileUrl, OssUploadStatusEnum status) {
+    public void updateStatus(Long id, OssUploadStatusEnum status) {
         OssUploadLog updateLog = new OssUploadLog();
         updateLog.setStatus(status.name());
         LambdaQueryWrapper<OssUploadLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(OssUploadLog::getFileUrl, fileUrl)
+        wrapper.eq(OssUploadLog::getId, id)
             .eq(OssUploadLog::getStatus, OssUploadStatusEnum.ACTIVE.name());
         ossUploadLogMapper.update(updateLog, wrapper);
     }

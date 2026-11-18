@@ -220,12 +220,6 @@ public class NovelCharacterService {
         // 验证小说权限
         novelService.getNovelById(userId, request.getNovelId());
 
-        // 验证人物存在
-        characterRepository.findById(request.getCharacterId())
-            .orElseThrow(() -> exception(NOT_FOUND));
-        characterRepository.findById(request.getTargetId())
-            .orElseThrow(() -> exception(NOT_FOUND));
-
         return createRelation(request);
     }
 
@@ -234,12 +228,12 @@ public class NovelCharacterService {
      */
     @Transactional(rollbackFor = Exception.class)
     public NovelCharacterRelation createRelation(CharacterRelationCreateRequest request) {
+        getCharacterInNovel(request.getNovelId(), request.getCharacterId());
+        getCharacterInNovel(request.getNovelId(), request.getTargetId());
         NovelCharacterRelation relation = NovelCharacterRelation.create(
-                request.getNovelId(), request.getCharacterId(),
-                request.getTargetId(), request.getRelationType(),
-                request.getDescription()
-        );
-
+            request.getNovelId(), request.getCharacterId(),
+            request.getTargetId(), request.getRelationType(),
+            request.getDescription());
         return characterRepository.saveRelation(relation);
     }
 
@@ -286,9 +280,10 @@ public class NovelCharacterService {
      * @return 关系列表
      */
     public CharacterGraphVO getCharacterGraph(Long userId, Long novelId) {
+        novelService.getNovelById(userId, novelId);
         CharacterGraphVO graph = new CharacterGraphVO();
-        graph.setCharacters(listCharactersByNovel(userId, novelId));
-        graph.setRelations(listRelationsByNovel(userId, novelId));
+        graph.setCharacters(listCharactersByNovel(novelId));
+        graph.setRelations(listRelationsByNovel(novelId));
         return graph;
     }
 

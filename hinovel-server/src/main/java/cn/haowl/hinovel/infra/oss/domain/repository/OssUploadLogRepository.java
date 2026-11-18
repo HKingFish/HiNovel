@@ -34,12 +34,13 @@ public interface OssUploadLogRepository {
     Optional<OssUploadLog> findById(Long id);
 
     /**
-     * 根据文件URL查询上传日志。
+     * 按文件 URL 和用户查询有效上传日志。
      *
-     * @param fileUrl 文件URL
+     * @param fileUrl 文件 URL
+     * @param userId 所属用户 ID
      * @return 上传日志实体
      */
-    Optional<OssUploadLog> findByFileUrl(String fileUrl);
+    Optional<OssUploadLog> findActiveByFileUrlAndUserId(String fileUrl, Long userId);
 
     /**
      * 按用户和可选业务类型查询有效上传记录。
@@ -52,10 +53,10 @@ public interface OssUploadLogRepository {
     /**
      * 更新上传日志状态。
      *
-     * @param fileUrl 文件URL
+     * @param id 日志 ID
      * @param status  新状态
      */
-    void updateStatusByFileUrl(String fileUrl, OssUploadStatusEnum status);
+    void updateStatus(Long id, OssUploadStatusEnum status);
 
     /**
      * 删除上传日志。

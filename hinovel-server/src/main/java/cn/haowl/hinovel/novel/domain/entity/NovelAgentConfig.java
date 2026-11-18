@@ -1,8 +1,14 @@
 package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 
@@ -40,6 +46,7 @@ public class NovelAgentConfig extends BaseEntity {
     /**
      * 问答 Agent ID（负责 AI 问答交互）。
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long qaAgentId;
 
     /**

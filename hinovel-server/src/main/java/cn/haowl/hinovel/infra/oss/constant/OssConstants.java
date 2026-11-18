@@ -1,5 +1,7 @@
 package cn.haowl.hinovel.infra.oss.constant;
 
+import java.util.regex.Pattern;
+
 /**
  * OSS 模块常量类。
  *
@@ -35,6 +37,11 @@ public final class OssConstants {
      * 默认业务类型。
      */
     public static final String DEFAULT_BIZ_TYPE = "common";
+
+    /**
+     * 用作存储目录的业务类型格式。
+     */
+    public static final Pattern BIZ_TYPE_PATTERN = Pattern.compile("[\\p{L}\\p{N}_-]{1,64}");
 
     /**
      * 存储对象默认使用的扩展名。

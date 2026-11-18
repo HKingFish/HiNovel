@@ -1,15 +1,14 @@
 package cn.haowl.hinovel.novel.application.service;
 
 import cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants;
-import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
-import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import cn.haowl.hinovel.novel.domain.repository.NovelOutlineRepository;
 import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.AiOutlineResponse;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterPageResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,11 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
-import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
-import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
-import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.VERSION_NOT_BELONG_TO_CHAPTER;
 
 /**
  * 小说章节应用服务。
@@ -40,12 +35,6 @@ public class NovelChapterService {
     private ChapterDomainService chapterDomainService;
 
     /**
-     * 章节版本仓储。
-     */
-    @Autowired
-    private NovelChapterVersionRepository versionRepository;
-
-    /**
      * 小说大纲仓储。
      */
     @Autowired
@@ -58,28 +47,27 @@ public class NovelChapterService {
     private NovelService novelService;
 
     /**
+     * 小说归属校验。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
+
+    /**
      * 章节大纲应用服务。
      */
     @Autowired
     private ChapterOutlineService chapterOutlineService;
 
     /**
-     * 获取小说的所有章节。
-     *
-     * @param novelId 小说 ID
-     * @return 章节列表
-     */
-    public List<NovelChapter> getNovelChapters(Long novelId) {
-        return chapterDomainService.listChaptersByNovelId(novelId);
-    }
-
-    /**
-     * 分页获取小说的章节（按章节号倒序）。
+     * 按排序号倒序查询章节。
      *
      * @param query 分页与筛选条件
+     * @param userId 操作者 ID
      * @return 章节分页响应
      */
-    public ChapterPageResponse getNovelChaptersPage(ChapterPageQuery query) {
+    public ChapterPageResponse getNovelChaptersPage(ChapterPageQuery query, Long userId) {
+        novelDomainService.validateOwnership(query.getNovelId(), userId);
+
         List<NovelChapter> chapters = chapterDomainService.listChaptersPage(query);
         int total = chapterDomainService.countChapters(query);
 
@@ -88,30 +76,45 @@ public class NovelChapterService {
         response.setTotal(total);
         response.setPageNum(query.getPageNum());
         response.setPageSize(query.getPageSize());
-        response.setHasMore(chapters.size() == query.getPageSize());
+        response.setHasMore((long) query.getPageNum() * query.getPageSize() < total);
         return response;
     }
 
     /**
-     * 获取章节详情。
+     * 获取当前用户有权查看的小说大纲。
      *
-     * @param chapterId 章节 ID
-     * @return 章节实体
+     * @param novelId 小说 ID
+     * @param userId 操作者 ID
+     * @return 小说大纲，尚未保存时返回空白大纲
      */
-    public NovelChapter getChapter(Long chapterId) {
-        return chapterDomainService.getChapter(chapterId);
+    public NovelOutline getNovelOutline(Long novelId, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
+        return getNovelOutline(novelId);
+    }
+
+    /**
+     * 获取小说大纲，缺失时返回空白大纲。
+     *
+     * @param novelId 小说 ID
+     * @return 小说大纲，尚未保存时返回空白大纲
+     */
+    public NovelOutline getNovelOutline(Long novelId) {
+        return outlineRepository.findByNovelId(novelId)
+            .orElseGet(() -> NovelOutline.createEmpty(novelId));
     }
 
     /**
      * 获取章节的 AI 大纲。
      *
      * @param chapterId 章节 ID
+     * @param userId 操作者 ID
      * @return AI 大纲响应，无 AI 大纲时返回空内容
      */
-    public AiOutlineResponse getAiOutline(Long chapterId) {
+    public AiOutlineResponse getAiOutline(Long chapterId, Long userId) {
+        chapterDomainService.getOwnedChapter(chapterId, userId);
         ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
         AiOutlineResponse response = new AiOutlineResponse();
-        if (outline != null && outline.getAiOutlineContent() != null) {
+        if (outline != null && outline.hasAiOutlineContent()) {
             response.setAiOutlineContent(outline.getAiOutlineContent());
             response.setHasAiOutline(true);
         } else {
@@ -125,132 +128,91 @@ public class NovelChapterService {
      * 用 AI 大纲替换用户大纲。
      *
      * @param chapterId 章节 ID
+     * @param userId 操作者 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void replaceOutlineWithAi(Long chapterId) {
+    public void replaceOutlineWithAi(Long chapterId, Long userId) {
+        NovelChapter chapter = chapterDomainService.getOwnedChapter(chapterId, userId);
         ChapterOutline outline = chapterOutlineService.getByChapterId(chapterId);
-        if (outline == null || outline.getAiOutlineContent() == null
-                || outline.getAiOutlineContent().isBlank()) {
+        if (outline == null || !outline.hasAiOutlineContent()) {
             throw exception0(GlobalErrorCodeConstants.PARAM_ERROR.getCode(), "暂无 AI 生成的大纲可替换");
         }
-        outline.setOutlineContent(outline.getAiOutlineContent());
-        chapterOutlineService.saveOrUpdateOutline(outline);
-    }
-
-    /**
-     * 创建章节。
-     *
-     * @param chapter 章节实体（携带 novelId、title、content 等基本信息）
-     * @return 创建的章节
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public NovelChapter createChapter(NovelChapter chapter) {
-        NovelChapter created = chapterDomainService.createChapter(CreateChapterCommand.builder()
-            .novelId(chapter.getNovelId())
-            .title(chapter.getTitle())
-            .content(chapter.getContent())
-            .sortOrder(chapter.getSortOrder())
-            .build());
-        novelService.refreshNovelStats(chapter.getNovelId());
-        return created;
+        chapterOutlineService.saveUserOutline(chapter, outline.getAiOutlineContent());
     }
 
     /**
      * 更新章节。
      *
-     * @param chapter 章节实体
+     * @param userId 当前用户 ID
+     * @param chapterId 章节 ID
+     * @param changes 标题与正文
      * @return 更新后的章节
      */
     @Transactional(rollbackFor = Exception.class)
-    public NovelChapter updateChapter(NovelChapter chapter) {
-        NovelChapter existing = chapterDomainService.getChapter(chapter.getId());
-        return chapterDomainService.updateChapter(existing, chapter.getTitle(), chapter.getContent());
+    public NovelChapter updateChapter(Long userId, Long chapterId, NovelChapter changes) {
+        NovelChapter chapter = chapterDomainService.getOwnedChapter(chapterId, userId);
+        chapter = chapterDomainService.updateChapter(chapter, changes.getTitle(), changes.getContent());
+        novelService.refreshNovelStats(chapter.getNovelId());
+        return chapter;
     }
 
     /**
      * 更新指定小说内的章节内容并保留历史版本。
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public NovelChapter updateChapterContent(Long novelId, Long chapterId, String content) {
-        NovelChapter chapter = chapterDomainService.getChapter(chapterId);
-        if (!chapter.belongsToNovel(novelId)) {
-            throw exception(FORBIDDEN);
-        }
-        return chapterDomainService.updateChapter(chapter, chapter.getTitle(), content);
-    }
-
-    /**
-     * 删除章节。
      *
+     * @param novelId 目标小说 ID
      * @param chapterId 章节 ID
+     * @param userId 操作者 ID
+     * @param content 新正文，为 null 时保留原正文
+     * @return 更新后的章节
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteChapter(Long chapterId) {
-        chapterDomainService.deleteChapter(chapterId);
+    public NovelChapter updateChapterContent(Long novelId, Long chapterId, Long userId, String content) {
+        novelDomainService.validateOwnership(novelId, userId);
+        NovelChapter chapter = chapterDomainService.getChapterInNovel(novelId, chapterId);
+        chapter = chapterDomainService.updateChapter(chapter, null, content);
+        novelService.refreshNovelStats(novelId);
+        return chapter;
     }
 
     /**
      * 发布章节。
      *
      * @param chapterId 章节 ID
+     * @param userId 操作者 ID
+     * @return 已发布的章节
      */
     @Transactional(rollbackFor = Exception.class)
-    public void publishChapter(Long chapterId) {
-        NovelChapter chapter = chapterDomainService.publishChapter(chapterId);
+    public NovelChapter publishChapter(Long chapterId, Long userId) {
+        NovelChapter chapter =
+            chapterDomainService.publishChapter(chapterDomainService.getOwnedChapter(chapterId, userId));
         novelService.refreshNovelStats(chapter.getNovelId());
+        return chapter;
     }
 
     /**
      * 获取章节历史版本。
      *
      * @param chapterId 章节 ID
+     * @param userId 操作者 ID
      * @return 版本列表
      */
-    public List<NovelChapterVersion> getChapterVersions(Long chapterId) {
+    public List<NovelChapterVersion> getChapterVersions(Long chapterId, Long userId) {
+        chapterDomainService.getOwnedChapter(chapterId, userId);
         return chapterDomainService.listVersions(chapterId);
-    }
-
-    /**
-     * 恢复章节到指定版本。
-     *
-     * @param chapterId 章节 ID
-     * @param versionId 版本 ID
-     * @return 恢复后的章节
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public NovelChapter restoreChapterVersion(Long chapterId, Long versionId) {
-        return chapterDomainService.restoreVersion(chapterId, versionId);
-    }
-
-    /**
-     * 获取小说大纲。
-     *
-     * @param novelId 小说 ID
-     * @return 小说大纲
-     */
-    public NovelOutline getNovelOutline(Long novelId) {
-        return outlineRepository.findByNovelId(novelId)
-                .orElseGet(() -> {
-                    NovelOutline empty = NovelOutline.createEmpty(novelId);
-                    empty.setOutlineContent("");
-                    return empty;
-                });
     }
 
     /**
      * 保存小说大纲。
      *
-     * @param outline 大纲实体
+     * @param novelId 小说 ID
+     * @param content 大纲内容
+     * @param userId 当前用户 ID
      * @return 保存后的大纲
      */
     @Transactional(rollbackFor = Exception.class)
-    public NovelOutline saveNovelOutline(NovelOutline outline) {
-        return outlineRepository.findByNovelId(outline.getNovelId())
-                .map(existing -> {
-                    existing.updateContent(outline.getOutlineContent());
-                    return outlineRepository.save(existing);
-                })
-                .orElseGet(() -> outlineRepository.save(outline));
+    public NovelOutline saveNovelOutline(Long novelId, String content, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
+        return novelDomainService.updateOutline(novelId, content);
     }
 
     /**
@@ -271,20 +233,12 @@ public class NovelChapterService {
      * @param chapterId 章节 ID
      * @param versionId 版本 ID
      * @param remark    备注内容
+     * @param userId 操作者 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void updateVersionRemark(Long chapterId, Long versionId, String remark) {
-        chapterDomainService.getChapter(chapterId);
-
-        NovelChapterVersion version = versionRepository.findById(versionId)
-            .orElseThrow(() -> exception(NOT_FOUND));
-
-        if (!version.belongsToChapter(chapterId)) {
-            throw exception(VERSION_NOT_BELONG_TO_CHAPTER);
-        }
-
-        version.updateRemark(remark);
-        versionRepository.save(version);
+    public void updateVersionRemark(Long chapterId, Long versionId, String remark, Long userId) {
+        chapterDomainService.getOwnedChapter(chapterId, userId);
+        chapterDomainService.updateVersionRemark(chapterId, versionId, remark);
     }
 
     /**
@@ -292,33 +246,39 @@ public class NovelChapterService {
      *
      * @param chapterId     章节 ID
      * @param chapterNumber 新章节号
+     * @param userId 操作者 ID
      * @return 更新后的章节
      */
     @Transactional(rollbackFor = Exception.class)
-    public NovelChapter updateChapterNumber(Long chapterId, Integer chapterNumber) {
-        return chapterDomainService.updateChapterNumber(chapterId, chapterNumber);
+    public NovelChapter updateChapterNumber(Long chapterId, Integer chapterNumber, Long userId) {
+        NovelChapter chapter = chapterDomainService.getOwnedChapter(chapterId, userId);
+        return chapterDomainService.updateChapterNumber(chapter, chapterNumber);
     }
 
     /**
      * 一键重排章节号，使章节号连续。
      *
      * @param novelId 小说 ID
+     * @param userId 操作者 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void reorderChapters(Long novelId) {
+    public void reorderChapters(Long novelId, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
         chapterDomainService.reorderChapters(novelId);
     }
 
     /**
      * 批量更新章节排序（拖拽排序场景）。
      *
-     * 按传入的章节 ID 顺序更新 sortOrder，同时同步更新 chapterNumber。
+     * 按传入顺序更新排序号和章节号，任一章节归属校验失败时整批回滚。
      *
      * @param novelId    小说 ID
      * @param chapterIds 按期望顺序排列的章节 ID 列表
+     * @param userId 操作者 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void batchUpdateSort(Long novelId, List<Long> chapterIds) {
+    public void batchUpdateSort(Long novelId, List<Long> chapterIds, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
         chapterDomainService.batchUpdateSort(novelId, chapterIds);
     }
 }

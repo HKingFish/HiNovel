@@ -1,8 +1,8 @@
 import http from './http'
 
 export interface NovelCharacter {
-    id: number
-    novelId: number
+    id: string
+    novelId: string
     name: string
     alias: string
     avatarUrl: string
@@ -23,10 +23,10 @@ export interface NovelCharacter {
 }
 
 export interface NovelCharacterRelation {
-    id: number
-    novelId: number
-    characterId: number
-    targetId: number
+    id: string
+    novelId: string
+    characterId: string
+    targetId: string
     relationType: string
     description: string
     createTime: string
@@ -39,7 +39,7 @@ export interface CharacterGraph {
 }
 
 export interface CreateCharacterRequest {
-    novelId: number
+    novelId: string
     name: string
     alias?: string
     avatarUrl?: string
@@ -74,9 +74,9 @@ export interface UpdateCharacterRequest {
 }
 
 export interface CreateRelationRequest {
-    novelId: number
-    characterId: number
-    targetId: number
+    novelId: string
+    characterId: string
+    targetId: string
     relationType: string
     description?: string
 }
@@ -105,10 +105,10 @@ export const roleTypeOptions = [
 export const createCharacter = (data: CreateCharacterRequest) =>
     http.post<never, { data: NovelCharacter }>('/api/novel/character/characters', data)
 
-export const updateCharacter = (characterId: number, data: UpdateCharacterRequest) =>
+export const updateCharacter = (characterId: string, data: UpdateCharacterRequest) =>
     http.put<never, { data: NovelCharacter }>(`/api/novel/character/characters/${characterId}`, data)
 
-export const deleteCharacter = (characterId: number) =>
+export const deleteCharacter = (characterId: string) =>
     http.delete<never, { data: void }>(`/api/novel/character/characters/${characterId}`)
 
 // ==================== 关系管理 ====================
@@ -116,11 +116,11 @@ export const deleteCharacter = (characterId: number) =>
 export const createRelation = (data: CreateRelationRequest) =>
     http.post<never, { data: NovelCharacterRelation }>('/api/novel/character/character-relations', data)
 
-export const deleteRelation = (relationId: number) =>
+export const deleteRelation = (relationId: string) =>
     http.delete<never, { data: void }>(`/api/novel/character/character-relations/${relationId}`)
 
-export const listCharacterRelations = (characterId: number) =>
+export const listCharacterRelations = (characterId: string) =>
     http.get<never, { data: NovelCharacterRelation[] }>(`/api/novel/character/characters/${characterId}/relations`)
 
-export const getCharacterGraph = (novelId: number) =>
+export const getCharacterGraph = (novelId: string) =>
     http.get<never, { data: CharacterGraph }>(`/api/novel/character/novels/${novelId}/character-graph`)

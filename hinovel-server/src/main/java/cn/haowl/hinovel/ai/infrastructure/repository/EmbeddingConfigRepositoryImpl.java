@@ -11,6 +11,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.SYSTEM_BUSY;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
 /**
  * 嵌入式模型配置仓储实现。
  *
@@ -30,8 +33,8 @@ public class EmbeddingConfigRepositoryImpl implements EmbeddingConfigRepository 
     public EmbeddingConfig save(EmbeddingConfig config) {
         if (config.getId() == null) {
             embeddingConfigMapper.insert(config);
-        } else {
-            embeddingConfigMapper.updateById(config);
+        } else if (0 == embeddingConfigMapper.updateById(config)) {
+            throw exception(SYSTEM_BUSY);
         }
         return config;
     }

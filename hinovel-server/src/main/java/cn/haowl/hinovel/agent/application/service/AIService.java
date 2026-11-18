@@ -1,6 +1,11 @@
 package cn.haowl.hinovel.agent.application.service;
 
-import cn.haowl.hinovel.agent.interfaces.dto.*;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
 import reactor.core.publisher.Flux;
 
 /**
@@ -32,15 +37,17 @@ public interface AIService {
      * AI 批量审核功能。
      *
      * @param request 批量审核请求
+     * @param userId 当前用户 ID
      * @return 批量审核结果
      */
-    AIAuditBatchResponse aiBatchAudit(AIAuditBatchRequest request);
+    AIAuditBatchResponse aiBatchAudit(AIAuditBatchRequest request, Long userId);
 
     /**
      * AI 重新生成功能。
      *
      * @param request 重新生成请求
+     * @param userId 当前用户 ID
      * @return 重新生成结果
      */
-    AIAuthorResponse aiRegenerate(AIAuthorRequest request);
+    AIAuthorResponse aiRegenerate(AIAuthorRequest request, Long userId);
 }

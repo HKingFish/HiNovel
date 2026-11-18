@@ -8,7 +8,12 @@ import cn.haowl.hinovel.novel.domain.entity.NovelSettings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 小说配置控制器。
@@ -35,7 +40,8 @@ public class NovelSettingsController {
     @Operation(summary = "获取小说有效配置", description = "获取小说级别与用户默认合并后的有效配置")
     @GetMapping("/{novelId}")
     public ApiResponse<NovelSettings> getEffectiveSettings(@PathVariable Long novelId) {
-        return ApiResponse.success(novelSettingsService.getEffectiveSettings(novelId, StpUtil.getLoginIdAsLong()));
+        return ApiResponse.success(
+            novelSettingsService.getOwnedEffectiveSettings(novelId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -44,7 +50,7 @@ public class NovelSettingsController {
     @Operation(summary = "获取小说级别配置", description = "仅获取小说级别的配置（不含用户默认）")
     @GetMapping("/{novelId}/novel-level")
     public ApiResponse<NovelSettings> getNovelSettings(@PathVariable Long novelId) {
-        return ApiResponse.success(novelSettingsService.getNovelSettings(novelId));
+        return ApiResponse.success(novelSettingsService.getNovelSettings(novelId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -55,7 +61,8 @@ public class NovelSettingsController {
     public ApiResponse<NovelSettings> saveNovelSettings(
             @PathVariable Long novelId,
             @RequestBody NovelSettings settings) {
-        return ApiResponse.success(novelSettingsService.saveNovelSettings(novelId, settings));
+        return ApiResponse.success(
+            novelSettingsService.saveNovelSettings(novelId, StpUtil.getLoginIdAsLong(), settings));
     }
 
     /**

@@ -23,6 +23,14 @@ public interface ChapterOutlineRepository {
     ChapterOutline save(ChapterOutline outline);
 
     /**
+     * 按大纲 ID 更新 AI 大纲内容。
+     *
+     * @param outlineId 大纲 ID
+     * @param content AI 大纲内容
+     */
+    void updateAiOutlineContent(Long outlineId, String content);
+
+    /**
      * 根据章节 ID 查询大纲。
      *
      * @param chapterId 章节 ID

@@ -3,11 +3,11 @@ import {stringifyWithLongIds} from './json-long-ids'
 
 // AI 改写相关接口
 export interface AIAuthorRequest {
-  chapterId: number
+  chapterId: string
   content: string
   outline?: string
   plotPoints?: string
-  characters?: number[]
+  characters?: string[]
   emotionTone?: string
   sceneSetting?: string
     userRequirement?: string
@@ -22,11 +22,11 @@ export interface AIAuthorResponse {
 }
 
 export interface AIAuditorRequest {
-  chapterId: number
+  chapterId: string
   content: string
   novelOutline: string
   previousChapters?: {
-    chapterId: number
+    chapterId: string
     chapterNumber: number
     content: string
   }[]
@@ -56,7 +56,7 @@ export interface AIAuditorResponse {
 }
 
 export interface AIAuditBatchRequest {
-  chapterId: number
+  chapterId: string
   content: string
   novelOutline: string
   chapterRanges: {

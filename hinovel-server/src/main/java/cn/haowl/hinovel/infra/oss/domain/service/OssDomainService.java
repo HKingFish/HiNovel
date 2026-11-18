@@ -13,9 +13,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TOO_LARGE;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_NOT_EXISTS;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TYPE_NOT_ALLOWED;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_FILE_TOO_LARGE;
+import static cn.haowl.hinovel.infra.oss.constant.OssConstants.BIZ_TYPE_PATTERN;
 
 /**
  * OSS 领域服务。
@@ -55,6 +58,9 @@ public class OssDomainService {
     public OssUploadLog upload(UploadCommand command) {
         MultipartFile file = command.getFile();
         validateFile(file);
+        if (command.getBizType() == null || !BIZ_TYPE_PATTERN.matcher(command.getBizType()).matches()) {
+            throw exception(PARAM_ERROR);
+        }
 
         String fileUrl = ossProvider.upload(file, command.getBizType());
         LocalDateTime now = LocalDateTime.now();
@@ -76,12 +82,14 @@ public class OssDomainService {
     /**
      * 删除文件。
      *
-     * @param fileUrl 文件URL
+     * @param fileUrl 文件 URL
+     * @param userId 当前用户 ID
      */
-    public void delete(String fileUrl) {
-        ossProvider.delete(fileUrl);
-
-        ossUploadLogRepository.updateStatusByFileUrl(fileUrl, OssUploadStatusEnum.DELETED);
+    public void delete(String fileUrl, Long userId) {
+        OssUploadLog uploadLog = ossUploadLogRepository.findActiveByFileUrlAndUserId(fileUrl, userId)
+            .orElseThrow(() -> exception(OSS_FILE_NOT_EXISTS));
+        ossProvider.delete(uploadLog.getFileUrl());
+        ossUploadLogRepository.updateStatus(uploadLog.getId(), OssUploadStatusEnum.DELETED);
     }
 
     /**

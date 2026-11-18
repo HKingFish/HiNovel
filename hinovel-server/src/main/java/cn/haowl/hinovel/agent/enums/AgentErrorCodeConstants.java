@@ -2,7 +2,10 @@ package cn.haowl.hinovel.agent.enums;
 
 import cn.haowl.hinovel.common.exception.ErrorCode;
 
-import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.*;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.AGENT_AUDIT_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.AGENT_CHAT_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.AGENT_CONFIG_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.AGENT_REWRITE_ERROR_CODE_MIN;
 
 /**
  * Agent 模块错误码常量接口。
@@ -59,6 +62,13 @@ public interface AgentErrorCodeConstants {
         AGENT_AUDIT_ERROR_CODE_MIN + 5,
         "审核结果解析失败，请稍后重试"
     );
+
+    /**
+     * 批量审核暂不可用。
+     */
+    ErrorCode AUDIT_BATCH_UNAVAILABLE = new ErrorCode(
+        AGENT_AUDIT_ERROR_CODE_MIN + 6,
+        "批量审核暂不可用，请使用单章审核");
 
     // ==================== Agent AI 改写模块 [1-003-002-xxx] ====================
 

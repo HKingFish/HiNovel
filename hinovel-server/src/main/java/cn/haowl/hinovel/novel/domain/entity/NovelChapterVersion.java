@@ -119,15 +119,15 @@ public class NovelChapterVersion {
         String safeContent = content != null ? content : "";
 
         return NovelChapterVersion.builder()
-                .chapterId(chapterId)
-                .content(safeContent)
-                .wordCount(calculateWordCount(safeContent))
+            .chapterId(chapterId)
+            .content(safeContent)
+            .wordCount(NovelChapter.countContentCharacters(safeContent))
             .contentMd5(DigestUtils.md5DigestAsHex(safeContent.getBytes(StandardCharsets.UTF_8)))
-                .remark(remark)
-                .published(published)
-                .createTime(LocalDateTime.now())
-                .deleted(CommonConstants.DELETED_FALSE)
-                .build();
+            .remark(remark)
+            .published(published)
+            .createTime(LocalDateTime.now())
+            .deleted(CommonConstants.DELETED_FALSE)
+            .build();
     }
 
     // ==================== 业务方法 ====================
@@ -179,18 +179,4 @@ public class NovelChapterVersion {
         return Objects.equals(this.contentMd5, md5);
     }
 
-    // ==================== 工具方法 ====================
-
-    /**
-     * 计算中文内容字数（去除空白字符后的长度）。
-     *
-     * @param content 内容
-     * @return 字数
-     */
-    private static int calculateWordCount(String content) {
-        if (content == null || content.isBlank()) {
-            return 0;
-        }
-        return content.replaceAll("\\s+", "").length();
-    }
 }

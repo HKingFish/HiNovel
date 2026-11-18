@@ -74,14 +74,15 @@ public class NovelService {
     @Transactional(rollbackFor = Exception.class)
     public Novel updateNovel(Long userId, Long novelId, NovelUpdateRequest request) {
         Novel novel = novelDomainService.validateOwnership(novelId, userId);
+        NovelStatusEnum status = request.parseStatus();
 
         // 通过领域服务更新基本信息（内部调用实体充血方法）
         novel = novelDomainService.updateNovelInfo(
                 novel, request.getTitle(), request.getDescription(), request.getCoverUrl());
 
         // 状态变更单独处理（状态转换有独立的领域规则）
-        if (request.getStatus() != null) {
-            novel = novelDomainService.changeStatus(novel, NovelStatusEnum.valueOf(request.getStatus()));
+        if (status != null) {
+            novel = novelDomainService.changeStatus(novel, status);
         }
 
         return novel;

@@ -234,12 +234,13 @@
 
 <script setup lang="ts">
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {ElMessage} from 'element-plus'
 import {EditorContent, useEditor} from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import AnnotationMark from './annotation-mark'
-import type {ChapterAnnotation} from '@/api/annotation'
+import type {AnnotationRewriteCallbacks, ChapterAnnotation} from '@/api/annotation'
 
 /**
  * 组件属性定义
@@ -295,11 +296,7 @@ const emit = defineEmits<{
     originalText: string
     annotationContent: string
     fullChapterContent: string
-  }, callbacks: {
-    onToken: (token: string) => void
-    onComplete: (fullText: string) => void
-    onError: (error: Error) => void
-  }]
+  }, callbacks: AnnotationRewriteCallbacks, signal: AbortSignal]
   /** 采纳 AI 改写结果 */
   'accept-rewrite': [data: {
     annotationId: string
@@ -313,11 +310,7 @@ const emit = defineEmits<{
     originalText: string
     rewritePrompt: string
     fullChapterContent: string
-  }, callbacks: {
-    onToken: (token: string) => void
-    onComplete: (fullText: string) => void
-    onError: (error: Error) => void
-  }]
+  }, callbacks: AnnotationRewriteCallbacks, signal: AbortSignal]
   /** 快捷改写采纳事件 */
   'accept-quick-rewrite': [data: {
     originalText: string
@@ -348,6 +341,7 @@ const isAiRewriting = ref(false)
 const aiRewriteResult = ref('')
 const rewritePromptText = ref('')
 let aiRewriteAbortController: AbortController | null = null
+let quickRewriteAbortController: AbortController | null = null
 
 // 弹窗置顶状态（置顶后点击编辑器其他位置不关闭弹窗）
 const isPopupPinned = ref(false)
@@ -368,7 +362,6 @@ const quickRewriteResult = ref('')
 const isQuickRewriting = ref(false)
 const quickRewriteInputRef = ref<HTMLTextAreaElement | null>(null)
 const quickRewriteRef = ref<HTMLDivElement | null>(null)
-let _quickRewriteSelectedRange: { from: number; to: number; text: string } | null = null
 
 // 弹窗拖拽调整大小
 let isResizing = false
@@ -539,65 +532,6 @@ const editor = useEditor({
   }
 })
 
-const _checkAnnotationAtCursor = (position: number) => {
-  if (!editor.value) return
-  // 置顶状态下不重新定位弹窗，避免跳动
-  if (isPopupPinned.value) return
-
-  // 检查当前位置和前一个位置的 marks（处理 mark 边界情况）
-  const doc = editor.value.state.doc
-  let annotationMark = null
-
-  // 优先检查当前位置
-  const resolvedPos = doc.resolve(position)
-  annotationMark = resolvedPos.marks().find(m => m.type.name === 'annotation') || null
-
-  // 当前位置没有，检查前一个位置（光标可能在 mark 右边界）
-  if (!annotationMark && position > 0) {
-    const prevPos = doc.resolve(position - 1)
-    annotationMark = prevPos.marks().find(m => m.type.name === 'annotation') || null
-  }
-
-  // 备选方案：通过 DOM 检测点击的高亮元素
-  if (!annotationMark) {
-    const domAtPos = editor.value.view.domAtPos(position)
-    const element = domAtPos.node instanceof HTMLElement
-        ? domAtPos.node
-        : domAtPos.node.parentElement
-    const highlightEl = element?.closest('.annotation-highlight') as HTMLElement | null
-    if (highlightEl) {
-      const annotationId = Number(highlightEl.getAttribute('data-annotation-id'))
-      const annotation = props.annotations.find(a => a.id === annotationId)
-      if (annotation) {
-        viewingAnnotation.value = annotation
-        annotationMode.value = 'view'
-        aiRewriteResult.value = annotation.aiRewriteResult || ''
-        isAiRewriting.value = false
-        showAnnotationPopupAtCursor()
-        showAnnotationPopup.value = true
-        emit('view-annotation', annotation.id)
-        return
-      }
-    }
-  }
-
-  if (annotationMark) {
-    const annotationId = Number(annotationMark.attrs.annotationId)
-    const annotation = props.annotations.find(a => a.id === annotationId)
-    if (annotation) {
-      viewingAnnotation.value = annotation
-      annotationMode.value = 'view'
-      aiRewriteResult.value = annotation.aiRewriteResult || ''
-      isAiRewriting.value = false
-      showAnnotationPopupAtCursor()
-      showAnnotationPopup.value = true
-      emit('view-annotation', annotation.id)
-    }
-  } else if (annotationMode.value === 'view' && !isPopupPinned.value) {
-    showAnnotationPopup.value = false
-  }
-}
-
 const showSelectionBubbleAtPosition = () => {
   nextTick(() => {
     const editorEl = document.querySelector('.tiptap-editor-wrapper')
@@ -612,22 +546,6 @@ const showSelectionBubbleAtPosition = () => {
       transform: 'translateX(-50%)'
     }
     showSelectionBubble.value = true
-  })
-}
-
-const showAnnotationPopupAtCursor = () => {
-  nextTick(() => {
-    const editorEl = document.querySelector('.tiptap-editor-wrapper')
-    if (!editorEl) return
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-    const rect = selection.getRangeAt(0).getBoundingClientRect()
-    const editorRect = editorEl.getBoundingClientRect()
-    annotationPopupStyle.value = {
-      top: `${rect.bottom - editorRect.top + 8}px`,
-      left: `${rect.left - editorRect.left}px`,
-      width: '340px'
-    }
   })
 }
 
@@ -680,7 +598,8 @@ const quoteAnnotationAsPrompt = () => {
  * 触发 AI 改写（使用用户输入的提示词）
  */
 const handleAiRewrite = () => {
-  if (!viewingAnnotation.value || !rewritePromptText.value.trim()) return
+  if (!viewingAnnotation.value || !rewritePromptText.value.trim() || isAiRewriting.value) return
+  aiRewriteAbortController = new AbortController()
   aiRewriteResult.value = ''
   isAiRewriting.value = true
 
@@ -695,20 +614,24 @@ const handleAiRewrite = () => {
     },
     onComplete: (fullText: string) => {
       aiRewriteResult.value = fullText
+      aiRewriteAbortController = null
       isAiRewriting.value = false
     },
     onError: (error: Error) => {
-      console.error('AI 改写失败:', error)
-      isAiRewriting.value = false
+      ElMessage.error(error.message)
+      stopAiRewrite()
     }
-  })
+  }, aiRewriteAbortController.signal)
 }
 
 /**
  * 停止 AI 改写
  */
 const stopAiRewrite = () => {
-  aiRewriteAbortController?.abort()
+  if (aiRewriteAbortController) {
+    aiRewriteAbortController.abort()
+    aiRewriteResult.value = viewingAnnotation.value?.aiRewriteResult ?? ''
+  }
   aiRewriteAbortController = null
   isAiRewriting.value = false
 }
@@ -780,7 +703,6 @@ const openQuickRewrite = () => {
   quickRewritePrompt.value = ''
   quickRewriteResult.value = ''
   isQuickRewriting.value = false
-  _quickRewriteSelectedRange = {...selectedRange.value}
 
   const editorEl = document.querySelector('.tiptap-editor-wrapper')
   if (!editorEl) return
@@ -801,7 +723,8 @@ const openQuickRewrite = () => {
  * 执行快捷 AI 改写
  */
 const handleQuickRewrite = () => {
-  if (!quickRewritePrompt.value.trim()) return
+  if (!quickRewritePrompt.value.trim() || isQuickRewriting.value) return
+  quickRewriteAbortController = new AbortController()
   quickRewriteResult.value = ''
   isQuickRewriting.value = true
 
@@ -815,18 +738,22 @@ const handleQuickRewrite = () => {
     },
     onComplete: (fullText: string) => {
       quickRewriteResult.value = fullText
+      quickRewriteAbortController = null
       isQuickRewriting.value = false
     },
-    onError: () => {
-      isQuickRewriting.value = false
+    onError: (error: Error) => {
+      ElMessage.error(error.message)
+      stopQuickRewrite()
     }
-  })
+  }, quickRewriteAbortController.signal)
 }
 
 /**
  * 停止快捷改写
  */
 const stopQuickRewrite = () => {
+  quickRewriteAbortController?.abort()
+  quickRewriteAbortController = null
   isQuickRewriting.value = false
 }
 
@@ -850,8 +777,7 @@ const closeQuickRewrite = () => {
   quickRewriteOriginalText.value = ''
   quickRewritePrompt.value = ''
   quickRewriteResult.value = ''
-  isQuickRewriting.value = false
-  _quickRewriteSelectedRange = null
+  stopQuickRewrite()
 }
 
 /**
@@ -937,8 +863,8 @@ const applyAnnotationMarks = () => {
     if (textIndex < 0) continue
 
     // 构建位置映射表：纯文本偏移量 → 文档位置
-    const fromPos = textOffsetToDocPos(doc, docSize, textIndex)
-    const toPos = textOffsetToDocPos(doc, docSize, textIndex + searchText.length)
+    const fromPos = textOffsetToDocPos(doc, textIndex)
+    const toPos = textOffsetToDocPos(doc, textIndex + searchText.length)
 
     if (fromPos >= 0 && toPos > fromPos && toPos <= docSize) {
       editor.value.chain()
@@ -962,7 +888,7 @@ const applyAnnotationMarks = () => {
 const textOffsetToDocPos = (doc: {
   childCount: number;
   child: (index: number) => { textContent: string }
-}, docSize: number, targetOffset: number): number => {
+}, targetOffset: number): number => {
   let textOffset = 0
   let docPos = 0
 
@@ -1001,7 +927,7 @@ watch(() => props.modelValue, (newValue) => {
   const currentText = htmlToText(editor.value.getHTML())
   if (newValue === currentText) return
   isUpdatingFromProp = true
-  editor.value.commands.setContent(textToHtml(newValue), false)
+  editor.value.commands.setContent(textToHtml(newValue), {emitUpdate: false})
   nextTick(() => {
     isUpdatingFromProp = false
     // 内容更新后重新应用批注标记（setContent 会清除所有 marks）
@@ -1035,8 +961,8 @@ const scrollToAnnotation = (annotation: ChapterAnnotation) => {
   const textIndex = fullText.indexOf(annotation.originalText)
   if (textIndex < 0) return
 
-  const from = textOffsetToDocPos(doc, docSize, textIndex)
-  const to = textOffsetToDocPos(doc, docSize, textIndex + annotation.originalText.length)
+  const from = textOffsetToDocPos(doc, textIndex)
+  const to = textOffsetToDocPos(doc, textIndex + annotation.originalText.length)
   if (from < 0 || to < 0) return
 
   // 选中批注对应的文本
@@ -1082,7 +1008,7 @@ const handleEditorClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
   const highlightEl = target.closest('.annotation-highlight') as HTMLElement | null
   if (highlightEl) {
-    const annotationId = Number(highlightEl.getAttribute('data-annotation-id'))
+    const annotationId = highlightEl.getAttribute('data-annotation-id')
     const annotation = props.annotations.find(a => a.id === annotationId)
     if (annotation) {
       viewingAnnotation.value = annotation
@@ -1154,6 +1080,7 @@ defineExpose({
 
 onBeforeUnmount(() => {
   stopAiRewrite()
+  stopQuickRewrite()
   stopDrag()
   stopResize()
   const wrapperEl = document.querySelector('.tiptap-editor-wrapper')

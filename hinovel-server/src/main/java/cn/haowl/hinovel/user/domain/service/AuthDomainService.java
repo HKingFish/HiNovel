@@ -10,7 +10,10 @@ import java.util.Optional;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ACCOUNT_DISABLED;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.EMAIL_ALREADY_EXISTS;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.LOGIN_FAILED;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.USERNAME_ALREADY_EXISTS;
 
 /**
  * 认证领域服务。
@@ -84,6 +87,7 @@ public class AuthDomainService {
      */
     public Optional<User> authenticateByEmail(String email, String password) {
         return userRepository.findByEmail(email)
+            .filter(user -> !user.isDisabled())
             .filter(user -> user.verifyPassword(password, passwordEncoder));
     }
 

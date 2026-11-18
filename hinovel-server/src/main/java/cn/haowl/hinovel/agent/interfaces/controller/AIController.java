@@ -6,7 +6,22 @@ import cn.haowl.hinovel.agent.application.service.agent.QaAgent;
 import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.agent.domain.entity.ChatMessage;
 import cn.haowl.hinovel.agent.domain.entity.ChatSession;
-import cn.haowl.hinovel.agent.interfaces.dto.*;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditBatchResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuditorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.AIAuthorResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.AiChatRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessagePageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageQuery;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.ChatSessionResponse;
+import cn.haowl.hinovel.agent.interfaces.dto.CreateSessionRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
+import cn.haowl.hinovel.agent.interfaces.dto.RenameSessionRequest;
+import cn.haowl.hinovel.agent.interfaces.dto.SavePartialRequest;
 import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +31,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -82,7 +105,7 @@ public class AIController {
                     request.getChapterId(), error.getClass().getSimpleName());
                 return Flux.just(ServerSentEvent.<String>builder()
                     .event(ChatEventEnum.ERROR.getCode())
-                    .data(error.getMessage() == null ? REWRITE_STREAM_ERROR_MESSAGE : error.getMessage())
+                    .data(error instanceof BusinessException ? error.getMessage() : REWRITE_STREAM_ERROR_MESSAGE)
                     .build());
             });
     }
@@ -111,7 +134,7 @@ public class AIController {
     @Operation(summary = "批量审核", description = "批量审核章节内容")
     @PostMapping("/audit/batch")
     public ApiResponse<AIAuditBatchResponse> aiBatchAudit(@RequestBody AIAuditBatchRequest request) {
-        return ApiResponse.success(aiService.aiBatchAudit(request));
+        return ApiResponse.success(aiService.aiBatchAudit(request, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -123,7 +146,7 @@ public class AIController {
     @Operation(summary = "重新生成", description = "重新生成章节内容")
     @PostMapping("/regenerate")
     public ApiResponse<AIAuthorResponse> aiRegenerate(@RequestBody AIAuthorRequest request) {
-        return ApiResponse.success(aiService.aiRegenerate(request));
+        return ApiResponse.success(aiService.aiRegenerate(request, StpUtil.getLoginIdAsLong()));
     }
 
     // ==================== AI 问答接口 ====================
@@ -137,7 +160,7 @@ public class AIController {
     @Operation(summary = "获取问答会话列表", description = "获取指定小说的所有问答会话")
     @GetMapping("/chat/sessions/{novelId}")
     public ApiResponse<List<ChatSessionResponse>> listChatSessions(@PathVariable Long novelId) {
-        List<ChatSession> sessions = qaAgentService.listSessions(novelId);
+        List<ChatSession> sessions = qaAgentService.listSessions(novelId, StpUtil.getLoginIdAsLong());
         List<ChatSessionResponse> responseList = sessions.stream()
                 .map(ChatSessionResponse::fromEntity)
                 .toList();
@@ -155,7 +178,7 @@ public class AIController {
     public ApiResponse<ChatSessionResponse> createChatSession(
             @RequestBody CreateSessionRequest request) {
         ChatSession session = qaAgentService.createSession(
-                request.getNovelId(), request.getTitle());
+                request.getNovelId(), request.getTitle(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success(ChatSessionResponse.fromEntity(session));
     }
 
@@ -168,7 +191,7 @@ public class AIController {
     @Operation(summary = "删除问答会话", description = "删除指定的问答会话及其所有消息")
     @DeleteMapping("/chat/sessions/{sessionId}")
     public ApiResponse<Void> deleteChatSession(@PathVariable Long sessionId) {
-        qaAgentService.deleteSession(sessionId);
+        qaAgentService.deleteSession(sessionId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success(null);
     }
 
@@ -184,7 +207,7 @@ public class AIController {
     public ApiResponse<Void> renameChatSession(
             @PathVariable Long sessionId,
             @RequestBody RenameSessionRequest request) {
-        qaAgentService.renameSession(sessionId, request.getTitle());
+        qaAgentService.renameSession(sessionId, request.getTitle(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success(null);
     }
 
@@ -197,7 +220,7 @@ public class AIController {
     @Operation(summary = "切换会话收藏", description = "切换指定会话的收藏状态")
     @PutMapping("/chat/sessions/{sessionId}/favorite")
     public ApiResponse<Boolean> toggleChatSessionFavorite(@PathVariable Long sessionId) {
-        return ApiResponse.success(qaAgentService.toggleFavorite(sessionId));
+        return ApiResponse.success(qaAgentService.toggleFavorite(sessionId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -264,7 +287,7 @@ public class AIController {
     @Operation(summary = "撤回消息", description = "撤回指定的问答消息，撤回后不再参与 LLM 上下文构建")
     @PutMapping("/chat/messages/{messageId}/revoke")
     public ApiResponse<Void> revokeChatMessage(@PathVariable Long messageId) {
-        qaAgentService.revokeMessage(messageId);
+        qaAgentService.revokeMessage(messageId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success(null);
     }
 
@@ -292,9 +315,9 @@ public class AIController {
             .onErrorResume(e -> {
                 log.error("[aiChat][问答流式异常，sessionId={}，异常类型={}]",
                     command.getSessionId(), e.getClass().getSimpleName());
-                String message = e.getMessage() != null ? e.getMessage() : QA_STREAM_ERROR_MESSAGE;
+                String message = QA_STREAM_ERROR_MESSAGE;
                 if (e instanceof BusinessException businessException) {
-                    message = businessException.getCode() + " " + message;
+                    message = businessException.getCode() + " " + businessException.getMessage();
                 }
                 return Flux.just(ServerSentEvent.<Object>builder()
                     .event(ChatEventEnum.ERROR.getCode())

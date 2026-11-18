@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
@@ -46,6 +47,18 @@ public class NovelAgentConfigService {
     private NovelDomainService novelDomainService;
 
     /**
+     * 获取当前用户有权查看的 Agent 配置。
+     *
+     * @param novelId 小说 ID
+     * @param userId 操作者 ID
+     * @return Agent 配置，尚未设置时仅包含小说 ID
+     */
+    public NovelAgentConfigResponse getConfig(Long novelId, Long userId) {
+        novelDomainService.validateOwnership(novelId, userId);
+        return getConfig(novelId);
+    }
+
+    /**
      * 获取小说的 Agent 配置
      *
      * @param novelId 小说 ID
@@ -72,8 +85,9 @@ public class NovelAgentConfigService {
     @Transactional(rollbackFor = Exception.class)
     public NovelAgentConfigResponse saveOrUpdateConfig(Long novelId, NovelAgentConfigRequest request, Long userId) {
         novelDomainService.validateOwnership(novelId, userId);
-        for (Long agentId : Stream.of(request.getAuthorAgentId(), request.getEditorAgentId(), request.getQaAgentId())
-                .filter(java.util.Objects::nonNull).distinct().toList()) {
+        for (Long agentId : Stream.of(
+            request.getAuthorAgentId(), request.getEditorAgentId(), request.getQaAgentId())
+            .filter(Objects::nonNull).distinct().toList()) {
             agentRepository.findById(agentId)
                 .filter(agent -> agent.isAvailableTo(userId))
                 .orElseThrow(() -> exception(AGENT_NOT_OWNED));

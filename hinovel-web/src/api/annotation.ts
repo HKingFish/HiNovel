@@ -24,8 +24,8 @@ export interface ChapterAnnotation {
  * 创建批注请求
  */
 export interface CreateAnnotationRequest {
-    chapterId: number
-    novelId: number
+    chapterId: string
+    novelId: string
     startOffset: number
     endOffset: number
     originalText: string
@@ -37,7 +37,7 @@ export interface CreateAnnotationRequest {
  *
  * @param chapterId 章节 ID
  */
-export const getChapterAnnotations = (chapterId: number) =>
+export const getChapterAnnotations = (chapterId: string) =>
     http.get<never, { data: ChapterAnnotation[] }>(`/api/novel/annotations/chapter/${chapterId}`)
 
 /**
@@ -54,7 +54,7 @@ export const createAnnotation = (data: CreateAnnotationRequest) =>
  * @param annotationId 批注 ID
  * @param annotationContent 新的批注内容
  */
-export const updateAnnotation = (annotationId: number, annotationContent: string) =>
+export const updateAnnotation = (annotationId: string, annotationContent: string) =>
     http.put<never, { data: void }>(`/api/novel/annotations/${annotationId}`, {annotationContent})
 
 /**
@@ -63,7 +63,7 @@ export const updateAnnotation = (annotationId: number, annotationContent: string
  * @param annotationId 批注 ID
  * @param rewriteResult AI 改写结果
  */
-export const saveAiRewriteResult = (annotationId: number, rewriteResult: string) =>
+export const saveAiRewriteResult = (annotationId: string, rewriteResult: string) =>
     http.put<never, { data: void }>(`/api/novel/annotations/${annotationId}/ai-rewrite`, {rewriteResult})
 
 /**
@@ -71,7 +71,7 @@ export const saveAiRewriteResult = (annotationId: number, rewriteResult: string)
  *
  * @param annotationId 批注 ID
  */
-export const acceptAnnotation = (annotationId: number) =>
+export const acceptAnnotation = (annotationId: string) =>
     http.post<never, { data: void }>(`/api/novel/annotations/${annotationId}/accept`)
 
 /**
@@ -79,7 +79,7 @@ export const acceptAnnotation = (annotationId: number) =>
  *
  * @param annotationId 批注 ID
  */
-export const deleteAnnotation = (annotationId: number) =>
+export const deleteAnnotation = (annotationId: string) =>
     http.delete<never, { data: void }>(`/api/novel/annotations/${annotationId}`)
 
 /**
@@ -87,7 +87,7 @@ export const deleteAnnotation = (annotationId: number) =>
  *
  * @param annotationId 批注 ID
  */
-export const markAnnotationViewed = (annotationId: number) =>
+export const markAnnotationViewed = (annotationId: string) =>
     http.post<never, { data: void }>(`/api/novel/annotations/${annotationId}/view`)
 
 /**
@@ -95,7 +95,7 @@ export const markAnnotationViewed = (annotationId: number) =>
  *
  * @param annotationId 批注 ID
  */
-export const resolveAnnotation = (annotationId: number) =>
+export const resolveAnnotation = (annotationId: string) =>
     http.post<never, { data: void }>(`/api/novel/annotations/${annotationId}/resolve`)
 
 
@@ -104,11 +104,11 @@ export const resolveAnnotation = (annotationId: number) =>
  */
 export interface AnnotationRewriteRequest {
     /** 批注 ID（快捷改写时可为 0 或不传） */
-    annotationId?: number
+    annotationId?: string
     /** 章节 ID */
-    chapterId: number
+    chapterId: string
     /** 小说 ID（快捷改写模式使用） */
-    novelId?: number
+    novelId?: string
     /** 整章正文内容（保证改写连贯性） */
     fullChapterContent: string
     /** 被批注的原文片段 */
@@ -117,30 +117,32 @@ export interface AnnotationRewriteRequest {
     annotationContent: string
 }
 
-/**
- * 批注 AI 改写（流式）
- * 将整章内容 + 原文片段 + 批注意见发送给 AI，流式返回改写结果
- *
- * @param data 改写请求
- * @param callbacks 流式回调
- * @returns AbortController 用于取消请求
- */
-export const annotationAiRewriteStream = (
-    data: AnnotationRewriteRequest,
-    callbacks: {
-        onToken: (token: string) => void
-        onComplete: (fullText: string) => void
-        onError: (error: Error) => void
-    }
-): AbortController => {
-    const abortController = new AbortController()
+export interface AnnotationRewriteCallbacks {
+    onToken: (token: string) => void
+    onComplete: (fullText: string) => void | Promise<void>
+    onError: (error: Error) => void
+}
 
-    fetch('/api/novel/annotations/ai-rewrite-stream', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data),
-        signal: abortController.signal
-    }).then(async (response) => {
+/** 接收完整的批注改写事件，并保留正文中的空白。 */
+export const annotationAiRewriteStream = async (
+    data: AnnotationRewriteRequest,
+    callbacks: AnnotationRewriteCallbacks,
+    signal: AbortSignal
+): Promise<void> => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+    const token = localStorage.getItem('accessToken')
+
+    try {
+        const response = await fetch(`${baseUrl}/api/novel/annotations/ai-rewrite-stream`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream',
+                ...(token ? {'satoken': token} : {})
+            },
+            body: JSON.stringify(data),
+            signal
+        })
         if (!response.ok) {
             throw new Error(`请求失败：${response.status}`)
         }
@@ -150,34 +152,47 @@ export const annotationAiRewriteStream = (
         }
 
         const decoder = new TextDecoder()
+        let buffer = ''
         let fullText = ''
+        try {
+            while (!signal.aborted) {
+                const {done, value} = await reader.read()
+                if (signal.aborted) return
+                if (done) break
 
-        while (true) {
-            const {done, value} = await reader.read()
-            if (done) break
+                buffer += decoder.decode(value, {stream: true})
+                const frames = buffer.split(/\r?\n\r?\n/)
+                buffer = frames.pop() ?? ''
+                for (const frame of frames) {
+                    const lines = frame.split(/\r?\n/)
+                    const event = lines.find(line => line.startsWith('event:'))?.slice(6).trim()
+                    const dataLines = lines.filter(line => line.startsWith('data:'))
+                    if (!dataLines.length) continue
 
-            const chunk = decoder.decode(value, {stream: true})
-            const lines = chunk.split('\n')
-
-            for (const line of lines) {
-                if (line.startsWith('data:')) {
-                    const content = line.slice(5).trim()
+                    // Spring 紧接 data: 写入正文，冒号后的空格属于改写内容。
+                    const content = dataLines.map(line => line.slice(5)).join('\n')
+                    if (event === 'error') {
+                        throw new Error(content || 'AI 改写失败')
+                    }
                     if (content === '[DONE]') {
-                        callbacks.onComplete(fullText)
+                        await callbacks.onComplete(fullText)
                         return
                     }
                     fullText += content
                     callbacks.onToken(content)
+                    if (signal.aborted) return
                 }
             }
+            if (!signal.aborted) {
+                throw new Error('改写连接中断，请稍后重试')
+            }
+        } finally {
+            await reader.cancel().catch(() => {})
+            reader.releaseLock()
         }
-
-        callbacks.onComplete(fullText)
-    }).catch((error) => {
-        if (error.name !== 'AbortError') {
-            callbacks.onError(error)
+    } catch (error) {
+        if (!signal.aborted) {
+            callbacks.onError(error instanceof Error ? error : new Error('AI 改写失败'))
         }
-    })
-
-    return abortController
+    }
 }

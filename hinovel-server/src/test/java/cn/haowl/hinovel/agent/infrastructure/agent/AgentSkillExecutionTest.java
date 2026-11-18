@@ -15,6 +15,7 @@ import cn.haowl.hinovel.agent.interfaces.dto.ChatMessageResponse;
 import cn.haowl.hinovel.agent.interfaces.dto.QaChatCommand;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderFactory;
 import cn.haowl.hinovel.ai.application.llm.LlmProviderPort;
+import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
 import cn.haowl.hinovel.ai.application.log.LlmCallLogService;
 import cn.haowl.hinovel.ai.application.vector.VectorStoreFactory;
 import cn.haowl.hinovel.ai.constant.SkillReadStatusEnum;
@@ -41,13 +42,24 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @author : haowl
@@ -139,7 +151,9 @@ class AgentSkillExecutionTest {
         });
         LlmCallLogService logs = mock(LlmCallLogService.class);
         ChatSessionMapper sessions = mock(ChatSessionMapper.class);
-        when(sessions.selectById(SESSION_ID)).thenReturn(ChatSession.create(NOVEL_ID, "会话"));
+        ChatSession session = ChatSession.create(NOVEL_ID, "会话");
+        when(sessions.selectById(SESSION_ID)).thenReturn(session);
+        when(sessions.selectByIdForUpdate(SESSION_ID)).thenReturn(session);
         ChatMessageMapper messages = mock(ChatMessageMapper.class);
         NovelSettingsService settings = mock(NovelSettingsService.class);
         when(settings.getEffectiveSettings(NOVEL_ID, USER_ID)).thenReturn(new NovelSettings());
@@ -290,7 +304,9 @@ class AgentSkillExecutionTest {
      */
     private QaAgent qa(AiServiceFactory factory) {
         ChatSessionMapper sessions = mock(ChatSessionMapper.class);
-        when(sessions.selectById(SESSION_ID)).thenReturn(ChatSession.create(NOVEL_ID, "会话"));
+        ChatSession session = ChatSession.create(NOVEL_ID, "会话");
+        when(sessions.selectById(SESSION_ID)).thenReturn(session);
+        when(sessions.selectByIdForUpdate(SESSION_ID)).thenReturn(session);
         NovelSettingsService settings = mock(NovelSettingsService.class);
         when(settings.getEffectiveSettings(NOVEL_ID, USER_ID)).thenReturn(new NovelSettings());
         return qaAgent(factory, mock(VectorStoreFactory.class), sessions, mock(ChatMessageMapper.class),
@@ -308,6 +324,8 @@ class AgentSkillExecutionTest {
         ReflectionTestUtils.setField(qa, "vectorStoreFactory", vectorStoreFactory);
         ReflectionTestUtils.setField(qa, "chatSessionMapper", sessions);
         ReflectionTestUtils.setField(qa, "chatMessageMapper", messages);
+        ReflectionTestUtils.setField(qa, "transactionTemplate",
+            new TransactionTemplate(mock(PlatformTransactionManager.class)));
         ReflectionTestUtils.setField(qa, "novelSettingsService", settings);
         ReflectionTestUtils.setField(qa, "novelService", novelService);
         return qa;
@@ -340,6 +358,7 @@ class AgentSkillExecutionTest {
         when(agents.findById(AGENT_ID)).thenReturn(Optional.of(agent));
         AiServiceFactory factory = new AiServiceFactory();
         ReflectionTestUtils.setField(factory, "llmProviderFactory", providers);
+        ReflectionTestUtils.setField(factory, "llmProviderService", mock(LlmProviderService.class));
         ReflectionTestUtils.setField(factory, "novelAgentConfigRepository", configs);
         ReflectionTestUtils.setField(factory, "agentRepository", agents);
         ReflectionTestUtils.setField(factory, "llmCallLogService", logs);

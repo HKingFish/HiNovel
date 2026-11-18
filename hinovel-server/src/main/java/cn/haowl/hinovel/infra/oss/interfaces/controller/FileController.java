@@ -11,7 +11,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Value;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -45,11 +50,11 @@ public class FileController {
             @RequestParam(value = "bizType", defaultValue = OssConstants.DEFAULT_BIZ_TYPE) String bizType,
             @RequestParam(value = "bizId", required = false) Long bizId) {
         UploadCommand command = UploadCommand.builder()
-                .file(file)
-                .bizType(bizType)
-                .bizId(bizId)
+            .file(file)
+            .bizType(bizType)
+            .bizId(bizId)
             .userId(StpUtil.getLoginIdAsLong())
-                .build();
+            .build();
         return ApiResponse.success(new UploadResponse(ossApplicationService.upload(command)));
     }
 
@@ -59,7 +64,7 @@ public class FileController {
     @Operation(summary = "删除文件", description = "删除指定 URL 的文件")
     @DeleteMapping("/delete")
     public ApiResponse<Void> delete(@RequestParam("fileUrl") String fileUrl) {
-        ossApplicationService.delete(fileUrl);
+        ossApplicationService.delete(fileUrl, StpUtil.getLoginIdAsLong());
         return ApiResponse.success("删除成功", null);
     }
 

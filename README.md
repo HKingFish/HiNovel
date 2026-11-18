@@ -64,10 +64,9 @@ HiNovel/
 
 ### 环境要求
 
-- JDK 21+
-- Maven 3.9+
 - Node.js 20+
 - Docker 24+ 与 Docker Compose 2.20+
+- 本地运行后端额外需要 JDK 21+ 与 Maven 3.9+。`start.sh` 需要 Compose 2.27.2+
 
 ### 1. 克隆并配置
 
@@ -82,9 +81,8 @@ cp .env.example .env
 | 变量 | 说明 |
 |------|------|
 | `MYSQL_PASSWORD` | MySQL 密码 |
-| `MYSQL_ROOT_PASSWORD` | MySQL root 密码（Docker 部署时使用） |
+| `MYSQL_ROOT_PASSWORD` | MySQL 容器的 root 密码。默认以 root 连接时，与 `MYSQL_PASSWORD` 相同 |
 | `API_KEY_SECRET` | LLM API Key 加密密钥（至少 16 字符） |
-| `OPENAI_EMBEDDING_API_KEY` | Embedding 接口密钥（使用 OpenAI 兼容 API 时） |
 
 ### 2. Docker 一键部署（推荐）
 
@@ -94,7 +92,7 @@ bash docker-build.sh up
 
 启动完成后：
 
-- 前端：http://localhost:80
+- 前端：http://localhost:3000
 - 后端 API：http://localhost:8080
 - Qdrant 面板：http://localhost:6333/dashboard
 
@@ -105,12 +103,13 @@ bash docker-build.sh up
 bash start.sh
 
 # 方式二：分步启动
-bash docker-build.sh infra          # 仅启动 MySQL / Redis / Qdrant
-cd hinovel-server && mvn spring-boot:run
-cd hinovel-web && npm install && npm run dev
+bash docker-build.sh infra
+# 在两个独立的终端中，从仓库根目录运行
+mvn -f hinovel-server/pom.xml spring-boot:run
+cd hinovel-web && npm ci && npm run dev
 ```
 
-本地开发时前端默认运行在 http://localhost:3000，API 请求通过 Vite 代理转发至后端。
+本地前端默认运行在 http://localhost:3000，Vite 转发 API 和本地文件请求。`bash start.sh --no-infra` 可复用已有基础设施。
 
 ### 4. 默认管理员账号
 
@@ -122,9 +121,9 @@ cd hinovel-web && npm install && npm run dev
 | 邮箱 | `admin@hinovel.com` |
 | 密码 | `Admin@123456` |
 
-**生产环境部署后请立即修改默认密码**，并确保 `.env` 中已设置强密码的 `API_KEY_SECRET` 与 `MYSQL_ROOT_PASSWORD`。
+Compose 默认只监听本机。对外开放之前，请由数据库管理员替换或禁用默认管理员凭据，并配置独立的 `API_KEY_SECRET` 与 MySQL 密码。
 
-若数据库未自动初始化（例如 `data/mysql/data` 已有旧数据），可手动执行：
+若数据库未自动初始化，可执行下列命令补建表与种子数据。已有数据库的结构更新见部署指南中的数据库迁移。
 
 ```powershell
 .\scripts\init-db.ps1
@@ -142,7 +141,7 @@ cd hinovel-web && npm install && npm run dev
 - **缓存**：Redis 连接与密码
 - **向量库**：Qdrant 主机与端口
 - **文件存储**：本地存储或阿里云 OSS
-- **Embedding**：OpenAI 兼容 API 或本地 ONNX 模型（BGE-M3）
+- **Embedding**：在「LLM 配置」中添加 OpenAI 兼容 Embedding 服务
 - **安全**：`API_KEY_SECRET` 用于加密用户配置的 LLM API Key
 
 完整变量说明见 [.env.example](./.env.example)。

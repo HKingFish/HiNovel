@@ -34,7 +34,7 @@ public interface NovelSettingsMapper extends BaseMapper<NovelSettings> {
      */
     default NovelSettings selectUserDefault(Long userId) {
         return selectOne(new LambdaQueryWrapper<NovelSettings>()
-                .eq(NovelSettings::getNovelId, 0L)
+                .eq(NovelSettings::getNovelId, NovelSettings.USER_DEFAULT_NOVEL_ID)
                 .eq(NovelSettings::getUserId, userId));
     }
 }

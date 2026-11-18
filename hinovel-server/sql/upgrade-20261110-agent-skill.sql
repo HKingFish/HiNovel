@@ -2,7 +2,7 @@
 -- 发布前备份，统计 agent_config、agent_chat_message、ai_llm_call_log 行数并确认 ALTER 执行窗口。
 -- 未传审核名单时，只升级 schema 并列出候选。名单与执行方式见文件末尾。
 
-USE hinovel_platform;
+-- 通过 MySQL 客户端指定目标数据库后执行。
 
 DROP PROCEDURE IF EXISTS hinovel_upgrade_agent_skill_schema;
 DELIMITER //

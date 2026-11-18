@@ -11,6 +11,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.SYSTEM_BUSY;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
 /**
  * LLM 提供方仓储实现。
  *
@@ -32,8 +35,8 @@ public class LlmProviderRepositoryImpl implements LlmProviderRepository {
     public LlmProvider save(LlmProvider provider) {
         if (provider.getId() == null) {
             llmProviderMapper.insert(provider);
-        } else {
-            llmProviderMapper.updateById(provider);
+        } else if (0 == llmProviderMapper.updateById(provider)) {
+            throw exception(SYSTEM_BUSY);
         }
         return provider;
     }

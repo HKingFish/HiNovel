@@ -41,12 +41,17 @@ public interface NovelChapterMapper extends BaseMapper<NovelChapter> {
      */
     default boolean existSameTitle(Long novelId, Long id, String title) {
         return exists(new LambdaQueryWrapper<NovelChapter>()
-                .eq(NovelChapter::getNovelId, novelId)
-                .ne(id != null, NovelChapter::getId, id)
-                .eq(NovelChapter::getTitle, title)
-                .orderByAsc(NovelChapter::getSortOrder));
+            .eq(NovelChapter::getNovelId, novelId)
+            .ne(id != null, NovelChapter::getId, id)
+            .eq(NovelChapter::getTitle, title));
     }
 
+    /**
+     * 仅更新仍与入库正文一致的章节标记。
+     */
+    int markVectorStored(
+        @Param("chapterId") Long chapterId,
+        @Param("indexedContent") String indexedContent);
 
     /**
      * 分页查询小说的章节（按章节号倒序）。

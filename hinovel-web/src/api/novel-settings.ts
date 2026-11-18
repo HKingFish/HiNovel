@@ -4,9 +4,9 @@ import http from './http'
  * 小说配置接口类型
  */
 export interface NovelSettings {
-    id?: number
-    novelId?: number
-    userId?: number
+    id?: string
+    novelId?: string
+    userId?: string
     autoAuditAfterRewrite: number
     autoOutlineAfterPublish: number
     autoVectorAfterPublish: number
@@ -41,19 +41,19 @@ export const createDefaultSettings = (): NovelSettings => ({
 /**
  * 获取小说有效配置（合并后）
  */
-export const getEffectiveSettings = (novelId: number) =>
+export const getEffectiveSettings = (novelId: string) =>
     http.get<never, { data: NovelSettings }>(`/api/novel/settings/${novelId}`)
 
 /**
  * 获取小说级别配置
  */
-export const getNovelLevelSettings = (novelId: number) =>
+export const getNovelLevelSettings = (novelId: string) =>
     http.get<never, { data: NovelSettings | null }>(`/api/novel/settings/${novelId}/novel-level`)
 
 /**
  * 保存小说级别配置
  */
-export const saveNovelSettings = (novelId: number, settings: NovelSettings) =>
+export const saveNovelSettings = (novelId: string, settings: NovelSettings) =>
     http.put<never, { data: NovelSettings }>(`/api/novel/settings/${novelId}`, settings)
 
 /**

@@ -10,9 +10,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_ACCESS_DENIED;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_DELETE_FAILED;
 import static cn.haowl.hinovel.infra.enums.InfraErrorCodeConstants.OSS_UPLOAD_FAILED;
 
@@ -58,8 +60,8 @@ public class AliyunOssProvider implements OssProvider {
         String objectKey = bizType + "/" + UUID.randomUUID() + "." + extension;
         String bucketName = ossProperties.getAliyun().getBucketName();
 
-        try {
-            ossClient.putObject(bucketName, objectKey, file.getInputStream());
+        try (InputStream inputStream = file.getInputStream()) {
+            ossClient.putObject(bucketName, objectKey, inputStream);
             log.info("[upload][阿里云 OSS 文件上传成功，bucket={}，bytes={}]", bucketName, file.getSize());
         } catch (OSSException e) {
             log.error("[upload][阿里云 OSS 上传失败，code={}，requestId={}]", e.getErrorCode(), e.getRequestId());
@@ -94,11 +96,13 @@ public class AliyunOssProvider implements OssProvider {
     }
 
     /**
-     * 从完整访问 URL 中提取 objectKey
+     * 从当前存储桶的访问 URL 提取对象键。
      */
     private String extractObjectKey(String fileUrl) {
-        OssProperties.Aliyun aliyun = ossProperties.getAliyun();
-        String prefix = "https://" + aliyun.getBucketName() + "." + aliyun.getEndpoint() + "/";
-        return fileUrl.replace(prefix, "");
+        String prefix = getAccessUrl("");
+        if (!fileUrl.startsWith(prefix) || prefix.length() == fileUrl.length()) {
+            throw exception(OSS_ACCESS_DENIED);
+        }
+        return fileUrl.substring(prefix.length());
     }
 }

@@ -12,6 +12,11 @@ import org.apache.commons.lang3.EnumUtils;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.agent.constant.AgentConstants.NOVEL_VECTOR_COLLECTION_PREFIX;
+import static cn.haowl.hinovel.agent.constant.AgentConstants.VECTOR_CHAPTER_ID;
+import static cn.haowl.hinovel.agent.constant.AgentConstants.VECTOR_CHAPTER_TITLE;
+import static cn.haowl.hinovel.agent.constant.AgentConstants.VECTOR_CONTENT_TYPE;
+
 /**
  * 小说内容检索工具。
  *
@@ -65,8 +70,9 @@ public class NovelContentRetrievalTool {
      */
     public static NovelContentRetrievalTool create(VectorStoreFactory vectorStoreFactory,
                                                    Long novelId, Long userId) {
-        String collectionName = "novel_" + novelId;
-        VectorStorePort vectorStore = vectorStoreFactory.getByCollection(collectionName, userId);
+        VectorStorePort vectorStore =
+            vectorStoreFactory.getByCollection(
+                NOVEL_VECTOR_COLLECTION_PREFIX + novelId, userId);
         if (vectorStore == null) {
             return null;
         }
@@ -103,20 +109,18 @@ public class NovelContentRetrievalTool {
                 EmbeddingMatch<TextSegment> match = matches.get(i);
                 TextSegment segment = match.embedded();
 
-                String chapterTitle = segment.metadata().getString("chapterTitle");
-                String contentType = segment.metadata().getString("contentType");
-                String chapterId = segment.metadata().getString("chapterId");
-                double score = match.score();
+                String chapterTitle = segment.metadata().getString(VECTOR_CHAPTER_TITLE);
+                String contentType = segment.metadata().getString(VECTOR_CONTENT_TYPE);
 
                 result.append("【").append(i + 1).append("】");
-                result.append("来源：第").append(chapterId).append("章");
+                result.append("来源：第").append(segment.metadata().getString(VECTOR_CHAPTER_ID)).append("章");
                 if (chapterTitle != null) {
                     result.append("「").append(chapterTitle).append("」");
                 }
                 result.append(" | 类型：")
                     .append(ChapterVectorContentTypeEnum.OUTLINE
                         == EnumUtils.getEnum(ChapterVectorContentTypeEnum.class, contentType) ? "大纲" : "正文");
-                result.append(String.format(" | 相似度：%.2f", score));
+                result.append(String.format(" | 相似度：%.2f", match.score()));
                 result.append("\n");
                 result.append(segment.text());
                 result.append("\n\n");

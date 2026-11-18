@@ -72,8 +72,12 @@ public class DefaultLlmProviderFactory implements LlmProviderFactory {
             return getByProviderId(preferredProviderId);
         }
         log.warn("[getAvailableProvider][首选提供方不健康，查找备选，providerId={}]", preferredProviderId);
-        // 查询所有激活的 Provider，尝试找到健康的替代
-        List<LlmProvider> activeProviders = llmProviderQueryPort.listActiveProviders();
+        LlmProvider preferred = llmProviderQueryPort.getWithDecryptedKey(preferredProviderId);
+        if (preferred == null) {
+            throw exception(LLM_PROVIDER_NOT_FOUND, preferredProviderId);
+        }
+        // 备选提供方必须属于首选提供方的用户。
+        List<LlmProvider> activeProviders = llmProviderQueryPort.listActiveProviders(preferred.getUserId());
         for (LlmProvider candidate : activeProviders) {
             if (!preferredProviderId.equals(candidate.getId())
                     && healthTracker.isHealthy(candidate.getId())) {

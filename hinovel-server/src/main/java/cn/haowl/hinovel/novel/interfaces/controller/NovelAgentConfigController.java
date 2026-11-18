@@ -10,7 +10,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 小说 Agent 配置控制器
@@ -33,7 +38,7 @@ public class NovelAgentConfigController {
     @Operation(summary = "获取小说Agent配置", description = "获取指定小说的作者和编辑Agent配置")
     @GetMapping("/{novelId}")
     public ApiResponse<NovelAgentConfigResponse> getConfig(@PathVariable Long novelId) {
-        return ApiResponse.success(novelAgentConfigService.getConfig(novelId));
+        return ApiResponse.success(novelAgentConfigService.getConfig(novelId, StpUtil.getLoginIdAsLong()));
     }
 
     /**

@@ -63,10 +63,10 @@ public class AuditResultParser {
                     .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .with(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
                     .readValue(stripCodeFence(modelOutput));
-            if (response != null) {
+            if (response != null && response.getOverallAssessment() != null) {
                 return response;
             }
-            log.warn("[readResponse][模型审核结果为空，chapterId={}]", chapterId);
+            log.warn("[readResponse][模型审核结果缺少评估结论，chapterId={}]", chapterId);
         } catch (JsonProcessingException error) {
             log.warn("[readResponse][模型审核结果解析失败，chapterId={}，异常类型={}]",
                 chapterId, error.getClass().getSimpleName());
@@ -74,7 +74,11 @@ public class AuditResultParser {
 
         AIAuditorResponse fallback = new AIAuditorResponse();
         fallback.setOverallAssessment(AuditAssessmentEnum.WARNING);
-        fallback.setSummary(modelOutput);
+        if (modelOutput != null && !modelOutput.isBlank()) {
+            fallback.setSummary(modelOutput);
+        } else {
+            fallback.setSummary("模型未返回有效审核结果");
+        }
         return fallback;
     }
 

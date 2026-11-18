@@ -381,7 +381,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const novelId = computed(() => Number(route.params.id))
+const novelId = String(route.params.id)
 
 const novelTitle = ref('')
 const graphMode = ref<'force' | 'circular'>('force')
@@ -429,7 +429,7 @@ const showCharacterDialog = ref(false)
 const isEditCharacter = ref(false)
 const savingCharacter = ref(false)
 const characterFormRef = ref<FormInstance>()
-const editingCharacterId = ref<number | null>(null)
+const editingCharacterId = ref<string | null>(null)
 
 const characterForm = ref({
   name: '',
@@ -455,7 +455,7 @@ const savingRelation = ref(false)
 const relationFormRef = ref<FormInstance>()
 
 const relationForm = ref({
-  targetId: null as number | null,
+  targetId: null as string | null,
   relationType: '',
   description: ''
 })
@@ -496,7 +496,7 @@ const beforeAvatarUpload = (file: File) => {
 const loadCharacterGraph = async () => {
   loading.value = true
   try {
-    const res = await getCharacterGraph(novelId.value)
+    const res = await getCharacterGraph(novelId)
     characters.value = res.data.characters || []
     relations.value = res.data.relations || []
     nextTick(() => updateGraph())
@@ -508,7 +508,7 @@ const loadCharacterGraph = async () => {
 }
 
 // 加载角色关系
-const loadCharacterRelations = async (characterId: number) => {
+const loadCharacterRelations = async (characterId: string) => {
   try {
     const res = await listCharacterRelations(characterId)
     characterRelations.value = res.data || []
@@ -518,7 +518,7 @@ const loadCharacterRelations = async (characterId: number) => {
 }
 
 // 获取目标角色
-const getTargetCharacter = (targetId: number) => {
+const getTargetCharacter = (targetId: string) => {
   return characters.value.find(c => c.id === targetId)
 }
 
@@ -734,7 +734,7 @@ const handleSaveCharacter = async () => {
       ElMessage.success('更新成功')
     } else {
       await createCharacter({
-        novelId: novelId.value,
+        novelId,
         name: characterForm.value.name,
         roleType: characterForm.value.roleType,
         gender: characterForm.value.gender,
@@ -793,7 +793,7 @@ const handleSaveRelation = async () => {
   savingRelation.value = true
   try {
     await createRelation({
-      novelId: novelId.value,
+      novelId,
       characterId: selectedCharacter.value.id,
       targetId: relationForm.value.targetId!,
       relationType: relationForm.value.relationType,
@@ -810,7 +810,7 @@ const handleSaveRelation = async () => {
   }
 }
 
-const removeRelation = async (relationId: number) => {
+const removeRelation = async (relationId: string) => {
   try {
     await deleteRelation(relationId)
     ElMessage.success('关系已删除')

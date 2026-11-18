@@ -1,12 +1,8 @@
 package cn.haowl.hinovel.ai.infrastructure.mapper;
 
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
-import cn.haowl.hinovel.common.constant.CommonConstants;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-
-import java.util.List;
 
 /**
  * LLM Provider 数据访问映射器接口。
@@ -19,12 +15,4 @@ import java.util.List;
  */
 @Mapper
 public interface LlmProviderMapper extends BaseMapper<LlmProvider> {
-
-    /**
-     * 查询可作为故障切换候选的提供方。
-     */
-    default List<LlmProvider> selectActiveProviders() {
-        return selectList(new LambdaQueryWrapper<LlmProvider>()
-            .eq(LlmProvider::getIsActive, CommonConstants.ENABLED));
-    }
 }

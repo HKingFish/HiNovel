@@ -7,6 +7,7 @@ import cn.haowl.hinovel.novel.domain.query.ChapterPageQuery;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
 import cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.CHAPTER_SAVE_FAILED;
 import static cn.haowl.hinovel.novel.enums.NovelErrorCodeConstants.CHAPTER_TITLE_EXISTS;
 import static cn.haowl.hinovel.novel.infrastructure.mapper.NovelChapterMapper.withoutContentWrapper;
 
@@ -43,10 +45,15 @@ public class NovelChapterRepositoryImpl implements NovelChapterRepository {
 
         if (chapter.getId() == null) {
             novelChapterMapper.insert(chapter);
-        } else {
-            novelChapterMapper.updateById(chapter);
+        } else if (0 == novelChapterMapper.updateById(chapter)) {
+            throw exception(CHAPTER_SAVE_FAILED);
         }
         return chapter;
+    }
+
+    @Override
+    public boolean markVectorStored(Long chapterId, String indexedContent) {
+        return 0 < novelChapterMapper.markVectorStored(chapterId, indexedContent);
     }
 
     @Override
@@ -99,9 +106,13 @@ public class NovelChapterRepositoryImpl implements NovelChapterRepository {
 
     @Override
     public List<NovelChapter> findByNovelIdPageWithoutContent(ChapterPageQuery query) {
-        return novelChapterMapper.selectList(applyPageFilters(withoutContentWrapper(), query)
-            .last(CommonConstants.limitOf((query.getPageNum() - 1) * query.getPageSize(), query.getPageSize()))
-                .orderByDesc(NovelChapter::getSortOrder));
+        return novelChapterMapper.selectPage(
+            new Page<NovelChapter>(query.getPageNum(), query.getPageSize(), false),
+            applyPageFilters(withoutContentWrapper(), query)
+                .orderByDesc(NovelChapter::getSortOrder)
+                .orderByDesc(NovelChapter::getChapterNumber)
+                .orderByDesc(NovelChapter::getId))
+            .getRecords();
     }
 
     @Override

@@ -16,7 +16,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -65,7 +72,8 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "获取章节批注列表")
     @GetMapping("/chapter/{chapterId}")
     public ApiResponse<List<ChapterAnnotation>> getAnnotations(@PathVariable Long chapterId) {
-        return ApiResponse.success(annotationService.getAnnotationsByChapterId(chapterId));
+        return ApiResponse.success(
+            annotationService.getAnnotationsByChapterId(chapterId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -92,7 +100,8 @@ public class NovelChapterAnnotationController {
     public ApiResponse<Void> updateAnnotation(
             @PathVariable Long annotationId,
             @RequestBody UpdateAnnotationRequest request) {
-        annotationService.updateAnnotationContent(annotationId, request.getAnnotationContent());
+        annotationService.updateAnnotationContent(
+            annotationId, request.getAnnotationContent(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -108,7 +117,8 @@ public class NovelChapterAnnotationController {
     public ApiResponse<Void> saveAiRewriteResult(
             @PathVariable Long annotationId,
             @RequestBody AiRewriteResultRequest request) {
-        annotationService.saveAiRewriteResult(annotationId, request.getRewriteResult());
+        annotationService.saveAiRewriteResult(
+            annotationId, request.getRewriteResult(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -121,7 +131,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "采纳批注")
     @PostMapping("/{annotationId}/accept")
     public ApiResponse<Void> acceptAnnotation(@PathVariable Long annotationId) {
-        annotationService.acceptAnnotation(annotationId);
+        annotationService.acceptAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -134,7 +144,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "删除批注")
     @DeleteMapping("/{annotationId}")
     public ApiResponse<Void> deleteAnnotation(@PathVariable Long annotationId) {
-        annotationService.deleteAnnotation(annotationId);
+        annotationService.deleteAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -147,7 +157,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "标记批注已查看")
     @PostMapping("/{annotationId}/view")
     public ApiResponse<Void> markAsViewed(@PathVariable Long annotationId) {
-        annotationService.markAsViewed(annotationId);
+        annotationService.markAsViewed(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -160,7 +170,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "标记批注已处理")
     @PostMapping("/{annotationId}/resolve")
     public ApiResponse<Void> resolveAnnotation(@PathVariable Long annotationId) {
-        annotationService.resolveAnnotation(annotationId);
+        annotationService.resolveAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 

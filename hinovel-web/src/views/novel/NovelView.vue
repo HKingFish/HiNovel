@@ -1554,7 +1554,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElIcon, ElInput, ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
-import { marked } from 'marked'
+import { renderMarkdown } from '@/utils/render-markdown'
 import draggable from 'vuedraggable'
 import {
     batchUpdateChapterSort,
@@ -1581,11 +1581,9 @@ import {
 } from '@/api/chapter'
 import {
     aiAudit,
-    type AIAuditIssue,
     type AIAuditorRequest,
     type AIAuditorResponse,
     type AIAuthorRequest,
-    aiBatchAudit,
     aiChatStream,
     aiRegenerate,
     aiRewriteStream,
@@ -1626,6 +1624,7 @@ import { getNovelMemo, saveNovelMemo } from '@/api/novel-memo'
 import {
     acceptAnnotation as acceptAnnotationApi,
     annotationAiRewriteStream,
+    type AnnotationRewriteCallbacks,
     type ChapterAnnotation as AnnotationData,
     createAnnotation,
     deleteAnnotation as deleteAnnotationApi,
@@ -1635,18 +1634,13 @@ import {
     saveAiRewriteResult as saveAiRewriteResultApi,
 } from '@/api/annotation'
 
-// 配置 marked 选项，支持流式输出中的换行渲染
-marked.setOptions({
-    breaks: true,
-    gfm: true,
-})
-
 defineOptions({ name: 'NovelView' })
 
 const route = useRoute()
 const router = useRouter()
 const novelRouteStore = useNovelRouteStore()
-const novelId = computed(() => Number(route.params.id))
+// 每个 KeepAlive 实例始终使用打开时的小说 ID。
+const novelId = String(route.params.id)
 
 // 小说基本信息
 const novelInfo = ref<Novel | null>(null)
@@ -1658,7 +1652,7 @@ const novelTotalWordCount = computed(() => novelInfo.value?.wordCount || 0)
  */
 const loadNovelInfo = async () => {
     try {
-        const res = await getNovelDetail(novelId.value)
+        const res = await getNovelDetail(novelId)
         novelInfo.value = res.data
     } catch (error) {
         console.error('加载小说信息失败:', error)
@@ -1669,7 +1663,7 @@ const loadNovelInfo = async () => {
 const chapterTitle = ref('')
 
 // 当前章节ID
-const currentChapterId = ref(0)
+const currentChapterId = ref('')
 
 // 章节内容
 const chapterContent = ref('')
@@ -1698,11 +1692,11 @@ const lastSavedOutline = ref({
     plotPointsText: '',
     emotionTone: '',
     sceneSetting: '',
-    selectedCharacters: [] as number[],
+    selectedCharacters: [] as string[],
 })
 
 // 本地草稿管理
-const DRAFT_KEY = computed(() => `novel_draft_${novelId.value}_${currentChapterId.value}`)
+const DRAFT_KEY = computed(() => `novel_draft_${novelId}_${currentChapterId.value}`)
 const draftContent = ref('') // 本地草稿内容
 const lastDraftSaveTime = ref<Date | null>(null)
 
@@ -1714,7 +1708,7 @@ const saveDraftToLocal = () => {
         content: chapterContent.value,
         title: chapterTitle.value,
         chapterId: currentChapterId.value,
-        novelId: novelId.value,
+        novelId,
         saveTime: new Date().toISOString(),
         wordCount: chapterContent.value.length,
         // 大纲相关字段
@@ -1740,11 +1734,20 @@ const loadDraftFromLocal = (): boolean => {
     if (!currentChapterId.value) return false
 
     try {
-        const draftStr = localStorage.getItem(DRAFT_KEY.value)
+        const draftKey = DRAFT_KEY.value
+        // 旧版本曾将路由中的小说 ID 转为数字，按旧键兼容尚未同步的草稿。
+        const legacyDraftKey = `novel_draft_${Number(novelId)}_${currentChapterId.value}`
+        const savedDraft = localStorage.getItem(draftKey)
+        const draftStr = savedDraft ?? localStorage.getItem(legacyDraftKey)
         if (draftStr) {
             const draft = JSON.parse(draftStr)
             // 检查是否是对应当前章节
-            if (draft.chapterId == currentChapterId.value && draft.novelId == novelId.value) {
+            if (String(draft.chapterId) === currentChapterId.value &&
+                (String(draft.novelId) === novelId || draft.novelId === Number(novelId))) {
+                if (!savedDraft && legacyDraftKey !== draftKey) {
+                    localStorage.setItem(draftKey, draftStr)
+                    localStorage.removeItem(legacyDraftKey)
+                }
                 // 判断正文是否有变化（trim 后比较，避免空白差异导致误判）
                 const draftContentTrimmed = (draft.content || '').trim()
                 const currentContentTrimmed = (chapterContent.value || '').trim()
@@ -1787,7 +1790,7 @@ const loadDraftFromLocal = (): boolean => {
                                 sceneSetting.value = draft.sceneSetting
                             }
                             if (draft.selectedCharacters !== undefined) {
-                                selectedCharacters.value = draft.selectedCharacters
+                                selectedCharacters.value = draft.selectedCharacters.map(String)
                             }
                             draftContent.value = draft.content || ''
                             hasUnsavedChanges.value = true
@@ -1852,8 +1855,8 @@ watch([chapterSearchKeyword, chapterFilterStatus, chapterFilterVector], () => {
 // 编辑章节
 const showEditChapter = ref(false)
 const editingChapter = ref<Chapter>({
-    id: 0,
-    novelId: 0,
+    id: '',
+    novelId: '',
     chapterNumber: 0,
     title: '',
     content: '',
@@ -1880,27 +1883,7 @@ const editingNovelOutlineContent = ref('')
 /**
  * 将 Markdown 文本渲染为 HTML
  */
-const renderedNovelOutline = computed(() => {
-    if (!novelOutline.value) return ''
-    return marked(novelOutline.value) as string
-})
-
-/**
- * 将 Markdown 文本渲染为 HTML（通用方法，用于 AI 问答消息等场景）
- * 支持流式输出中不完整的 Markdown 片段安全渲染
- *
- * @param content Markdown 原始文本
- * @returns 渲染后的 HTML 字符串
- */
-const renderMarkdown = (content: string): string => {
-    if (!content) return ''
-    try {
-        return marked(content) as string
-    } catch {
-        // 流式输出中 Markdown 片段可能不完整，降级为纯文本展示
-        return content.replace(/\n/g, '<br>')
-    }
-}
+const renderedNovelOutline = computed(() => renderMarkdown(novelOutline.value))
 
 /**
  * 复制消息内容到剪贴板（复制原始 Markdown 文本，非 HTML）
@@ -2056,12 +2039,7 @@ const chapterOutline = ref('')
 const plotPointsText = ref('')
 
 // 涉及人物
-const _involvedCharacters = ref([
-    { id: 1, name: '孙悟空', color: '#667eea' },
-    { id: 2, name: '唐僧', color: '#f5576c' },
-    { id: 3, name: '猪八戒', color: '#4facfe' },
-])
-const selectedCharacters = ref<number[]>([])
+const selectedCharacters = ref<string[]>([])
 
 // 情感基调
 const emotionTone = ref('')
@@ -2127,8 +2105,8 @@ const handleChatScroll = () => {
  * 处理AI问答输入框回车事件
  * Enter发送消息，Shift+Enter换行
  */
-const handleChatInputEnter = (e: KeyboardEvent) => {
-    if (e.shiftKey) {
+const handleChatInputEnter = (e: Event) => {
+    if (!(e instanceof KeyboardEvent) || e.shiftKey || e.isComposing) {
         // Shift+Enter 换行，不阻止默认行为
         return
     }
@@ -2138,8 +2116,6 @@ const handleChatInputEnter = (e: KeyboardEvent) => {
 }
 
 // 问答会话管理
-// KeepAlive 中仍在接收回复的实例继续使用打开时的小说 ID。
-const chatNovelId = typeof route.params.id === 'string' ? route.params.id : novelId.value
 const chatSessionId = ref<ChatSessionItem['id']>(0)
 const chatSessions = ref<ChatSessionItem[]>([])
 const chatHistoryLoading = ref(false)
@@ -2161,7 +2137,7 @@ const historyVersions = ref<ChapterVersion[]>([])
 const isLoadingVersions = ref(false)
 
 // 预览版本
-const previewVersionId = ref<number | null>(null)
+const previewVersionId = ref<string | null>(null)
 const previewVersionContent = ref('')
 
 // 版本备注弹窗
@@ -2188,7 +2164,7 @@ const isSavingSettings = ref(false)
 const hasOwnSettings = ref(false)
 const agents = ref<AgentConfig[]>([])
 const agentConfig = ref<NovelAgentConfig>({
-    novelId: 0,
+    novelId: '',
     authorAgentId: undefined,
     editorAgentId: undefined,
     qaAgentId: undefined,
@@ -2285,7 +2261,7 @@ const sortedAnnotations = computed(() => {
  *
  * @param chapterId 章节 ID
  */
-const loadChapterAnnotations = async (chapterId: number) => {
+const loadChapterAnnotations = async (chapterId: string) => {
     try {
         const res = await getChapterAnnotations(chapterId)
         chapterAnnotations.value = res.data || []
@@ -2308,7 +2284,7 @@ const handleCreateAnnotation = async (data: {
     try {
         const res = await createAnnotation({
             chapterId: currentChapterId.value,
-            novelId: novelId.value,
+            novelId,
             startOffset: data.startOffset,
             endOffset: data.endOffset,
             originalText: data.originalText,
@@ -2328,7 +2304,7 @@ const handleCreateAnnotation = async (data: {
  */
 const handleDeleteAnnotation = async (annotationId: string) => {
     try {
-        await deleteAnnotationApi(Number(annotationId))
+        await deleteAnnotationApi(annotationId)
         chapterAnnotations.value = chapterAnnotations.value.filter((a) => String(a.id) !== String(annotationId))
         ElMessage.success('批注已删除')
     } catch (error) {
@@ -2343,18 +2319,15 @@ const handleDeleteAnnotation = async (annotationId: string) => {
  */
 const handleAiRewriteAnnotation = (
     data: {
-        annotationId: number
+        annotationId: string
         originalText: string
         annotationContent: string
         fullChapterContent: string
     },
-    callbacks: {
-        onToken: (token: string) => void
-        onComplete: (fullText: string) => void
-        onError: (error: Error) => void
-    },
+    callbacks: AnnotationRewriteCallbacks,
+    signal: AbortSignal,
 ) => {
-    annotationAiRewriteStream(
+    void annotationAiRewriteStream(
         {
             annotationId: data.annotationId,
             chapterId: currentChapterId.value,
@@ -2364,15 +2337,16 @@ const handleAiRewriteAnnotation = (
         },
         {
             onToken: callbacks.onToken,
-            onComplete: (fullText: string) => {
-                // 改写完成后保存结果到后端
-                saveAiRewriteResultApi(data.annotationId, fullText).catch((error) => {
-                    console.error('保存 AI 改写结果失败:', error)
-                })
+            onComplete: async (fullText: string) => {
+                await saveAiRewriteResultApi(data.annotationId, fullText)
+                if (signal.aborted) return
+                const annotation = chapterAnnotations.value.find(item => item.id === data.annotationId)
+                if (annotation) annotation.aiRewriteResult = fullText
                 callbacks.onComplete(fullText)
             },
             onError: callbacks.onError,
         },
+        signal,
     )
 }
 
@@ -2391,7 +2365,7 @@ const handleAcceptRewrite = async (data: { annotationId: string; originalText: s
         chapterContent.value.substring(originalIndex + data.originalText.length)
 
     try {
-        await acceptAnnotationApi(Number(data.annotationId))
+        await acceptAnnotationApi(data.annotationId)
         chapterAnnotations.value = chapterAnnotations.value.filter((a) => String(a.id) !== String(data.annotationId))
         hasUnsavedChanges.value = true
         ElMessage.success('已采纳改写结果')
@@ -2408,21 +2382,19 @@ const handleAcceptRewrite = async (data: { annotationId: string; originalText: s
  */
 const handleQuickRewrite = (
     data: { originalText: string; rewritePrompt: string; fullChapterContent: string },
-    callbacks: {
-        onToken: (token: string) => void
-        onComplete: (fullText: string) => void
-        onError: (error: Error) => void
-    },
+    callbacks: AnnotationRewriteCallbacks,
+    signal: AbortSignal,
 ) => {
-    annotationAiRewriteStream(
+    void annotationAiRewriteStream(
         {
             chapterId: currentChapterId.value,
-            novelId: novelId.value,
+            novelId,
             fullChapterContent: data.fullChapterContent,
             originalText: data.originalText,
             annotationContent: data.rewritePrompt,
         },
         callbacks,
+        signal,
     )
 }
 
@@ -2453,7 +2425,7 @@ const unreadAnnotationCount = computed(() => {
 /**
  * 判断批注是否已读
  */
-const isAnnotationRead = (annotationId: number): boolean => {
+const isAnnotationRead = (annotationId: string): boolean => {
     const annotation = chapterAnnotations.value.find((a) => a.id === annotationId)
     return annotation ? annotation.viewed === 1 : true
 }
@@ -2468,7 +2440,7 @@ const handleViewAnnotation = (annotationId: string) => {
             ...chapterAnnotations.value[index],
             viewed: 1,
         }
-        markAnnotationViewed(Number(annotationId)).catch((error) => {
+        markAnnotationViewed(annotationId).catch((error) => {
             console.error('标记批注已查看失败:', error)
         })
     }
@@ -2487,7 +2459,7 @@ const handleAnnotationListClick = (annotation: AnnotationData) => {
  */
 const handleResolveAnnotation = async (annotationId: string) => {
     try {
-        await resolveAnnotationApi(Number(annotationId))
+        await resolveAnnotationApi(annotationId)
         const annotation = chapterAnnotations.value.find((a) => String(a.id) === String(annotationId))
         if (annotation) {
             annotation.status = 'RESOLVED'
@@ -2518,10 +2490,7 @@ const isSavingMemo = ref(false)
 /**
  * 渲染手记 Markdown 内容
  */
-const renderedMemoContent = computed(() => {
-    if (!memoContent.value) return ''
-    return marked(memoContent.value) as string
-})
+const renderedMemoContent = computed(() => renderMarkdown(memoContent.value))
 
 /**
  * 加载创作手记
@@ -2529,7 +2498,7 @@ const renderedMemoContent = computed(() => {
 const loadMemo = async () => {
     isLoadingMemo.value = true
     try {
-        const res = await getNovelMemo(novelId.value)
+        const res = await getNovelMemo(novelId)
         memoContent.value = res.data?.content || ''
     } catch (error) {
         console.error('加载创作手记失败:', error)
@@ -2550,7 +2519,7 @@ const cancelEditMemo = () => {
 const saveMemoHandler = async () => {
     isSavingMemo.value = true
     try {
-        await saveNovelMemo(novelId.value, editingMemoContent.value)
+        await saveNovelMemo(novelId, editingMemoContent.value)
         memoContent.value = editingMemoContent.value
         isEditingMemo.value = false
         ElMessage.success('手记已保存')
@@ -2735,7 +2704,7 @@ const loadChapters = async () => {
     hasMoreChapters.value = true
     try {
         const res = await getNovelChaptersPage(
-            novelId.value,
+            novelId,
             chapterPageNum.value,
             chapterPageSize,
             chapterFilterStatus.value,
@@ -2764,7 +2733,7 @@ const loadMoreChapters = async () => {
     try {
         const nextPage = chapterPageNum.value + 1
         const res = await getNovelChaptersPage(
-            novelId.value,
+            novelId,
             nextPage,
             chapterPageSize,
             chapterFilterStatus.value,
@@ -2801,7 +2770,6 @@ const handleChapterListScroll = () => {
 }
 
 // 快速定位锚点列表（倒序排列，与章节列表排序一致）
-const _QUICK_JUMP_VISIBLE_COUNT = 5
 const quickJumpAnchors = computed(() => {
     const total = chapterTotal.value
     if (total <= 10) return []
@@ -2864,7 +2832,7 @@ const jumpToChapter = async (targetChapterNumber: number) => {
         while (hasMoreChapters.value) {
             const nextPage = chapterPageNum.value + 1
             const res = await getNovelChaptersPage(
-                novelId.value,
+                novelId,
                 nextPage,
                 chapterPageSize,
                 chapterFilterStatus.value,
@@ -2948,7 +2916,7 @@ const scrollJumpRail = (direction: number) => {
 const loadNovelOutline = async () => {
     isLoadingOutline.value = true
     try {
-        const res = await getNovelOutline(novelId.value)
+        const res = await getNovelOutline(novelId)
         if (res.data) {
             novelOutline.value = res.data.outlineContent || ''
         }
@@ -2960,7 +2928,7 @@ const loadNovelOutline = async () => {
 }
 
 // 选择章节
-const selectChapter = async (id: number) => {
+const selectChapter = async (id: string) => {
     // 如果有未保存的更改，先保存到本地
     if (hasUnsavedChanges.value && currentChapterId.value) {
         saveDraftToLocal()
@@ -3037,7 +3005,7 @@ const addChapter = async () => {
     isCreatingChapter.value = true
     try {
         const res = await createChapter({
-            novelId: novelId.value,
+            novelId,
             title: newChapterTitle.value.trim(),
         })
         if (res.data) {
@@ -3120,7 +3088,7 @@ const updateChapter = async () => {
 const handleDragEnd = async () => {
     const chapterIds = chapters.value.map((c) => c.id)
     try {
-        await batchUpdateChapterSort(novelId.value, chapterIds)
+        await batchUpdateChapterSort(novelId, chapterIds)
         // 拖拽后重新加载以同步章节号
         await loadChapters()
         ElMessage.success('排序已更新')
@@ -3138,7 +3106,7 @@ const handleReorderChapters = async () => {
             cancelButtonText: '取消',
             type: 'warning',
         })
-        await reorderChaptersApi(novelId.value)
+        await reorderChaptersApi(novelId)
         // 重新加载章节列表
         chapters.value = []
         chapterPageNum.value = 1
@@ -3171,7 +3139,7 @@ const confirmDeleteChapter = (chapter: Chapter) => {
                     if (chapters.value.length > 0) {
                         await selectChapter(chapters.value[0].id)
                     } else {
-                        currentChapterId.value = 0
+                        currentChapterId.value = ''
                         chapterContent.value = ''
                         chapterOutline.value = ''
                     }
@@ -3328,73 +3296,6 @@ const regenerateContent = async () => {
     }
 }
 
-// 批量审核功能（处理大纲过长的情况）
-const _performBatchAudit = async () => {
-    if (!chapterContent.value.trim()) {
-        ElMessage.warning('请先输入需要审核的内容')
-        return
-    }
-
-    isAiProcessing.value = true
-    aiProcessingType.value = 'audit'
-
-    try {
-        // 计算章节范围，确保有重叠
-        const currentChapter = chapters.value.find((c) => c.id === currentChapterId.value)
-        if (!currentChapter) return
-
-        const totalChapters = chapters.value.length
-        const chapterRanges = []
-
-        // 生成重叠的章节范围
-        const batchSize = 5 // 每个审核负责5个章节
-        const overlap = 2 // 重叠2个章节
-
-        for (let i = 1; i <= totalChapters; i += batchSize - overlap) {
-            chapterRanges.push({
-                startChapter: Math.max(1, i),
-                endChapter: Math.min(totalChapters, i + batchSize - 1),
-            })
-        }
-
-        const request = {
-            chapterId: currentChapterId.value,
-            content: chapterContent.value,
-            novelOutline: novelOutline.value,
-            chapterRanges,
-        }
-
-        const response = await aiBatchAudit(request)
-
-        // 合并审核结果
-        const mergedIssues: AIAuditIssue[] = []
-        response.audits.forEach((audit) => {
-            audit.issues.forEach((issue) => {
-                // 避免重复问题
-                if (!mergedIssues.some((existing) => existing.originalText === issue.originalText)) {
-                    mergedIssues.push(issue)
-                }
-            })
-        })
-
-        // 创建合并后的审核结果
-        auditResult.value = {
-            id: response.id,
-            overallAssessment: response.overallAssessment,
-            issues: mergedIssues,
-            summary: response.summary,
-            processingTime: response.audits.reduce((sum, audit) => sum + audit.processingTime, 0),
-        }
-
-        showAuditResult.value = true
-    } catch (error) {
-        ElMessage.error('批量审核失败，请稍后重试')
-    } finally {
-        isAiProcessing.value = false
-        aiProcessingType.value = null
-    }
-}
-
 // 切换专注模式
 const toggleFocusMode = () => {
     isFocusMode.value = !isFocusMode.value
@@ -3405,22 +3306,14 @@ const toggleFocusMode = () => {
     }
 }
 
-// AI 问答（切换到问答 Tab）
-const _openAIChat = () => {
-    activeFunctionTab.value = 'chat'
-    nextTick(() => {
-        scrollToBottom()
-    })
-}
-
 /**
  * 初始化或加载问答会话（切换到问答 Tab 时调用）
  */
 const initChatSession = async () => {
-    if (!chatNovelId || chatHistoryLoading.value || chatSessionId.value) return
+    if (!novelId || chatHistoryLoading.value || chatSessionId.value) return
 
     // 优先从 store 恢复缓存的问答状态（避免切换页面后断开）
-    const cachedState = chatStore.getChatState(chatNovelId)
+    const cachedState = chatStore.getChatState(novelId)
     if (cachedState && cachedState.sessions.length > 0) {
         chatSessions.value = cachedState.sessions
         chatSessionId.value = cachedState.sessionId
@@ -3439,7 +3332,7 @@ const initChatSession = async () => {
     chatHistoryLoading.value = true
     try {
         // 加载该小说的会话列表
-        const res = await listChatSessions(chatNovelId)
+        const res = await listChatSessions(novelId)
         if (chatHistoryVersion !== version) return
         chatSessions.value = res.data || []
 
@@ -3449,7 +3342,7 @@ const initChatSession = async () => {
             await loadChatHistory(chatSessionId.value)
         } else {
             // 创建新会话
-            const sessionRes = await createChatSession(chatNovelId, '默认对话')
+            const sessionRes = await createChatSession(novelId, '默认对话')
             if (chatHistoryVersion !== version) return
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
@@ -3481,8 +3374,8 @@ const initChatSession = async () => {
  * 将当前问答状态持久化到 store（切换页面时不丢失）
  */
 const persistChatState = () => {
-    if (!chatNovelId) return
-    chatStore.saveChatState(chatNovelId, chatSessionId.value, chatSessions.value, chatMessages.value)
+    if (!novelId) return
+    chatStore.saveChatState(novelId, chatSessionId.value, chatSessions.value, chatMessages.value)
 }
 
 /**
@@ -3604,9 +3497,9 @@ const handleSwitchSession = async (sessionId: ChatSessionItem['id']) => {
  * 新建会话
  */
 const handleCreateSession = async () => {
-    if (!chatNovelId) return
+    if (!novelId) return
     try {
-        const sessionRes = await createChatSession(chatNovelId, '新对话')
+        const sessionRes = await createChatSession(novelId, '新对话')
         chatSessionId.value = sessionRes.data.id
         chatHistoryVersion++
         chatHistoryLoading.value = false
@@ -3732,7 +3625,7 @@ const handleStopChat = async () => {
     // 如果有已生成的内容，调用后端保存接口
     if (partialContent && partialContent.trim()) {
         try {
-            await savePartialChatResponse(sessionId, chatNovelId, partialContent)
+            await savePartialChatResponse(sessionId, novelId, partialContent)
         } catch {
             console.error('保存中断回复失败')
         }
@@ -3748,7 +3641,7 @@ const sendChatMessage = async () => {
     // 确保有会话
     if (!chatSessionId.value) {
         try {
-            const sessionRes = await createChatSession(chatNovelId, '默认对话')
+            const sessionRes = await createChatSession(novelId, '默认对话')
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
         } catch (error) {
@@ -3783,7 +3676,7 @@ const sendChatMessage = async () => {
 
     const controller = aiChatStream(
         {
-            novelId: chatNovelId,
+            novelId: novelId,
             sessionId,
             question: userMessage,
         },
@@ -3973,10 +3866,10 @@ const getRoleLabel = (roleType?: string): string => {
  * 加载人物图谱数据（从后端获取）
  */
 const loadCharacterGraphData = async () => {
-    if (!novelId.value) return
+    if (!novelId) return
     isLoadingCharacterGraph.value = true
     try {
-        const res = await getCharacterGraph(novelId.value)
+        const res = await getCharacterGraph(novelId)
         characterData.value = res.data.characters || []
         characterRelationData.value = res.data.relations || []
     } catch (error) {
@@ -3991,7 +3884,7 @@ const loadCharacterGraphData = async () => {
 /**
  * 获取人物的关系列表
  */
-const getCharacterRelations = (characterId: number): NovelCharacterRelation[] => {
+const getCharacterRelations = (characterId: string): NovelCharacterRelation[] => {
     return characterRelationData.value.filter((r) => r.characterId === characterId || r.targetId === characterId)
 }
 
@@ -4018,7 +3911,7 @@ const initMiniGraph = () => {
     const links: {
         source: string
         target: string
-        value: string
+        relationType: string
         label: { show: boolean; formatter: string; fontSize: number }
     }[] = []
     characterRelationData.value.forEach((rel) => {
@@ -4028,7 +3921,7 @@ const initMiniGraph = () => {
             links.push({
                 source: String(rel.characterId),
                 target: String(rel.targetId),
-                value: rel.relationType,
+                relationType: rel.relationType,
                 label: { show: true, formatter: rel.relationType, fontSize: 10 },
             })
         }
@@ -4037,18 +3930,18 @@ const initMiniGraph = () => {
     const option: echarts.EChartsOption = {
         tooltip: {
             trigger: 'item',
-            formatter: (params: Record<string, unknown>) => {
-                const p = params as { dataType: string; data: { characterData: NovelCharacter; value: string } }
-                if (p.dataType === 'node') {
-                    const char = p.data.characterData
-                    return `<div style="padding: 8px;">
-                        <div style="font-weight: bold; margin-bottom: 4px;">${char.name}</div>
-                        <div style="color: #666; font-size: 12px;">${getRoleLabel(char.roleType)}</div>
-                        ${char.identity ? `<div style="color: #888; font-size: 11px;">${char.identity}</div>` : ''}
-                        <div style="color: #999; font-size: 11px; margin-top: 4px;">点击查看详情</div>
-                    </div>`
+            renderMode: 'richText',
+            formatter: (params) => {
+                if (Array.isArray(params) || !params.data || typeof params.data !== 'object') return ''
+                if (params.dataType === 'node' && 'id' in params.data) {
+                    const charId = params.data.id
+                    const character = characterData.value.find(item => item.id === charId)
+                    if (!character) return params.name
+                    return [character.name, getRoleLabel(character.roleType), character.identity, '点击查看详情']
+                        .filter(Boolean)
+                        .join('\n')
                 }
-                return `${p.data.value}`
+                return 'relationType' in params.data ? String(params.data.relationType) : ''
             },
         },
         series: [
@@ -4195,7 +4088,7 @@ const publishChapter = async () => {
 }
 
 // 加载章节大纲
-const loadChapterOutline = async (chapterId: number) => {
+const loadChapterOutline = async (chapterId: string) => {
     try {
         const res = await getChapterOutline(chapterId)
         if (res.data) {
@@ -4207,7 +4100,7 @@ const loadChapterOutline = async (chapterId: number) => {
             if (res.data.involvedCharacters) {
                 try {
                     const characters = JSON.parse(res.data.involvedCharacters)
-                    selectedCharacters.value = Array.isArray(characters) ? characters : []
+                    selectedCharacters.value = Array.isArray(characters) ? characters.map(String) : []
                 } catch {
                     selectedCharacters.value = []
                 }
@@ -4273,7 +4166,7 @@ const AI_OUTLINE_POLL_INTERVAL = 3000
 /**
  * 发布后开始轮询 AI 大纲生成结果
  */
-const startPollingAiOutline = (chapterId: number) => {
+const startPollingAiOutline = (chapterId: string) => {
     let pollCount = 0
     const poll = async () => {
         if (pollCount >= AI_OUTLINE_POLL_MAX) {
@@ -4359,7 +4252,7 @@ const closePreviewVersion = () => {
 }
 
 // 恢复版本
-const restoreVersion = async (versionId: number) => {
+const restoreVersion = async (versionId: string) => {
     if (!currentChapterId.value) return
 
     ElMessageBox.confirm('恢复此版本将覆盖当前内容，是否继续？', '恢复确认', {
@@ -4441,9 +4334,7 @@ const manualSave = async () => {
 
 // 自动保存定时器
 let draftSaveTimer: ReturnType<typeof setTimeout>
-let backendAutoSaveTimer: ReturnType<typeof setTimeout>
 let outlineDraftSaveTimer: ReturnType<typeof setTimeout>
-let outlineBackendSaveTimer: ReturnType<typeof setTimeout>
 
 // 智能同步保存相关状态
 const lastSyncedContent = ref('') // 上次同步到后端的内容
@@ -4452,7 +4343,7 @@ const lastSyncedOutline = ref({
     plotPointsText: '',
     emotionTone: '',
     sceneSetting: '',
-    selectedCharacters: [] as number[],
+    selectedCharacters: [] as string[],
 })
 const contentSyncInterval = ref<number | null>(null) // 内容同步循环定时器
 const outlineSyncInterval = ref<number | null>(null) // 大纲同步循环定时器
@@ -4465,12 +4356,6 @@ const SYNC_INTERVAL = 15000
 const MAX_NO_CHANGE_TIME = 60000
 /** 本地草稿防抖时间（毫秒）：1秒 */
 const DRAFT_DEBOUNCE_TIME = 1000
-
-// 保存草稿到本地（高频）
-const _performDraftSave = () => {
-    if (!hasUnsavedChanges.value || !currentChapterId.value) return
-    saveDraftToLocal()
-}
 
 /**
  * 检查内容是否有实际变化（与上次同步的内容对比）
@@ -4542,7 +4427,7 @@ const performOutlineSync = async (): Promise<boolean> => {
     isOutlineSaving.value = true
     try {
         await saveChapterOutline({
-            novelId: novelId.value,
+            novelId,
             chapterId: currentChapterId.value,
             outlineContent: chapterOutline.value,
             plotPoints: plotPointsText.value,
@@ -4645,22 +4530,6 @@ const stopOutlineSyncLoop = () => {
     }
 }
 
-// 自动保存到后端（低频）- 保留用于兼容，实际逻辑已迁移到 performContentSync
-const _performAutoSave = async () => {
-    await performContentSync()
-}
-
-// 大纲草稿保存到本地（高频，复用 saveDraftToLocal）
-const _performOutlineDraftSave = () => {
-    if (!hasOutlineUnsavedChanges.value || !currentChapterId.value) return
-    saveDraftToLocal()
-}
-
-// 大纲自动保存到后端（低频）- 保留用于兼容，实际逻辑已迁移到 performOutlineSync
-const _performOutlineAutoSave = async () => {
-    await performOutlineSync()
-}
-
 /**
  * 检测大纲字段是否有变更
  */
@@ -4703,7 +4572,7 @@ const saveNovelOutlineHandler = async () => {
     try {
         // 将编辑内容同步到 novelOutline
         novelOutline.value = editingNovelOutlineContent.value
-        await saveNovelOutline(novelId.value, novelOutline.value)
+        await saveNovelOutline(novelId, novelOutline.value)
         isEditingNovelOutline.value = false
         ElMessage.success('大纲保存成功')
     } catch (error) {
@@ -4797,9 +4666,7 @@ onUnmounted(() => {
     stopContentSyncLoop()
     stopOutlineSyncLoop()
     clearTimeout(draftSaveTimer)
-    clearTimeout(backendAutoSaveTimer)
     clearTimeout(outlineDraftSaveTimer)
-    clearTimeout(outlineBackendSaveTimer)
     window.removeEventListener('beforeunload', handleBeforeUnload)
     // 组件卸载时也中断正在进行的流式请求
     if (activeChatStream) {
@@ -4822,7 +4689,7 @@ onActivated(() => {
  */
 const loadNovelSettings = async () => {
     try {
-        const res = await getEffectiveSettings(novelId.value)
+        const res = await getEffectiveSettings(novelId)
         if (res.data) {
             novelSettings.value = res.data
         }
@@ -4854,8 +4721,8 @@ const loadSettingsPanel = async () => {
         // 并行加载 Agent 列表、Agent 配置和小说级别配置
         const [agentList, agentRes, settingsRes] = await Promise.all([
             getAvailableAgentList(),
-            getNovelAgentConfig(novelId.value),
-            getNovelLevelSettings(novelId.value),
+            getNovelAgentConfig(novelId),
+            getNovelLevelSettings(novelId),
         ])
         agents.value = agentList
         if (agentRes.data) {
@@ -4869,7 +4736,7 @@ const loadSettingsPanel = async () => {
             // 小说没有自身配置，加载有效配置（合并后的结果）展示
             hasOwnSettings.value = false
             try {
-                const effectiveRes = await getEffectiveSettings(novelId.value)
+                const effectiveRes = await getEffectiveSettings(novelId)
                 novelSettingsForm.value = effectiveRes.data
             } catch {
                 novelSettingsForm.value = createDefaultSettings()
@@ -4896,8 +4763,8 @@ const saveSettingsPanel = async () => {
         }
         // 并行保存 Agent 配置和小说配置
         await Promise.all([
-            saveNovelAgentConfig(novelId.value, agentRequest),
-            saveNovelSettings(novelId.value, novelSettingsForm.value),
+            saveNovelAgentConfig(novelId, agentRequest),
+            saveNovelSettings(novelId, novelSettingsForm.value),
         ])
         // 保存成功后同步更新运行时配置
         novelSettings.value = { ...novelSettingsForm.value }

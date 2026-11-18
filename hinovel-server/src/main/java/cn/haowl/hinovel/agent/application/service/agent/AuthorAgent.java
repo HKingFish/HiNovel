@@ -15,6 +15,7 @@ import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
 import dev.langchain4j.service.TokenStream;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,9 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.function.Function;
 
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.REWRITE_RESULT_EMPTY;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception0;
 
 /**
@@ -57,6 +60,12 @@ public class AuthorAgent {
      */
     @Autowired
     private ChapterAnnotationService chapterAnnotationService;
+
+    /**
+     * 校验临时批注所属小说的归属。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
     /**
      * 作者 Agent 默认系统提示词（引用统一模板）
      */
@@ -65,24 +74,23 @@ public class AuthorAgent {
     /**
      * 根据大纲同步改写章节。
      *
-     * @param chapter 章节信息
-     * @param outline 章节大纲
+     * @param command 改写内容与前情
      * @param userId  当前用户 ID
      * @return 生成的章节内容
      */
-    public String rewriteChapterByOutline(NovelChapter chapter, ChapterOutline outline, Long userId) {
+    public String rewriteChapterByOutline(ChapterRewriteCommand command, Long userId) {
+        NovelChapter chapter = command.getChapter();
         log.info("[rewriteChapterByOutline][作者 Agent 改写章节，chapterId={}]", chapter.getId());
         long startTime = System.currentTimeMillis();
 
         CallContext callContext = aiServiceFactory.prepareNovelCall(
             chapter.getNovelId(), AgentRoleEnum.AUTHOR, userId, DEFAULT_SYSTEM_PROMPT);
         GenericAiAssistant assistant = aiServiceFactory.buildNovelAssistant(callContext, false);
-        String userPrompt = AgentPromptTemplates.buildRewritePrompt(
-            ChapterRewriteCommand.builder().chapter(chapter).outline(outline).build());
+        String userPrompt = AgentPromptTemplates.buildRewritePrompt(command);
 
         CallLogContext logContext =
             CallLogContext.builder()
-                .callScene(LlmCallSceneEnum.REWRITE)
+                .callScene(LlmCallSceneEnum.REGENERATE)
                 .callContext(callContext)
                 .requestContent(userPrompt)
                 .build();
@@ -90,6 +98,9 @@ public class AuthorAgent {
         try {
             String content = assistant.chat(callContext.getSystemPrompt(),
                 aiServiceFactory.writingPrompt(callContext, userPrompt));
+            if (content == null || content.isBlank()) {
+                throw exception(REWRITE_RESULT_EMPTY);
+            }
             long processingTimeMs = System.currentTimeMillis() - startTime;
             log.info("[rewriteChapterByOutline][作者 Agent 改写完成，chapterId={}，生成字数={}，耗时={}ms]",
                 chapter.getId(), content.length(), processingTimeMs);
@@ -112,8 +123,10 @@ public class AuthorAgent {
      * @param userId  当前用户 ID
      * @return 逐 Token 推送的 Flux 流
      */
-    public Flux<String> streamRewriteChapterByOutline(NovelChapter chapter, ChapterOutline outline,
-                                                      Long userId) {
+    public Flux<String> streamRewriteChapterByOutline(
+        NovelChapter chapter,
+        ChapterOutline outline,
+        Long userId) {
         return streamRewriteChapterByOutline(
             ChapterRewriteCommand.builder().chapter(chapter).outline(outline).build(), userId);
     }
@@ -161,8 +174,11 @@ public class AuthorAgent {
      * @param userId      当前用户 ID
      * @return 重写后的章节内容
      */
-    public String rewriteBySuggestions(NovelChapter chapter, ChapterOutline outline,
-                                       List<String> suggestions, Long userId) {
+    public String rewriteBySuggestions(
+        NovelChapter chapter,
+        ChapterOutline outline,
+        List<String> suggestions,
+        Long userId) {
         log.info("[rewriteBySuggestions][作者 Agent 根据建议重写，chapterId={}，建议数={}]", chapter.getId(), suggestions.size());
         long startTime = System.currentTimeMillis();
 
@@ -208,11 +224,13 @@ public class AuthorAgent {
         Long novelId = request.getNovelId();
         Long annotationId = request.getAnnotationId();
         if (annotationId != null && 0L < annotationId) {
-            ChapterAnnotation annotation = chapterAnnotationService.getAnnotationById(annotationId);
+            ChapterAnnotation annotation = chapterAnnotationService.getAnnotationById(annotationId, userId);
             if (annotation == null) {
                 return Flux.error(exception0(NOT_FOUND.getCode(), "批注不存在"));
             }
             novelId = annotation.getNovelId();
+        } else {
+            novelDomainService.validateOwnership(novelId, userId);
         }
 
         String originalText = request.getOriginalText();
@@ -247,9 +265,10 @@ public class AuthorAgent {
      * @param rewriteRequirement 改写要求
      * @return 用户 Prompt
      */
-    private String buildAnnotationRewritePrompt(String fullChapterContent,
-                                                String originalText,
-                                                String rewriteRequirement) {
+    private String buildAnnotationRewritePrompt(
+        String fullChapterContent,
+        String originalText,
+        String rewriteRequirement) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("以下是一章小说的完整正文内容，请仔细阅读理解上下文：\n\n");
         prompt.append("【整章正文】\n").append(fullChapterContent).append("\n\n");

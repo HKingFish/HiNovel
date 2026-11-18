@@ -16,7 +16,7 @@
                 FROM novel_chapter_version
                 WHERE chapter_id = #{chapterId}
                   AND deleted = 0
-                ORDER BY create_time DESC
+                ORDER BY create_time DESC, id DESC
                 LIMIT #{keepCount}
             ) AS tmp
           )

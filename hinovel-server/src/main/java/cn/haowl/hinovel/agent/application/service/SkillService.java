@@ -13,9 +13,16 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static cn.haowl.hinovel.agent.constant.SkillConstants.*;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.COLD_SUSPENSE_SKILL_ID;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.WARM_NARRATIVE_SKILL_ID;
 import static cn.haowl.hinovel.agent.enums.SkillErrorCodeConstants.SKILL_NOT_EXISTS;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 

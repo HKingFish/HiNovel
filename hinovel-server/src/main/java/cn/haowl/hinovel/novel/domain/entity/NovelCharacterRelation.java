@@ -3,7 +3,11 @@ package cn.haowl.hinovel.novel.domain.entity;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import cn.haowl.hinovel.novel.constant.CharacterRelationTypeEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.EnumUtils;
 
 import java.util.Objects;

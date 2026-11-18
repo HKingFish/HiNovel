@@ -52,12 +52,13 @@ public class OssApplicationService {
     /**
      * 删除文件。
      *
-     * @param fileUrl 文件URL
+     * @param fileUrl 文件 URL
+     * @param userId 当前用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void delete(String fileUrl) {
-        ossDomainService.delete(fileUrl);
-        log.info("[delete][文件删除成功]");
+    public void delete(String fileUrl, Long userId) {
+        ossDomainService.delete(fileUrl, userId);
+        log.info("[delete][文件删除成功，userId={}]", userId);
     }
 
     /**

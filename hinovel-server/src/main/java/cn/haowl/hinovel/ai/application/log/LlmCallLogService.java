@@ -14,6 +14,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.common.constant.CommonConstants.DEFAULT_PAGE_NUM;
+import static cn.haowl.hinovel.common.constant.CommonConstants.MAX_PAGE_SIZE;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
 /**
  * LLM 调用记录服务。
  *
@@ -45,6 +50,7 @@ public class LlmCallLogService {
             truncateContent(callLog);
             llmCallLogMapper.insert(callLog);
         } catch (Exception e) {
+            // 调用记录独立于模型请求，持久化失败仅记录诊断信息。
             log.error("[saveAsync][保存 LLM 调用记录失败，userId={}，agentId={}，异常类型={}]",
                 callLog.getUserId(), callLog.getAgentId(), e.getClass().getSimpleName());
         }
@@ -58,11 +64,14 @@ public class LlmCallLogService {
      * @return 分页结果
      */
     public IPage<LlmCallLog> listByPage(LlmCallLogQuery query, Long userId) {
+        if (query.getPageNum() < DEFAULT_PAGE_NUM || query.getPageSize() <= 0 || query.getPageSize() > MAX_PAGE_SIZE) {
+            throw exception(PARAM_ERROR);
+        }
         log.info("[listByPage][分页查询调用记录，userId={}，pageNum={}，pageSize={}]",
-                userId, query.getPageNum(), query.getPageSize());
+            userId, query.getPageNum(), query.getPageSize());
         return llmCallLogMapper.selectPage(
             new Page<>(query.getPageNum(), query.getPageSize()),
-            buildQueryWrapper(query, userId).orderByDesc(LlmCallLog::getCreateTime));
+            buildQueryWrapper(query, userId).orderByDesc(LlmCallLog::getCreateTime, LlmCallLog::getId));
     }
 
     /**
@@ -74,7 +83,8 @@ public class LlmCallLogService {
      */
     public LlmCallStatistics getCallStatistics(LlmCallLogQuery query, Long userId) {
         log.info("[getCallStatistics][统计调用消耗，userId={}]", userId);
-        List<LlmCallLog> logs = llmCallLogMapper.selectList(buildQueryWrapper(query, userId));
+        List<LlmCallLog> logs = llmCallLogMapper.selectList(buildQueryWrapper(query, userId)
+            .select(LlmCallLog::getStatus, LlmCallLog::getTotalTokens, LlmCallLog::getProcessingTimeMs));
 
         long successCount = logs.stream()
             .filter(LlmCallLog::isSuccess)
@@ -90,26 +100,6 @@ public class LlmCallLogService {
                 .sum();
 
         return new LlmCallStatistics(successCount, failCount, totalTokens, totalDuration);
-    }
-
-    /**
-     * 查询所有调用记录（不分页）。
-     *
-     * @return 调用记录列表
-     */
-    public List<LlmCallLog> listAll() {
-        return llmCallLogMapper.selectList(
-            new LambdaQueryWrapper<LlmCallLog>().orderByDesc(LlmCallLog::getCreateTime));
-    }
-
-    /**
-     * 根据 ID 查询调用记录详情。
-     *
-     * @param id 记录 ID
-     * @return 调用记录实体
-     */
-    public LlmCallLog getById(Long id) {
-        return llmCallLogMapper.selectById(id);
     }
 
     /**
