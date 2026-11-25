@@ -3,13 +3,16 @@ package cn.haowl.hinovel.infra.mq.constant;
 /**
  * 消息队列常量类。
  *
- * <p>定义消息队列相关的常量配置。</p>
+ * 定义消息队列相关的常量配置。
  *
  * @author haowl
  * @since 2024
  */
 public final class MqConstants {
 
+    /**
+     * 禁止实例化消息常量类。
+     */
     private MqConstants() {
     }
 

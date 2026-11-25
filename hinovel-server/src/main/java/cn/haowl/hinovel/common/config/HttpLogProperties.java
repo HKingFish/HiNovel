@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * HTTP 日志配置属性。
  *
- * <p>对应 application.yml 中 hinovel.http-log.* 配置项。</p>
+ * 对应 application.yml 中 hinovel.http-log.* 配置项。
  *
  * @author haowl
  * @since 2024

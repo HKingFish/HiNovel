@@ -7,8 +7,8 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * LLM Provider 数据访问映射器接口。
  *
- * <p>继承自 MyBatis-Plus 的 {@link BaseMapper}，提供对 {@code ai_llm_provider} 表的
- * CRUD 操作能力。</p>
+ * 继承自 MyBatis-Plus 的 {@link BaseMapper}，提供对 {@code ai_llm_provider} 表的
+ * CRUD 操作能力。
  *
  * @author haowl
  * @since 2024

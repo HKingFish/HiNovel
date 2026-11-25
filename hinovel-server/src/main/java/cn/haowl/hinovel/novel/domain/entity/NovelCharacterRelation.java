@@ -1,16 +1,22 @@
 package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import cn.haowl.hinovel.novel.constant.CharacterRelationTypeEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.util.Objects;
 
 /**
  * 人物关系实体。
  *
- * <p>存储小说中两个人物之间的关系，包含关系类型和描述。
- * 关系具有方向性：characterId 为主体，targetId 为客体。</p>
+ * 存储小说中两个人物之间的关系，包含关系类型和描述。
+ * 关系具有方向性：characterId 为主体，targetId 为客体。
  *
  * @author haowl
  */
@@ -40,7 +46,7 @@ public class NovelCharacterRelation extends BaseEntity {
     /**
      * 关系类型。
      *
-     * @see RelationType
+     * @see CharacterRelationTypeEnum
      */
     private String relationType;
 
@@ -48,42 +54,6 @@ public class NovelCharacterRelation extends BaseEntity {
      * 关系描述。
      */
     private String description;
-
-    // ==================== 关系类型枚举 ====================
-
-    /**
-     * 人物关系类型。
-     */
-    public enum RelationType {
-        /**
-         * 朋友
-         */
-        FRIEND,
-        /**
-         * 敌人
-         */
-        ENEMY,
-        /**
-         * 恋人
-         */
-        LOVER,
-        /**
-         * 家人
-         */
-        FAMILY,
-        /**
-         * 师徒
-         */
-        MASTER,
-        /**
-         * 同事
-         */
-        COLLEAGUE,
-        /**
-         * 其他
-         */
-        OTHER
-    }
 
     // ==================== 工厂方法 ====================
 
@@ -111,7 +81,7 @@ public class NovelCharacterRelation extends BaseEntity {
                 .novelId(novelId)
                 .characterId(characterId)
                 .targetId(targetId)
-                .relationType(relationType != null ? relationType : RelationType.OTHER.name())
+            .relationType(relationType != null ? relationType : CharacterRelationTypeEnum.OTHER.name())
                 .description(description)
                 .build();
     }
@@ -162,7 +132,7 @@ public class NovelCharacterRelation extends BaseEntity {
      * @param type 关系类型
      * @return 是否匹配
      */
-    public boolean isRelationType(RelationType type) {
-        return type != null && type.name().equals(this.relationType);
+    public boolean isRelationType(CharacterRelationTypeEnum type) {
+        return type != null && type == EnumUtils.getEnum(CharacterRelationTypeEnum.class, this.relationType);
     }
 }

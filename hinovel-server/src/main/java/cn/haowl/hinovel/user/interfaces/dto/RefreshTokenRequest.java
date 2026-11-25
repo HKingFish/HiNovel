@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 刷新 Token 请求 DTO。
  *
- * <p>用于通过 refresh token 获取新的访问令牌。</p>
+ * 用于通过 refresh token 获取新的访问令牌。
  *
  * @author haowl
  * @since 2024

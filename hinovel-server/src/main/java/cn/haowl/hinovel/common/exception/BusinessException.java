@@ -5,7 +5,7 @@ import lombok.Getter;
 /**
  * 业务异常。
  *
- * <p>用于业务逻辑中抛出的可预期异常，由 {@link GlobalExceptionHandler} 统一处理。</p>
+ * 用于业务逻辑中抛出的可预期异常，由 {@link GlobalExceptionHandler} 统一处理。
  *
  * @author haowl
  * @since 2024

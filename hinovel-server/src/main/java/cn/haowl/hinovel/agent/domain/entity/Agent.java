@@ -3,10 +3,16 @@ package cn.haowl.hinovel.agent.domain.entity;
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Objects;
 
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
@@ -15,7 +21,7 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * Agent 实体。
  *
- * <p>AI Agent 配置实体，包含模型参数和系统提示词。</p>
+ * AI Agent 配置实体，包含模型参数和系统提示词。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -100,6 +106,14 @@ public class Agent extends BaseEntity {
      * 排序序号（越小越靠前，仅内置 Agent 使用）。
      */
     private Integer sortOrder;
+
+    /**
+     * 绑定的 Skill ID 列表。
+     *
+     * 非持久化字段，由绑定表关联查询后填充；无绑定时为空数组。
+     */
+    @TableField(exist = false)
+    private List<Integer> skillIds;
 
     /**
      * 创建用户自定义 Agent。
@@ -228,6 +242,13 @@ public class Agent extends BaseEntity {
      */
     public boolean belongsTo(Long userId) {
         return Objects.equals(this.userId, userId);
+    }
+
+    /**
+     * 判断当前用户是否可以选用该 Agent。
+     */
+    public boolean isAvailableTo(Long userId) {
+        return userId != null && (isBuiltin() || belongsTo(userId));
     }
 
     /**

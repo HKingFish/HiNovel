@@ -7,8 +7,8 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * LLM 调用记录数据访问映射器接口。
  *
- * <p>继承自 MyBatis-Plus 的 {@link BaseMapper}，提供对 {@code ai_llm_call_log} 表的
- * CRUD 操作能力。</p>
+ * 继承自 MyBatis-Plus 的 {@link BaseMapper}，提供对 {@code ai_llm_call_log} 表的
+ * CRUD 操作能力。
  *
  * @author haowl
  */

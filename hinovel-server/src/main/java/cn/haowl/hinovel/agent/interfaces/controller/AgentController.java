@@ -4,14 +4,21 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.AgentService;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
+import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
 import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
-import cn.haowl.hinovel.ai.domain.service.LlmProviderDomainService;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -21,11 +28,19 @@ import java.util.List;
 @Tag(name = "Agent 管理", description = "Agent 的创建、查询、更新、删除")
 @RestController
 @RequestMapping("/api/agent/agents")
-@RequiredArgsConstructor
 public class AgentController {
 
-    private final AgentService agentService;
-    private final LlmProviderDomainService llmProviderDomainService;
+    /**
+     * Agent 业务服务。
+     */
+    @Autowired
+    private AgentService agentService;
+
+    /**
+     * LLM 提供方查询。
+     */
+    @Autowired
+    private LlmProviderService llmProviderService;
 
     /**
      * 创建 Agent
@@ -52,8 +67,9 @@ public class AgentController {
      */
     @Operation(summary = "更新 Agent 配置", description = "更新 Agent 的提示词、模型参数等配置，仅限创建者操作")
     @PutMapping("/{id}")
-    public ApiResponse<Agent> update(@PathVariable Long id,
-                                     @Valid @RequestBody AgentRequest request) {
+    public ApiResponse<Agent> update(
+        @PathVariable Long id,
+        @Valid @RequestBody AgentRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
         return ApiResponse.success(agentService.update(id, userId, request));
     }
@@ -75,7 +91,7 @@ public class AgentController {
     @Operation(summary = "获取 LLM 提供方列表", description = "返回所有激活的 LLM 提供方，供创建 Agent 时选择")
     @GetMapping("/llm-providers")
     public ApiResponse<List<LlmProvider>> listLlmProviders() {
-        return ApiResponse.success(llmProviderDomainService.getActiveProviders());
+        return ApiResponse.success(llmProviderService.getActiveProviders(StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -84,6 +100,7 @@ public class AgentController {
     @Operation(summary = "获取默认配置模板", description = "返回所有内置 Agent 作为预设模板，供新建 Agent 时快速填充")
     @GetMapping("/default-configs")
     public ApiResponse<List<Agent>> listDefaultConfigs() {
+        StpUtil.checkLogin();
         return ApiResponse.success(agentService.listBuiltin());
     }
 }

@@ -1,62 +1,65 @@
 package cn.haowl.hinovel.novel.application.service;
 
-import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapterVersion;
 import cn.haowl.hinovel.novel.domain.repository.NovelChapterRepository;
-import cn.haowl.hinovel.novel.domain.repository.NovelChapterVersionRepository;
 import cn.haowl.hinovel.novel.domain.service.ChapterDomainService;
+import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterAutoSaveRequest;
-import cn.haowl.hinovel.novel.interfaces.dto.ChapterCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.ChapterUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
-import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
-
 /**
  * 章节应用服务。
  *
- * <p>协调领域服务完成章节的创建、更新、删除、自动保存及版本管理，
- * 核心业务逻辑委托给 {@link ChapterDomainService}。</p>
+ * 协调领域服务完成章节的创建、更新、删除、自动保存及版本管理，
+ * 核心业务逻辑委托给 {@link ChapterDomainService}。
  */
 @Service
-@RequiredArgsConstructor
 public class ChapterService {
 
-    private final ChapterDomainService chapterDomainService;
-    private final NovelChapterRepository chapterRepository;
-    private final NovelChapterVersionRepository versionRepository;
-    private final NovelService novelService;
-    private final NovelSettingsService novelSettingsService;
+    /**
+     * 章节领域服务。
+     */
+    @Autowired
+    private ChapterDomainService chapterDomainService;
+
+    /**
+     * 章节仓储。
+     */
+    @Autowired
+    private NovelChapterRepository chapterRepository;
+
+    /**
+     * 小说应用服务。
+     */
+    @Autowired
+    private NovelService novelService;
+
+    /**
+     * 小说归属校验。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
 
     /**
      * 创建章节。
      *
      * @param userId  用户 ID
-     * @param request 创建请求
+     * @param command 创建参数
      * @return 创建的章节
      */
     @Transactional(rollbackFor = Exception.class)
-    public NovelChapter createChapter(Long userId, ChapterCreateRequest request) {
-        // 验证小说权限
-        novelService.getNovelById(userId, request.getNovelId());
-
-        // 委托领域服务创建章节
-        NovelChapter chapter = chapterDomainService.createChapter(
-                request.getNovelId(),
-                request.getTitle(),
-                request.getContent(),
-                request.getSortOrder()
-        );
-
-        // 刷新小说统计
-        novelService.refreshNovelStats(request.getNovelId());
+    public NovelChapter createChapter(Long userId, CreateChapterCommand command) {
+        novelDomainService.validateOwnership(command.getNovelId(), userId);
+        NovelChapter chapter = chapterDomainService.createChapter(command);
+        novelService.refreshNovelStats(chapter.getNovelId());
         return chapter;
     }
 
@@ -72,20 +75,10 @@ public class ChapterService {
     public NovelChapter updateChapter(Long userId, Long chapterId, ChapterUpdateRequest request) {
         NovelChapter chapter = getChapterById(userId, chapterId);
 
-        // 保存章节时始终创建历史版本（作为内容安全保障）
-        boolean createVersion = true;
-
-        // 委托领域服务更新章节
         chapter = chapterDomainService.updateChapter(
-                chapter, request.getTitle(), request.getContent(), createVersion);
+            chapter, request.getTitle(), request.getContent(), !Boolean.FALSE.equals(request.getCreateVersion()));
 
-        // 处理排序号和状态（应用层关注点）
-        if (request.getSortOrder() != null) {
-            chapter.setSortOrder(request.getSortOrder());
-            chapterRepository.save(chapter);
-        }
-        if (request.getStatus() != null) {
-            chapter.setStatus(request.getStatus());
+        if (chapter.updateMetadata(request.getSortOrder(), request.getStatus())) {
             chapterRepository.save(chapter);
         }
 
@@ -106,22 +99,16 @@ public class ChapterService {
         NovelChapter chapter = getChapterById(userId, request.getChapterId());
 
         if (request.getContent() != null) {
-            chapter.updateContent(request.getContent());
+            if (!request.getContent().equals(chapter.getContent())) {
+                chapter.updateContent(request.getContent());
+            }
             if (request.getWordCount() != null) {
                 chapter.setWordCount(request.getWordCount());
             }
         }
 
-        chapter = chapterRepository.save(chapter);
-
-        // 自动保存创建版本，保留 diff 信息
-        NovelChapterVersion version = NovelChapterVersion.createFromChapter(
-                chapter.getId(), chapter.getContent(), null,
-                NovelChapterVersion.UNPUBLISHED
-        );
-        version.setChangeDiff(request.getDiff());
-        versionRepository.save(version);
-
+        chapter = chapterDomainService.saveChapterWithDiff(chapter, request.getDiff());
+        novelService.refreshNovelStats(chapter.getNovelId());
         return chapter;
     }
 
@@ -134,10 +121,8 @@ public class ChapterService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteChapter(Long userId, Long chapterId) {
         NovelChapter chapter = getChapterById(userId, chapterId);
-        Long novelId = chapter.getNovelId();
-
-        chapterDomainService.deleteChapter(chapterId);
-        novelService.refreshNovelStats(novelId);
+        chapterDomainService.deleteChapter(chapter);
+        novelService.refreshNovelStats(chapter.getNovelId());
     }
 
     /**
@@ -148,16 +133,7 @@ public class ChapterService {
      * @return 章节实体
      */
     public NovelChapter getChapterById(Long userId, Long chapterId) {
-        NovelChapter chapter = chapterDomainService.getChapter(chapterId);
-
-        if (chapter.getDeleted() != null
-                && chapter.getDeleted().equals(CommonConstants.DELETED_TRUE)) {
-            throw exception(NOT_FOUND);
-        }
-
-        // 验证权限
-        novelService.getNovelById(userId, chapter.getNovelId());
-        return chapter;
+        return chapterDomainService.getOwnedChapter(chapterId, userId);
     }
 
     /**
@@ -178,7 +154,7 @@ public class ChapterService {
      * @return 章节列表
      */
     public List<NovelChapter> listChaptersByNovel(Long userId, Long novelId) {
-        novelService.getNovelById(userId, novelId);
+        novelDomainService.validateOwnership(novelId, userId);
         return chapterDomainService.listChaptersByNovelId(novelId);
     }
 
@@ -206,7 +182,8 @@ public class ChapterService {
      */
     @Transactional(rollbackFor = Exception.class)
     public NovelChapter restoreVersion(Long userId, Long chapterId, Long versionId) {
-        getChapterById(userId, chapterId);
-        return chapterDomainService.restoreVersion(chapterId, versionId);
+        NovelChapter chapter = chapterDomainService.restoreVersion(getChapterById(userId, chapterId), versionId);
+        novelService.refreshNovelStats(chapter.getNovelId());
+        return chapter;
     }
 }

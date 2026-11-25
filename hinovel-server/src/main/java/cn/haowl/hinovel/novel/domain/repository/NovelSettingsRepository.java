@@ -7,11 +7,18 @@ import java.util.Optional;
 /**
  * 小说配置仓储接口。
  *
- * <p>定义小说配置和用户默认配置的存储与查询操作。</p>
+ * 定义小说配置和用户默认配置的存储与查询操作。
  *
  * @author haowl
  */
 public interface NovelSettingsRepository {
+
+    /**
+     * 插入新配置。
+     *
+     * @param settings 待插入的配置
+     */
+    void insert(NovelSettings settings);
 
     /**
      * 保存配置。

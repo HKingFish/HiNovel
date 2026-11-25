@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Jackson 全局序列化配置。
  *
- * <p>将 Long 类型固定序列化为 String，确保前端接收到的 ID 不会因
- * JavaScript Number 精度限制而丢失。</p>
+ * 将 Long 类型固定序列化为 String，确保前端接收到的 ID 不会因
+ * JavaScript Number 精度限制而丢失。
  *
  * @author haowl
  */

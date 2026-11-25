@@ -1,12 +1,13 @@
 package cn.haowl.hinovel.novel.application.service;
 
+import cn.haowl.hinovel.novel.constant.NovelStatusEnum;
 import cn.haowl.hinovel.novel.domain.entity.Novel;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import cn.haowl.hinovel.novel.domain.service.NovelDomainService;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.NovelUpdateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.OutlineUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,20 +16,28 @@ import java.util.List;
 /**
  * 小说应用服务。
  *
- * <p>负责小说相关用例的流程编排，协调领域服务完成业务操作。
- * 不包含业务逻辑，业务规则由 {@link NovelDomainService} 和领域实体承担。</p>
+ * 负责小说相关用例的流程编排，协调领域服务完成业务操作。
+ * 不包含业务逻辑，业务规则由 {@link NovelDomainService} 和领域实体承担。
  */
 @Service
-@RequiredArgsConstructor
 public class NovelService {
 
-    private final NovelDomainService novelDomainService;
-    private final NovelAgentConfigService novelAgentConfigService;
+    /**
+     * 小说领域服务。
+     */
+    @Autowired
+    private NovelDomainService novelDomainService;
+
+    /**
+     * 小说 Agent 配置服务。
+     */
+    @Autowired
+    private NovelAgentConfigService novelAgentConfigService;
 
     /**
      * 创建小说。
      *
-     * <p>编排流程：创建小说 → 初始化空白大纲 → 初始化 Agent 配置。</p>
+     * 编排流程：创建小说 → 初始化空白大纲 → 初始化 Agent 配置。
      *
      * @param userId  用户 ID
      * @param request 创建请求
@@ -65,14 +74,15 @@ public class NovelService {
     @Transactional(rollbackFor = Exception.class)
     public Novel updateNovel(Long userId, Long novelId, NovelUpdateRequest request) {
         Novel novel = novelDomainService.validateOwnership(novelId, userId);
+        NovelStatusEnum status = request.parseStatus();
 
         // 通过领域服务更新基本信息（内部调用实体充血方法）
         novel = novelDomainService.updateNovelInfo(
                 novel, request.getTitle(), request.getDescription(), request.getCoverUrl());
 
         // 状态变更单独处理（状态转换有独立的领域规则）
-        if (request.getStatus() != null) {
-            novel = novelDomainService.changeStatus(novel, request.getStatus());
+        if (status != null) {
+            novel = novelDomainService.changeStatus(novel, status);
         }
 
         return novel;

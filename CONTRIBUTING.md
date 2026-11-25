@@ -19,9 +19,8 @@
 
 ```bash
 cp .env.example .env
-bash docker-build.sh infra
-cd hinovel-server && mvn spring-boot:run
-cd hinovel-web && npm install && npm run dev
+# 填写 .env 中的 MySQL 密码和 API_KEY_SECRET
+bash start.sh
 ```
 
 ## 提交规范

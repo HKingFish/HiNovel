@@ -5,7 +5,7 @@ import cn.haowl.hinovel.infra.mq.event.DomainEvent;
 /**
  * 消息发送模板接口。
  *
- * <p>定义消息发送的统一接口，支持同步/异步发送、延迟消息等。</p>
+ * 定义消息发送的统一接口，支持同步/异步发送、延迟消息等。
  *
  * @author haowl
  * @since 2024

@@ -1,6 +1,7 @@
 package cn.haowl.hinovel.novel.interfaces.dto;
 
-import cn.haowl.hinovel.novel.constant.NovelChapterStatus;
+import cn.haowl.hinovel.common.constant.CommonConstants;
+import cn.haowl.hinovel.novel.constant.NovelChapterStatusEnum;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -10,14 +11,28 @@ import lombok.Data;
 @Data
 public class ChapterUpdateRequest {
 
-    @Size(max = 200, message = "标题长度不能超过200字符")
+    /**
+     * 标题。
+     */
+    @Size(max = CommonConstants.LENGTH_200, message = "标题长度不能超过200字符")
     private String title;
 
+    /**
+     * 正文。
+     */
     private String content;
 
+    /**
+     * 排序号。
+     */
     private Integer sortOrder;
 
-    private NovelChapterStatus status;
+    /**
+     * 章节发布状态。
+     *
+     * @see NovelChapterStatusEnum
+     */
+    private NovelChapterStatusEnum status;
 
     /**
      * 是否创建版本记录（自动保存时传false，手动保存传true）

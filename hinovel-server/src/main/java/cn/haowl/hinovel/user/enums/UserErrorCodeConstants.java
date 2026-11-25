@@ -8,8 +8,8 @@ import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.USER_USER_
 /**
  * User 用户模块错误码常量接口。
  *
- * <p>定义 User 用户模块相关的错误码。
- * 错误码范围：[1-001-000-000 ~ 1-002-000-000)</p>
+ * 定义 User 用户模块相关的错误码。
+ * 错误码范围：[1-001-000-000 ~ 1-002-000-000)
  *
  * @author haowl
  * @see ErrorCode

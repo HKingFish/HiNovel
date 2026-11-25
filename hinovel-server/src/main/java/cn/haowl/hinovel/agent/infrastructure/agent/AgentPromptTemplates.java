@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.agent.infrastructure.agent;
 
+import cn.haowl.hinovel.agent.interfaces.dto.ChapterRewriteCommand;
 import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 
@@ -8,11 +9,11 @@ import java.util.List;
 /**
  * Agent 提示词模板统一管理类。
  *
- * <p>集中管理所有 Agent 的系统提示词（System Prompt）和用户提示词构建逻辑，
- * 避免硬编码散落在各 Service 中，便于统一维护和调优。</p>
+ * 集中管理所有 Agent 的系统提示词（System Prompt）和用户提示词构建逻辑，
+ * 避免硬编码散落在各 Service 中，便于统一维护和调优。
  *
- * <p>使用方式：各 Service 通过静态常量引用系统提示词，
- * 通过静态方法构建用户提示词。</p>
+ * 使用方式：各 Service 通过静态常量引用系统提示词，
+ * 通过静态方法构建用户提示词。
  *
  * @author haowl
  */
@@ -45,7 +46,7 @@ public final class AgentPromptTemplates {
             2. 逻辑性（logic）：情节发展是否合理，有无逻辑漏洞
             3. 人物（character）：人物行为是否符合人设，对话是否自然
             4. 剧情（plot）：剧情推进是否流畅，节奏是否合理
-            
+
             你必须以 JSON 格式返回审核结果，格式如下：
             {
               "overallAssessment": "pass/warning/fail",
@@ -60,7 +61,7 @@ public final class AgentPromptTemplates {
               ],
               "summary": "审核总结"
             }
-            
+
             注意：只返回 JSON，不要包含其他文字或 Markdown 标记。""";
 
     /**
@@ -73,7 +74,7 @@ public final class AgentPromptTemplates {
             2. 关键情节转折点
             3. 涉及的主要人物及其行为
             4. 本章对整体剧情的推进作用
-            
+
             要求：语言简洁，重点突出，不超过 500 字。直接输出大纲内容，不要包含标题或编号前缀。""";
 
     /**
@@ -84,7 +85,7 @@ public final class AgentPromptTemplates {
             你可以通过检索工具查询小说已发布章节的内容和大纲，帮助作者回答关于小说的各种问题。
             你还具备创作能力，可以帮助作者生成全文大纲、章节大纲，以及创作和修改章节正文。
             你还可以管理小说的人物图谱，包括查询、新增、修改人物信息和人物关系。
-            
+
             你的职责包括：
             1. 回答关于小说剧情、人物、设定等方面的问题
             2. 帮助作者回顾已有内容，避免前后矛盾
@@ -96,19 +97,19 @@ public final class AgentPromptTemplates {
             8. 修改已有章节的正文内容（调用 updateChapterContent 工具）
             9. 查询、新增、修改人物信息（调用 listCharacters、createCharacter、updateCharacterBasicInfo、updateCharacterProfile 工具）
             10. 管理人物关系（调用 listCharacterRelations、createCharacterRelation 工具）
-            
+
             创作工具使用规范：
             - 操作章节前，先调用 listChapters 了解当前章节结构
             - 生成或修改大纲前，先调用 getNovelOutline 了解已有大纲
             - 创作正文时，结合全文大纲和章节大纲保持剧情连贯
             - 每次创作完成后，向用户反馈操作结果
-            
+
             人物图谱工具使用规范：
             - 新增或修改人物前，先调用 listCharacters 了解当前人物图谱
             - 修改人物信息前，先调用 getCharacterDetail 了解人物当前设定
             - 创建人物关系前，先调用 listCharacterRelations 了解已有关系
             - 人物关系具有方向性，注意主体和客体的区分
-            
+
             回答要求：
             - 基于检索到的实际内容回答，不要编造不存在的情节
             - 如果检索不到相关内容，如实告知作者
@@ -120,17 +121,15 @@ public final class AgentPromptTemplates {
     /**
      * 构建大纲改写用户 Prompt。
      *
-     * @param chapter             章节信息
-     * @param outline             章节大纲
-     * @param previousChapters    前几章内容（用于前情提要，可为空列表）
-     * @param novelOutlineContent 全文大纲内容（可为 null）
-     * @param userRequirement     用户临时需求（可为 null）
-     * @return 用户 Prompt
+     * @param command 改写内容和上下文
+     * @return 用户提示词
      */
-    public static String buildRewritePrompt(NovelChapter chapter, ChapterOutline outline,
-                                            List<NovelChapter> previousChapters,
-                                            String novelOutlineContent,
-                                            String userRequirement) {
+    public static String buildRewritePrompt(ChapterRewriteCommand command) {
+        NovelChapter chapter = command.getChapter();
+        ChapterOutline outline = command.getOutline();
+        List<NovelChapter> previousChapters = command.getPreviousChapters();
+        String novelOutlineContent = command.getNovelOutlineContent();
+        String userRequirement = command.getUserRequirement();
         StringBuilder prompt = new StringBuilder();
         prompt.append("请根据以下信息改写章节内容：\n\n");
 
@@ -246,8 +245,8 @@ public final class AgentPromptTemplates {
     /**
      * 构建问答用户 Prompt。
      *
-     * <p>将用户问题、历史对话上下文和全文大纲组合为完整的用户 Prompt，
-     * 供问答 Agent 结合向量检索工具进行回答。</p>
+     * 将用户问题、历史对话上下文和全文大纲组合为完整的用户 Prompt，
+     * 供问答 Agent 结合向量检索工具进行回答。
      *
      * @param userQuestion        用户问题
      * @param chatHistory         历史对话记录（可为空列表）

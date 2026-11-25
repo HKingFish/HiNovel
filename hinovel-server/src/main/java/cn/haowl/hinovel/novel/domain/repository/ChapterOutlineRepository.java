@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * 章节大纲仓储接口。
  *
- * <p>定义章节大纲的存储与查询操作。</p>
+ * 定义章节大纲的存储与查询操作。
  *
  * @author haowl
  */
@@ -21,6 +21,14 @@ public interface ChapterOutlineRepository {
      * @return 保存后的大纲
      */
     ChapterOutline save(ChapterOutline outline);
+
+    /**
+     * 按大纲 ID 更新 AI 大纲内容。
+     *
+     * @param outlineId 大纲 ID
+     * @param content AI 大纲内容
+     */
+    void updateAiOutlineContent(Long outlineId, String content);
 
     /**
      * 根据章节 ID 查询大纲。

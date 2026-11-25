@@ -3,16 +3,16 @@ package cn.haowl.hinovel.common.exception;
 /**
  * 业务异常的错误码区间定义。
  *
- * <p>用于避免各模块错误码重复定义，在此声明各模块的错误码范围。
- * </p>
+ * 用于避免各模块错误码重复定义，在此声明各模块的错误码范围。
  *
- * <p>错误码格式：1-SSS-MMM-EEE
+ *
+ * 错误码格式：1-SSS-MMM-EEE
  * <ul>
  *   <li>SSS：系统类型</li>
  *   <li>MMM：模块细分</li>
  *   <li>EEE：错误序号</li>
  * </ul>
- * </p>
+ *
  *
  * @author haowl
  * @see ErrorCode
@@ -20,6 +20,9 @@ package cn.haowl.hinovel.common.exception;
  */
 public final class ServiceErrorCodeRange {
 
+    /**
+     * 禁止实例化错误码范围定义。
+     */
     private ServiceErrorCodeRange() {
     }
 
@@ -120,12 +123,18 @@ public final class ServiceErrorCodeRange {
      * User - OAuth 模块错误码区间 [1-001-001-000 ~ 1-001-002-000)。
      */
     public static final int USER_OAUTH_ERROR_CODE_MIN = 1_001_001_000;
+    /**
+     * OAuth2 授权错误码上限。
+     */
     public static final int USER_OAUTH_ERROR_CODE_MAX = 1_001_002_000;
 
     /**
      * User - User 模块错误码区间 [1-001-002-000 ~ 1-001-003-000)。
      */
     public static final int USER_USER_ERROR_CODE_MIN = 1_001_002_000;
+    /**
+     * 用户错误码上限。
+     */
     public static final int USER_USER_ERROR_CODE_MAX = 1_001_003_000;
 
     // ==================== Novel 系统模块 ====================
@@ -134,24 +143,36 @@ public final class ServiceErrorCodeRange {
      * Novel - 小说模块错误码区间 [1-002-001-000 ~ 1-002-002-000)。
      */
     public static final int NOVEL_NOVEL_ERROR_CODE_MIN = 1_002_001_000;
+    /**
+     * 小说错误码上限。
+     */
     public static final int NOVEL_NOVEL_ERROR_CODE_MAX = 1_002_002_000;
 
     /**
      * Novel - 章节模块错误码区间 [1-002-002-000 ~ 1-002-003-000)。
      */
     public static final int NOVEL_CHAPTER_ERROR_CODE_MIN = 1_002_002_000;
+    /**
+     * 章节错误码上限。
+     */
     public static final int NOVEL_CHAPTER_ERROR_CODE_MAX = 1_002_003_000;
 
     /**
      * Novel - 大纲模块错误码区间 [1-002-003-000 ~ 1-002-004-000)。
      */
     public static final int NOVEL_OUTLINE_ERROR_CODE_MIN = 1_002_003_000;
+    /**
+     * 大纲错误码上限。
+     */
     public static final int NOVEL_OUTLINE_ERROR_CODE_MAX = 1_002_004_000;
 
     /**
      * Novel - 角色模块错误码区间 [1-002-004-000 ~ 1-002-005-000)。
      */
     public static final int NOVEL_CHARACTER_ERROR_CODE_MIN = 1_002_004_000;
+    /**
+     * 人物错误码上限。
+     */
     public static final int NOVEL_CHARACTER_ERROR_CODE_MAX = 1_002_005_000;
 
     // ==================== Agent 系统模块 ====================
@@ -160,25 +181,46 @@ public final class ServiceErrorCodeRange {
      * Agent - AI 审核模块错误码区间 [1-003-001-000 ~ 1-003-002-000)。
      */
     public static final int AGENT_AUDIT_ERROR_CODE_MIN = 1_003_001_000;
+    /**
+     * 审校错误码上限。
+     */
     public static final int AGENT_AUDIT_ERROR_CODE_MAX = 1_003_002_000;
 
     /**
      * Agent - AI 改写模块错误码区间 [1-003-002-000 ~ 1-003-003-000)。
      */
     public static final int AGENT_REWRITE_ERROR_CODE_MIN = 1_003_002_000;
+    /**
+     * 改写错误码上限。
+     */
     public static final int AGENT_REWRITE_ERROR_CODE_MAX = 1_003_003_000;
 
     /**
      * Agent - AI 问答模块错误码区间 [1-003-003-000 ~ 1-003-004-000)。
      */
     public static final int AGENT_CHAT_ERROR_CODE_MIN = 1_003_003_000;
+    /**
+     * 聊天错误码上限。
+     */
     public static final int AGENT_CHAT_ERROR_CODE_MAX = 1_003_004_000;
 
     /**
      * Agent - Agent 配置模块错误码区间 [1-003-010-000 ~ 1-003-011-000)。
      */
     public static final int AGENT_CONFIG_ERROR_CODE_MIN = 1_003_010_000;
+    /**
+     * Agent 配置错误码上限。
+     */
     public static final int AGENT_CONFIG_ERROR_CODE_MAX = 1_003_011_000;
+
+    /**
+     * Agent - Skill 模块错误码区间 [1-003-011-000 ~ 1-003-012-000)。
+     */
+    public static final int AGENT_SKILL_ERROR_CODE_MIN = 1_003_011_000;
+    /**
+     * Skill错误码上限。
+     */
+    public static final int AGENT_SKILL_ERROR_CODE_MAX = 1_003_012_000;
 
     // ==================== AI 系统模块 ====================
 
@@ -186,12 +228,18 @@ public final class ServiceErrorCodeRange {
      * AI - LLM Provider 模块错误码区间 [1-004-001-000 ~ 1-004-002-000)。
      */
     public static final int AI_LLM_PROVIDER_ERROR_CODE_MIN = 1_004_001_000;
+    /**
+     * LLM 提供方错误码上限。
+     */
     public static final int AI_LLM_PROVIDER_ERROR_CODE_MAX = 1_004_002_000;
 
     /**
      * AI - Embedding 配置模块错误码区间 [1-004-002-000 ~ 1-004-003-000)。
      */
     public static final int AI_EMBEDDING_ERROR_CODE_MIN = 1_004_002_000;
+    /**
+     * Embedding错误码上限。
+     */
     public static final int AI_EMBEDDING_ERROR_CODE_MAX = 1_004_003_000;
 
     // ==================== Infra 系统模块 ====================
@@ -200,11 +248,17 @@ public final class ServiceErrorCodeRange {
      * Infra - OSS 存储模块错误码区间 [1-005-001-000 ~ 1-005-002-000)。
      */
     public static final int INFRA_OSS_ERROR_CODE_MIN = 1_005_001_000;
+    /**
+     * OSS错误码上限。
+     */
     public static final int INFRA_OSS_ERROR_CODE_MAX = 1_005_002_000;
 
     /**
      * Infra - MQ 消息队列模块错误码区间 [1-005-002-000 ~ 1-005-003-000)。
      */
     public static final int INFRA_MQ_ERROR_CODE_MIN = 1_005_002_000;
+    /**
+     * 消息队列错误码上限。
+     */
     public static final int INFRA_MQ_ERROR_CODE_MAX = 1_005_003_000;
 }

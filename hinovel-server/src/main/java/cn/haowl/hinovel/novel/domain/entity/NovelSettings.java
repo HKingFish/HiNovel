@@ -2,6 +2,7 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import cn.haowl.hinovel.common.util.ObjectUtil;
 import cn.haowl.hinovel.novel.constant.NovelConstants;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -11,9 +12,9 @@ import lombok.EqualsAndHashCode;
 /**
  * 小说配置实体。
  *
- * <p>统一管理小说级别和用户级别的 AI 功能配置。
+ * 统一管理小说级别和用户级别的 AI 功能配置。
  * 当 novelId = 0 时表示用户级别默认配置，novelId > 0 时表示小说级别配置。
- * 小说级别配置优先级高于用户默认配置。</p>
+ * 小说级别配置优先级高于用户默认配置。
  *
  * @author haowl
  */
@@ -115,7 +116,24 @@ public class NovelSettings extends BaseEntity {
      */
     @JsonIgnore
     public boolean isUserDefault() {
-        return novelId != null && USER_DEFAULT_NOVEL_ID == novelId;
+        return Long.valueOf(USER_DEFAULT_NOVEL_ID).equals(novelId);
+    }
+
+    /**
+     * 仅覆盖已提供的功能配置。
+     *
+     * @param source 新配置，值为 null 的字段沿用原值
+     */
+    public void updateOptions(NovelSettings source) {
+        ObjectUtil.doIfNonNull(source.getAutoAuditAfterRewrite(), this::setAutoAuditAfterRewrite);
+        ObjectUtil.doIfNonNull(source.getAutoOutlineAfterPublish(), this::setAutoOutlineAfterPublish);
+        ObjectUtil.doIfNonNull(source.getAutoVectorAfterPublish(), this::setAutoVectorAfterPublish);
+        ObjectUtil.doIfNonNull(source.getRewriteContextChapters(), this::setRewriteContextChapters);
+        ObjectUtil.doIfNonNull(source.getRewriteIncludeOutline(), this::setRewriteIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getAuditIncludeOutline(), this::setAuditIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getQaIncludeOutline(), this::setQaIncludeOutline);
+        ObjectUtil.doIfNonNull(source.getQaContextLength(), this::setQaContextLength);
+        ObjectUtil.doIfNonNull(source.getAutoSaveContent(), this::setAutoSaveContent);
     }
 
     /**
@@ -140,7 +158,7 @@ public class NovelSettings extends BaseEntity {
     /**
      * 将小说级别配置与用户默认配置合并（小说级别优先）。
      *
-     * <p>如果小说级别某个字段为 null，则使用用户默认配置的值。</p>
+     * 如果小说级别某个字段为 null，则使用用户默认配置的值。
      *
      * @param novelLevel  小说级别配置（可为 null）
      * @param userDefault 用户默认配置（可为 null）
@@ -151,45 +169,12 @@ public class NovelSettings extends BaseEntity {
 
         // 先用用户默认配置覆盖系统默认值
         if (userDefault != null) {
-            applyNonNull(base, userDefault);
+            base.updateOptions(userDefault);
         }
         // 再用小说级别配置覆盖
         if (novelLevel != null) {
-            applyNonNull(base, novelLevel);
+            base.updateOptions(novelLevel);
         }
         return base;
-    }
-
-    /**
-     * 将 source 中非 null 的字段覆盖到 target。
-     */
-    private static void applyNonNull(NovelSettings target, NovelSettings source) {
-        if (source.getAutoAuditAfterRewrite() != null) {
-            target.setAutoAuditAfterRewrite(source.getAutoAuditAfterRewrite());
-        }
-        if (source.getAutoOutlineAfterPublish() != null) {
-            target.setAutoOutlineAfterPublish(source.getAutoOutlineAfterPublish());
-        }
-        if (source.getAutoVectorAfterPublish() != null) {
-            target.setAutoVectorAfterPublish(source.getAutoVectorAfterPublish());
-        }
-        if (source.getRewriteContextChapters() != null) {
-            target.setRewriteContextChapters(source.getRewriteContextChapters());
-        }
-        if (source.getRewriteIncludeOutline() != null) {
-            target.setRewriteIncludeOutline(source.getRewriteIncludeOutline());
-        }
-        if (source.getAuditIncludeOutline() != null) {
-            target.setAuditIncludeOutline(source.getAuditIncludeOutline());
-        }
-        if (source.getQaIncludeOutline() != null) {
-            target.setQaIncludeOutline(source.getQaIncludeOutline());
-        }
-        if (source.getQaContextLength() != null) {
-            target.setQaContextLength(source.getQaContextLength());
-        }
-        if (source.getAutoSaveContent() != null) {
-            target.setAutoSaveContent(source.getAutoSaveContent());
-        }
     }
 }

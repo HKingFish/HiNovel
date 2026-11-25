@@ -1,7 +1,7 @@
 package cn.haowl.hinovel.infra.oss.config;
 
 import cn.haowl.hinovel.infra.oss.constant.OssConstants;
-import cn.haowl.hinovel.infra.oss.constant.OssStorageType;
+import cn.haowl.hinovel.infra.oss.constant.OssStorageTypeEnum;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * OSS 配置属性。
  *
- * <p>对应 application.yml 中 hinovel.oss.* 配置项。</p>
+ * 对应 application.yml 中 hinovel.oss.* 配置项。
  *
  * @author haowl
  * @since 2024
@@ -23,9 +23,9 @@ public class OssProperties {
     /**
      * 存储类型。
      *
-     * @see OssStorageType
+     * @see OssStorageTypeEnum
      */
-    private String type = OssStorageType.LOCAL.name();
+    private String type = OssStorageTypeEnum.LOCAL.name();
 
     /**
      * 文件大小上限（字节）。

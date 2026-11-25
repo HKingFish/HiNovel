@@ -13,14 +13,23 @@ import lombok.Data;
 @Data
 public class NovelChatRequest {
 
+    /**
+     * 会话 ID。
+     */
     @Schema(description = "对话 ID（首次创作时为 null，系统自动创建）")
     private Long conversationId;
 
+    /**
+     * 用户消息正文。
+     */
     @Schema(description = "用户输入（创作指令或已有内容）", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "输入内容不能为空")
     @Size(max = CommonConstants.LENGTH_5000, message = "输入内容不能超过5000个字符")
     private String message;
 
+    /**
+     * 小说创作模式。
+     */
     @Schema(description = "创作模式", example = "CONTINUE",
             allowableValues = {"CONTINUE", "REWRITE", "DIALOGUE", "EXPAND"})
     private String mode = "CONTINUE";

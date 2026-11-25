@@ -8,8 +8,8 @@ import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.INFRA_OSS_
 /**
  * Infra 基础设施模块错误码常量接口。
  *
- * <p>定义基础设施模块相关的错误码。
- * 错误码范围：[1-005-000-000 ~ 1-006-000-000)</p>
+ * 定义基础设施模块相关的错误码。
+ * 错误码范围：[1-005-000-000 ~ 1-006-000-000)
  *
  * @author haowl
  * @see ErrorCode

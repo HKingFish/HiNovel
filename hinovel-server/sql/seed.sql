@@ -7,8 +7,6 @@
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
-USE hinovel_platform;
-
 -- 默认管理员（ID 固定为 1，便于关联初始数据）
 INSERT INTO `user` (id, username, email, password, role, status, deleted, version)
 VALUES (
@@ -20,11 +18,11 @@ VALUES (
     'ACTIVE',
     0,
     0
-) ON DUPLICATE KEY UPDATE
-    username = VALUES(username),
-    password = VALUES(password),
-    role = VALUES(role),
-    status = VALUES(status);
+) ON DUPLICATE KEY UPDATE id = id;
+
+-- 首次初始化创作模板时挂载去 AI 味，重复执行 seed 时保留用户修改。
+START TRANSACTION;
+SELECT COUNT(*) INTO @writing_template_exists FROM agent_config WHERE id = 101;
 
 -- 内置 Agent 模板（user_id=0，供用户创建小说时选用）
 INSERT INTO agent_config (
@@ -56,11 +54,12 @@ INSERT INTO agent_config (
     '你是一个通用的 AI 助手，请根据用户的需求提供帮助。',
     0.70, 2000, 1.00, 10, 1, 5, 0, 0
 )
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    description = VALUES(description),
-    system_prompt = VALUES(system_prompt),
-    sort_order = VALUES(sort_order);
+ON DUPLICATE KEY UPDATE id = id;
+
+INSERT INTO agent_skill_binding (agent_id, skill_id)
+SELECT 101, 3 FROM DUAL WHERE @writing_template_exists = 0
+ON DUPLICATE KEY UPDATE skill_id = 3;
+COMMIT;
 
 -- LLM 提供方参考模板（默认禁用，用户自行配置 API Key 后启用）
 INSERT INTO ai_llm_provider (id, name, provider_type, base_url, models, is_active, deleted, version)
@@ -69,7 +68,4 @@ VALUES
 (202, 'DeepSeek', 'DEEPSEEK', 'https://api.deepseek.com/v1', 'deepseek-chat,deepseek-reasoner', 0, 0, 0),
 (203, '通义千问', 'QWEN', 'https://dashscope.aliyuncs.com/api/v1', 'qwen-max,qwen-plus,qwen-turbo', 0, 0, 0),
 (204, 'Gemini', 'GEMINI', 'https://generativelanguage.googleapis.com/v1beta', 'gemini-1.5-pro,gemini-1.5-flash', 0, 0, 0)
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    base_url = VALUES(base_url),
-    models = VALUES(models);
+ON DUPLICATE KEY UPDATE id = id;

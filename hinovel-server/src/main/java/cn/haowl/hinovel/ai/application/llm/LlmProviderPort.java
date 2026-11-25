@@ -6,8 +6,8 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 /**
  * LLM 提供方端口接口。
  *
- * <p>定义 LLM 模型的统一访问规范，屏蔽底层提供商差异，
- * 支持后续替换为其他 LLM 提供商（如 Anthropic、Gemini 等）。</p>
+ * 定义 LLM 模型的统一访问规范，屏蔽底层提供商差异，
+ * 支持后续替换为其他 LLM 提供商（如 Anthropic、Gemini 等）。
  *
  * @author haowl
  */

@@ -4,9 +4,9 @@ import http from './http'
  * 小说创作手记接口
  */
 export interface NovelMemo {
-    id: number
-    novelId: number
-    userId: number
+    id: string
+    novelId: string
+    userId: string
     content: string
     createTime: string
     updateTime: string
@@ -17,7 +17,7 @@ export interface NovelMemo {
  *
  * @param novelId 小说 ID
  */
-export const getNovelMemo = (novelId: number) =>
+export const getNovelMemo = (novelId: string) =>
     http.get<never, { data: NovelMemo | null }>(`/api/novel/memo/${novelId}`)
 
 /**
@@ -26,5 +26,5 @@ export const getNovelMemo = (novelId: number) =>
  * @param novelId 小说 ID
  * @param content 手记内容（Markdown 格式）
  */
-export const saveNovelMemo = (novelId: number, content: string) =>
+export const saveNovelMemo = (novelId: string, content: string) =>
     http.put<never, { data: void }>(`/api/novel/memo/${novelId}`, {content})

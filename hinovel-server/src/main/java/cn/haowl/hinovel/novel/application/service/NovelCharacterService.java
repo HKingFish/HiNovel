@@ -4,29 +4,39 @@ import cn.haowl.hinovel.novel.domain.entity.NovelCharacter;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
 import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterCreateRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterGraphVO;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterRelationCreateRequest;
 import cn.haowl.hinovel.novel.interfaces.dto.CharacterUpdateRequest;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
  * 小说人物应用服务。
  *
- * <p>协调领域层完成人物的创建、更新、删除、查询及人物关系管理，
- * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。</p>
+ * 协调领域层完成人物的创建、更新、删除、查询及人物关系管理，
+ * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。
  */
 @Service
-@RequiredArgsConstructor
 public class NovelCharacterService {
 
-    private final NovelCharacterRepository characterRepository;
-    private final NovelService novelService;
+    /**
+     * 人物仓储。
+     */
+    @Autowired
+    private NovelCharacterRepository characterRepository;
+
+    /**
+     * 小说应用服务。
+     */
+    @Autowired
+    private NovelService novelService;
 
     /**
      * 创建人物。
@@ -39,8 +49,15 @@ public class NovelCharacterService {
     public NovelCharacter createCharacter(Long userId, CharacterCreateRequest request) {
         // 验证小说权限
         novelService.getNovelById(userId, request.getNovelId());
+        return createCharacter(request);
+    }
 
-        // 通过工厂方法创建人物
+    /**
+     * 在已确定的小说中创建人物。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public NovelCharacter createCharacter(CharacterCreateRequest request) {
+        // 续用该小说的人物排序号
         Integer maxOrder = characterRepository.findMaxSortOrder(request.getNovelId());
         int sortOrder = maxOrder != null ? maxOrder + 1 : 1;
 
@@ -78,9 +95,21 @@ public class NovelCharacterService {
      */
     @Transactional(rollbackFor = Exception.class)
     public NovelCharacter updateCharacter(Long userId, Long characterId, CharacterUpdateRequest request) {
-        NovelCharacter character = getCharacterById(userId, characterId);
+        return saveCharacterChanges(getCharacterById(userId, characterId), request);
+    }
 
-        // 通过富方法更新基本信息
+    /**
+     * 更新指定小说中的人物。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public NovelCharacter updateCharacterInNovel(Long novelId, Long characterId, CharacterUpdateRequest request) {
+        return saveCharacterChanges(getCharacterInNovel(novelId, characterId), request);
+    }
+
+    /**
+     * 保存人物的非空更新字段。
+     */
+    private NovelCharacter saveCharacterChanges(NovelCharacter character, CharacterUpdateRequest request) {
         character.updateBasicInfo(
                 request.getName(), request.getAlias(),
                 request.getGender(), request.getAge(), request.getIdentity()
@@ -123,7 +152,8 @@ public class NovelCharacterService {
         }
 
         // 删除作为目标人物的关系
-        List<NovelCharacterRelation> novelRelations = characterRepository.findRelationsByNovelId(character.getNovelId());
+        List<NovelCharacterRelation> novelRelations =
+            characterRepository.findRelationsByNovelId(character.getNovelId());
         novelRelations.stream()
                 .filter(r -> r.involvesCharacter(characterId))
                 .forEach(r -> characterRepository.deleteRelationById(r.getId()));
@@ -148,6 +178,18 @@ public class NovelCharacterService {
     }
 
     /**
+     * 获取指定小说中的人物。
+     */
+    public NovelCharacter getCharacterInNovel(Long novelId, Long characterId) {
+        NovelCharacter character = characterRepository.findById(characterId)
+            .orElseThrow(() -> exception(NOT_FOUND));
+        if (!character.belongsToNovel(novelId)) {
+            throw exception(FORBIDDEN);
+        }
+        return character;
+    }
+
+    /**
      * 获取小说的所有人物。
      *
      * @param userId  用户 ID
@@ -156,6 +198,13 @@ public class NovelCharacterService {
      */
     public List<NovelCharacter> listCharactersByNovel(Long userId, Long novelId) {
         novelService.getNovelById(userId, novelId);
+        return listCharactersByNovel(novelId);
+    }
+
+    /**
+     * 查询已确定小说中的人物。
+     */
+    public List<NovelCharacter> listCharactersByNovel(Long novelId) {
         return characterRepository.findByNovelId(novelId);
     }
 
@@ -171,19 +220,20 @@ public class NovelCharacterService {
         // 验证小说权限
         novelService.getNovelById(userId, request.getNovelId());
 
-        // 验证人物存在
-        characterRepository.findById(request.getCharacterId())
-            .orElseThrow(() -> exception(NOT_FOUND));
-        characterRepository.findById(request.getTargetId())
-            .orElseThrow(() -> exception(NOT_FOUND));
+        return createRelation(request);
+    }
 
-        // 通过工厂方法创建关系（内部校验自关联）
+    /**
+     * 在已确定的小说中创建人物关系。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public NovelCharacterRelation createRelation(CharacterRelationCreateRequest request) {
+        getCharacterInNovel(request.getNovelId(), request.getCharacterId());
+        getCharacterInNovel(request.getNovelId(), request.getTargetId());
         NovelCharacterRelation relation = NovelCharacterRelation.create(
-                request.getNovelId(), request.getCharacterId(),
-                request.getTargetId(), request.getRelationType(),
-                request.getDescription()
-        );
-
+            request.getNovelId(), request.getCharacterId(),
+            request.getTargetId(), request.getRelationType(),
+            request.getDescription());
         return characterRepository.saveRelation(relation);
     }
 
@@ -212,7 +262,14 @@ public class NovelCharacterService {
      */
     public List<NovelCharacterRelation> listRelationsByCharacter(Long userId, Long characterId) {
         NovelCharacter character = getCharacterById(userId, characterId);
-        return characterRepository.findRelationsByCharacterId(character.getId());
+        return listRelationsByCharacter(character.getId());
+    }
+
+    /**
+     * 查询已确定人物的出向关系。
+     */
+    public List<NovelCharacterRelation> listRelationsByCharacter(Long characterId) {
+        return characterRepository.findRelationsByCharacterId(characterId);
     }
 
     /**
@@ -222,8 +279,26 @@ public class NovelCharacterService {
      * @param novelId 小说 ID
      * @return 关系列表
      */
+    public CharacterGraphVO getCharacterGraph(Long userId, Long novelId) {
+        novelService.getNovelById(userId, novelId);
+        CharacterGraphVO graph = new CharacterGraphVO();
+        graph.setCharacters(listCharactersByNovel(novelId));
+        graph.setRelations(listRelationsByNovel(novelId));
+        return graph;
+    }
+
+    /**
+     * 校验归属后查询小说的人物关系。
+     */
     public List<NovelCharacterRelation> listRelationsByNovel(Long userId, Long novelId) {
         novelService.getNovelById(userId, novelId);
+        return listRelationsByNovel(novelId);
+    }
+
+    /**
+     * 查询已确定小说中的人物关系。
+     */
+    public List<NovelCharacterRelation> listRelationsByNovel(Long novelId) {
         return characterRepository.findRelationsByNovelId(novelId);
     }
 }

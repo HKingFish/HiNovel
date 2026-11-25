@@ -1,15 +1,26 @@
 package cn.haowl.hinovel.ai.domain.entity;
 
+import cn.haowl.hinovel.ai.constant.LlmCallSceneEnum;
+import cn.haowl.hinovel.ai.constant.LlmCallStatusEnum;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
+
+import java.util.List;
 
 /**
  * LLM 调用记录实体。
  *
- * <p>记录每次 LLM 调用的请求、响应、Token 消耗、耗时等信息，
- * 用于调用追踪、成本分析和问题排查。</p>
+ * 记录每次 LLM 调用的请求、响应、Token 消耗、耗时等信息，
+ * 用于调用追踪、成本分析和问题排查。
  *
  * @author haowl
  */
@@ -18,18 +29,8 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-@TableName("ai_llm_call_log")
+@TableName(value = "ai_llm_call_log", autoResultMap = true)
 public class LlmCallLog extends BaseEntity {
-
-    /**
-     * 调用状态常量：成功。
-     */
-    public static final String STATUS_SUCCESS = "SUCCESS";
-
-    /**
-     * 调用状态常量：失败。
-     */
-    public static final String STATUS_FAILED = "FAILED";
 
     /**
      * 毫秒转秒的除数。
@@ -37,7 +38,9 @@ public class LlmCallLog extends BaseEntity {
     private static final double MILLIS_PER_SECOND = 1000.0;
 
     /**
-     * 调用场景（如 REWRITE、AUDIT、REGENERATE）。
+     * 调用场景编码。
+     *
+     * @see LlmCallSceneEnum
      */
     private String callScene;
 
@@ -102,7 +105,9 @@ public class LlmCallLog extends BaseEntity {
     private Long userId;
 
     /**
-     * 调用状态：SUCCESS / FAILED。
+     * 调用状态编码。
+     *
+     * @see LlmCallStatusEnum
      */
     private String status;
 
@@ -110,6 +115,19 @@ public class LlmCallLog extends BaseEntity {
      * 错误信息（调用失败时记录）。
      */
     private String errorMessage;
+
+    /**
+     * 当次 Skill 读取的有序记录。
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<SkillReadCall> skillReadCalls;
+
+    /**
+     * 兼容上线前的空记录。
+     */
+    public List<SkillReadCall> getSkillReadCalls() {
+        return skillReadCalls == null ? List.of() : skillReadCalls;
+    }
 
     /**
      * 是否流式调用。
@@ -132,17 +150,17 @@ public class LlmCallLog extends BaseEntity {
      * @param modelName       模型名称
      * @return 调用记录实体
      */
-    public static LlmCallLog createSuccess(String callScene, Long agentId, String agentName,
-                                           Long llmProviderId, String llmProviderName,
-                                           String modelName) {
+    public static LlmCallLog createSuccess(
+        LlmCallSceneEnum callScene, Long agentId, String agentName, Long llmProviderId,
+        String llmProviderName, String modelName) {
         LlmCallLog log = new LlmCallLog();
-        log.setCallScene(callScene);
+        log.setCallScene(callScene == null ? null : callScene.name());
         log.setAgentId(agentId);
         log.setAgentName(agentName);
         log.setLlmProviderId(llmProviderId);
         log.setLlmProviderName(llmProviderName);
         log.setModelName(modelName);
-        log.setStatus(STATUS_SUCCESS);
+        log.setStatus(LlmCallStatusEnum.SUCCESS.name());
         return log;
     }
 
@@ -154,11 +172,11 @@ public class LlmCallLog extends BaseEntity {
      * @param errorMessage 错误信息
      * @return 调用记录实体
      */
-    public static LlmCallLog createFailed(String callScene, String modelName, String errorMessage) {
+    public static LlmCallLog createFailed(LlmCallSceneEnum callScene, String modelName, String errorMessage) {
         LlmCallLog log = new LlmCallLog();
-        log.setCallScene(callScene);
+        log.setCallScene(callScene == null ? null : callScene.name());
         log.setModelName(modelName);
-        log.setStatus(STATUS_FAILED);
+        log.setStatus(LlmCallStatusEnum.FAILED.name());
         log.setErrorMessage(errorMessage);
         return log;
     }
@@ -199,7 +217,7 @@ public class LlmCallLog extends BaseEntity {
      * @param errorMessage 错误信息
      */
     public void markAsFailed(String errorMessage) {
-        this.status = STATUS_FAILED;
+        this.status = LlmCallStatusEnum.FAILED.name();
         this.errorMessage = errorMessage;
     }
 
@@ -211,7 +229,7 @@ public class LlmCallLog extends BaseEntity {
      * @return 成功返回 true
      */
     public boolean isSuccess() {
-        return STATUS_SUCCESS.equals(this.status);
+        return LlmCallStatusEnum.SUCCESS == EnumUtils.getEnum(LlmCallStatusEnum.class, this.status);
     }
 
     /**
@@ -220,7 +238,7 @@ public class LlmCallLog extends BaseEntity {
      * @return 失败返回 true
      */
     public boolean isFailed() {
-        return STATUS_FAILED.equals(this.status);
+        return LlmCallStatusEnum.FAILED == EnumUtils.getEnum(LlmCallStatusEnum.class, this.status);
     }
 
     /**
@@ -229,7 +247,7 @@ public class LlmCallLog extends BaseEntity {
      * @return 流式调用返回 true
      */
     public boolean isStreamingCall() {
-        return this.isStreaming != null && this.isStreaming == CommonConstants.ENABLED;
+        return Integer.valueOf(CommonConstants.ENABLED).equals(this.isStreaming);
     }
 
     /**

@@ -12,7 +12,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class RateLimitProperties {
 
     /**
-     * 每用户每分钟最大 LLM 请求次数，默认 60 次
+     * 未配置时每用户每分钟允许的 LLM 请求数。
      */
-    private int llmPerMinute = 30;
+    private static final int DEFAULT_LLM_REQUESTS_PER_MINUTE = 30;
+
+    /**
+     * 每用户每分钟最大 LLM 请求次数。
+     */
+    private int llmPerMinute = DEFAULT_LLM_REQUESTS_PER_MINUTE;
 }

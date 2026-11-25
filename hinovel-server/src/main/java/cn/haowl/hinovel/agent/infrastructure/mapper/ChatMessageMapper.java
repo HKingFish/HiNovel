@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -15,6 +16,14 @@ import java.util.List;
  */
 @Mapper
 public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
+
+    /**
+     * 删除指定会话的所有消息。
+     */
+    default void deleteBySessionId(Long sessionId) {
+        delete(new LambdaQueryWrapper<ChatMessage>()
+            .eq(ChatMessage::getSessionId, sessionId));
+    }
 
     /**
      * 根据会话 ID 查询所有消息（含撤回标记，前端展示用，按创建时间正序）。
@@ -31,7 +40,7 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
     /**
      * 根据会话 ID 分页查询消息（游标分页，按时间倒序取最近的，返回时正序排列）。
      *
-     * <p>首次加载传 cursorId=null，加载更早消息时传当前最早消息的 ID。</p>
+     * 首次加载传 cursorId=null，加载更早消息时传当前最早消息的 ID。
      *
      * @param sessionId 会话 ID
      * @param cursorId  游标消息 ID（加载该 ID 之前的消息，null 表示从最新开始）
@@ -47,14 +56,14 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
         wrapper.orderByDesc(ChatMessage::getId)
                 .last(CommonConstants.limitOf(pageSize));
         List<ChatMessage> messages = selectList(wrapper);
-        java.util.Collections.reverse(messages);
+        Collections.reverse(messages);
         return messages;
     }
 
     /**
      * 根据会话 ID 查询最近 N 条未撤回消息（用于构建 LLM 上下文）。
      *
-     * <p>已撤回的消息不会发送给 LLM，确保撤回功能生效。</p>
+     * 已撤回的消息不会发送给 LLM，确保撤回功能生效。
      *
      * @param sessionId 会话 ID
      * @param limit     最大条数
@@ -67,9 +76,10 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
                 .and(w -> w.eq(ChatMessage::getRevoked, CommonConstants.DISABLED)
                         .or().isNull(ChatMessage::getRevoked))
                 .orderByDesc(ChatMessage::getCreateTime)
+                .orderByDesc(ChatMessage::getId)
                 .last(CommonConstants.limitOf(limit)));
         // 反转为正序
-        java.util.Collections.reverse(messages);
+        Collections.reverse(messages);
         return messages;
     }
 }

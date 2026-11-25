@@ -3,12 +3,7 @@
 -- 适用：MySQL 8.0+，字符集 utf8mb4
 -- ========================================================
 
-CREATE DATABASE IF NOT EXISTS hinovel_platform
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE hinovel_platform;
-
+-- 通过 MySQL 客户端指定目标数据库后执行。
 SET NAMES utf8mb4;
 
 -- --------------------------------------------------------
@@ -183,15 +178,15 @@ CREATE TABLE IF NOT EXISTS novel_settings (
     id                         BIGINT  NOT NULL COMMENT '配置 ID',
     novel_id                   BIGINT  NOT NULL COMMENT '小说 ID，0 表示用户默认配置',
     user_id                    BIGINT           DEFAULT NULL COMMENT '用户 ID',
-    auto_audit_after_rewrite   TINYINT NOT NULL DEFAULT 1 COMMENT '改写后自动审核',
-    auto_outline_after_publish TINYINT NOT NULL DEFAULT 1 COMMENT '发布后自动生成大纲',
-    auto_vector_after_publish  TINYINT NOT NULL DEFAULT 1 COMMENT '发布后自动向量入库',
-    rewrite_context_chapters   INT     NOT NULL DEFAULT 2 COMMENT '改写携带前几章',
-    rewrite_include_outline    TINYINT NOT NULL DEFAULT 1 COMMENT '改写是否携带全文大纲',
-    audit_include_outline      TINYINT NOT NULL DEFAULT 1 COMMENT '审核是否携带全文大纲',
-    qa_include_outline         TINYINT NOT NULL DEFAULT 1 COMMENT '问答是否携带全文大纲',
-    qa_context_length          INT     NOT NULL DEFAULT 10 COMMENT '问答历史消息条数',
-    auto_save_content          TINYINT NOT NULL DEFAULT 1 COMMENT '是否自动保存编辑器内容',
+    auto_audit_after_rewrite   TINYINT          DEFAULT NULL COMMENT '改写后自动审核',
+    auto_outline_after_publish TINYINT          DEFAULT NULL COMMENT '发布后自动生成大纲',
+    auto_vector_after_publish  TINYINT          DEFAULT NULL COMMENT '发布后自动向量入库',
+    rewrite_context_chapters   INT              DEFAULT NULL COMMENT '改写携带前几章',
+    rewrite_include_outline    TINYINT          DEFAULT NULL COMMENT '改写是否携带全文大纲',
+    audit_include_outline      TINYINT          DEFAULT NULL COMMENT '审核是否携带全文大纲',
+    qa_include_outline         TINYINT          DEFAULT NULL COMMENT '问答是否携带全文大纲',
+    qa_context_length          INT              DEFAULT NULL COMMENT '问答历史消息条数',
+    auto_save_content          TINYINT          DEFAULT NULL COMMENT '是否自动保存编辑器内容',
     creator                    BIGINT           DEFAULT NULL COMMENT '创建人 ID',
     updater                    BIGINT           DEFAULT NULL COMMENT '更新人 ID',
     create_time                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -199,7 +194,9 @@ CREATE TABLE IF NOT EXISTS novel_settings (
     deleted                    TINYINT  NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     version                    INT      NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_novel_id (novel_id, deleted),
+    UNIQUE KEY uk_settings_scope (
+        novel_id, (CASE WHEN novel_id = 0 THEN COALESCE(user_id, 0) ELSE 0 END), deleted
+    ),
     KEY idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='小说 AI 配置表';
 
@@ -312,6 +309,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     novel_id    BIGINT      NOT NULL COMMENT '小说 ID',
     role        VARCHAR(32) NOT NULL COMMENT '角色：user/assistant',
     content     TEXT                 DEFAULT NULL COMMENT '消息内容',
+    loaded_skill_names JSON         DEFAULT NULL COMMENT '本次成功读取的 Skill 名称',
     revoked     TINYINT     NOT NULL DEFAULT 0 COMMENT '是否已撤回',
     creator     BIGINT               DEFAULT NULL COMMENT '创建人 ID',
     updater     BIGINT               DEFAULT NULL COMMENT '更新人 ID',
@@ -323,6 +321,13 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     KEY idx_session_id (session_id),
     KEY idx_novel_id (novel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 问答消息表';
+
+-- Agent 与内置 Skill 的挂载关系
+CREATE TABLE IF NOT EXISTS agent_skill_binding (
+    agent_id BIGINT NOT NULL COMMENT 'Agent ID',
+    skill_id BIGINT NOT NULL COMMENT '内置 Skill ID',
+    PRIMARY KEY (agent_id, skill_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent 与 Skill 绑定表';
 
 -- --------------------------------------------------------
 -- AI 模块
@@ -358,6 +363,7 @@ CREATE TABLE IF NOT EXISTS ai_llm_call_log (
     model_name          VARCHAR(128)          DEFAULT NULL COMMENT '模型名称',
     request_content     TEXT                  DEFAULT NULL COMMENT '请求摘要',
     response_content    TEXT                  DEFAULT NULL COMMENT '响应摘要',
+    skill_read_calls    JSON                  DEFAULT NULL COMMENT '有序 Skill 读取结果',
     prompt_tokens       INT                   DEFAULT NULL COMMENT '输入 Token',
     completion_tokens   INT                   DEFAULT NULL COMMENT '输出 Token',
     total_tokens        INT                   DEFAULT NULL COMMENT '总 Token',

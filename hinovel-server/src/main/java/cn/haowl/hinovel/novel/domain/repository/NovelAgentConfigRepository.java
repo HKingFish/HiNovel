@@ -11,7 +11,13 @@ import java.util.Optional;
  */
 public interface NovelAgentConfigRepository {
 
+    /**
+     * 保存小说 Agent 配置。
+     */
     NovelAgentConfig save(NovelAgentConfig config);
 
+    /**
+     * 按小说 ID 查询 Agent 配置。
+     */
     Optional<NovelAgentConfig> findByNovelId(Long novelId);
 }

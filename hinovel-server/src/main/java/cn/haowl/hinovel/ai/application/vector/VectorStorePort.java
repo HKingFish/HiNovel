@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 向量存储端口接口。
  *
- * <p>定义向量数据库的核心操作，屏蔽底层实现细节，支持后续替换为其他向量数据库（如 Milvus、Weaviate 等）。</p>
+ * 定义向量数据库的核心操作，屏蔽底层实现细节，支持后续替换为其他向量数据库（如 Milvus、Weaviate 等）。
  *
  * @author haowl
  */

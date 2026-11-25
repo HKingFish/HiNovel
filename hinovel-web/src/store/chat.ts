@@ -6,11 +6,12 @@ import type { ChatSessionItem } from '@/api/ai'
  * 前端问答消息（含撤回标记）
  */
 export interface ChatMessageLocal {
-    id?: number
+    id?: number | string
     role: 'user' | 'assistant'
     content: string
     time: string
     revoked?: number
+    loadedSkillNames?: string[]
 }
 
 /**
@@ -23,8 +24,8 @@ export const useChatStore = defineStore('chat', () => {
     /**
      * 按小说 ID 缓存的问答状态
      */
-    const chatStateMap = ref<Record<number, {
-        sessionId: number
+    const chatStateMap = ref<Record<string, {
+        sessionId: ChatSessionItem['id']
         sessions: ChatSessionItem[]
         messages: ChatMessageLocal[]
     }>>({})
@@ -38,8 +39,8 @@ export const useChatStore = defineStore('chat', () => {
      * @param messages 消息列表
      */
     const saveChatState = (
-        novelId: number,
-        sessionId: number,
+        novelId: number | string,
+        sessionId: ChatSessionItem['id'],
         sessions: ChatSessionItem[],
         messages: ChatMessageLocal[]
     ) => {
@@ -56,7 +57,7 @@ export const useChatStore = defineStore('chat', () => {
      * @param novelId 小说 ID
      * @returns 缓存的问答状态，不存在时返回 null
      */
-    const getChatState = (novelId: number) => {
+    const getChatState = (novelId: number | string) => {
         return chatStateMap.value[novelId] || null
     }
 
@@ -65,7 +66,7 @@ export const useChatStore = defineStore('chat', () => {
      *
      * @param novelId 小说 ID
      */
-    const clearChatState = (novelId: number) => {
+    const clearChatState = (novelId: number | string) => {
         delete chatStateMap.value[novelId]
     }
 

@@ -1,6 +1,5 @@
 package cn.haowl.hinovel.common.config;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +15,6 @@ import java.util.Locale;
  * 包含国际化、TraceId 响应头注入、HTTP 请求日志拦截器注册
  */
 @Configuration
-@RequiredArgsConstructor
 public class I18nConfig implements WebMvcConfigurer {
 
 

@@ -2,17 +2,28 @@ package cn.haowl.hinovel.novel.interfaces.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.haowl.hinovel.agent.application.service.agent.AuthorAgent;
+import cn.haowl.hinovel.agent.constant.ChatEventEnum;
 import cn.haowl.hinovel.common.response.ApiResponse;
 import cn.haowl.hinovel.novel.application.service.ChapterAnnotationService;
+import cn.haowl.hinovel.novel.domain.command.CreateAnnotationRequest;
 import cn.haowl.hinovel.novel.domain.entity.ChapterAnnotation;
+import cn.haowl.hinovel.novel.interfaces.dto.AiRewriteResultRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.AnnotationRewriteRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.UpdateAnnotationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -20,7 +31,7 @@ import java.util.List;
 /**
  * 章节批注管理接口。
  *
- * <p>提供批注的增删改查及状态流转操作。</p>
+ * 提供批注的增删改查及状态流转操作。
  *
  * @author haowl
  */
@@ -28,11 +39,29 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/novel/annotations")
-@RequiredArgsConstructor
 public class NovelChapterAnnotationController {
 
-    private final ChapterAnnotationService annotationService;
-    private final AuthorAgent authorAgent;
+    /**
+     * 改写完成时发送的数据。
+     */
+    private static final String SSE_DONE = "[DONE]";
+
+    /**
+     * 改写失败时的兜底文案。
+     */
+    private static final String REWRITE_STREAM_ERROR_MESSAGE = "AI 改写异常";
+
+    /**
+     * 批注应用服务。
+     */
+    @Autowired
+    private ChapterAnnotationService annotationService;
+
+    /**
+     * 作者 Agent，负责批注改写。
+     */
+    @Autowired
+    private AuthorAgent authorAgent;
 
     /**
      * 获取章节的所有批注。
@@ -43,7 +72,8 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "获取章节批注列表")
     @GetMapping("/chapter/{chapterId}")
     public ApiResponse<List<ChapterAnnotation>> getAnnotations(@PathVariable Long chapterId) {
-        return ApiResponse.success(annotationService.getAnnotationsByChapterId(chapterId));
+        return ApiResponse.success(
+            annotationService.getAnnotationsByChapterId(chapterId, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -55,17 +85,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "创建批注")
     @PostMapping
     public ApiResponse<ChapterAnnotation> createAnnotation(@RequestBody CreateAnnotationRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-        ChapterAnnotation annotation = ChapterAnnotation.createSelfAnnotation(
-                request.getChapterId(),
-                request.getNovelId(),
-                userId,
-                request.getStartOffset(),
-                request.getEndOffset(),
-                request.getOriginalText(),
-                request.getAnnotationContent()
-        );
-        return ApiResponse.success(annotationService.createAnnotation(annotation));
+        return ApiResponse.success(annotationService.createSelfAnnotation(request, StpUtil.getLoginIdAsLong()));
     }
 
     /**
@@ -80,12 +100,8 @@ public class NovelChapterAnnotationController {
     public ApiResponse<Void> updateAnnotation(
             @PathVariable Long annotationId,
             @RequestBody UpdateAnnotationRequest request) {
-        ChapterAnnotation annotation = annotationService.getAnnotationById(annotationId);
-        if (annotation == null) {
-            return ApiResponse.error(404, "批注不存在");
-        }
-        annotation.setAnnotationContent(request.getAnnotationContent());
-        annotationService.updateAnnotation(annotation);
+        annotationService.updateAnnotationContent(
+            annotationId, request.getAnnotationContent(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -101,7 +117,8 @@ public class NovelChapterAnnotationController {
     public ApiResponse<Void> saveAiRewriteResult(
             @PathVariable Long annotationId,
             @RequestBody AiRewriteResultRequest request) {
-        annotationService.saveAiRewriteResult(annotationId, request.getRewriteResult());
+        annotationService.saveAiRewriteResult(
+            annotationId, request.getRewriteResult(), StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -114,7 +131,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "采纳批注")
     @PostMapping("/{annotationId}/accept")
     public ApiResponse<Void> acceptAnnotation(@PathVariable Long annotationId) {
-        annotationService.acceptAnnotation(annotationId);
+        annotationService.acceptAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -127,7 +144,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "删除批注")
     @DeleteMapping("/{annotationId}")
     public ApiResponse<Void> deleteAnnotation(@PathVariable Long annotationId) {
-        annotationService.deleteAnnotation(annotationId);
+        annotationService.deleteAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -140,7 +157,7 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "标记批注已查看")
     @PostMapping("/{annotationId}/view")
     public ApiResponse<Void> markAsViewed(@PathVariable Long annotationId) {
-        annotationService.markAsViewed(annotationId);
+        annotationService.markAsViewed(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
@@ -153,15 +170,15 @@ public class NovelChapterAnnotationController {
     @Operation(summary = "标记批注已处理")
     @PostMapping("/{annotationId}/resolve")
     public ApiResponse<Void> resolveAnnotation(@PathVariable Long annotationId) {
-        annotationService.resolveAnnotation(annotationId);
+        annotationService.resolveAnnotation(annotationId, StpUtil.getLoginIdAsLong());
         return ApiResponse.success();
     }
 
     /**
      * 批注 AI 改写（流式 SSE）。
      *
-     * <p>将整章内容 + 被批注原文 + 改写要求发送给作者 Agent，
-     * 流式返回改写结果，保证与上下文的连贯性。</p>
+     * 将整章内容 + 被批注原文 + 改写要求发送给作者 Agent，
+     * 流式返回改写结果，保证与上下文的连贯性。
      *
      * @param request 批注改写请求
      * @return SSE 流式响应
@@ -170,139 +187,16 @@ public class NovelChapterAnnotationController {
     @PostMapping(value = "/ai-rewrite-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> annotationAiRewriteStream(
             @RequestBody AnnotationRewriteRequest request) {
-        Long userId = StpUtil.getLoginIdAsLong();
-
-        // 快捷改写模式：不关联批注，直接使用请求参数
-        Long novelId;
-        if (request.getAnnotationId() != null && request.getAnnotationId() > 0) {
-            ChapterAnnotation annotation = annotationService.getAnnotationById(request.getAnnotationId());
-            if (annotation == null) {
-                log.warn("批注不存在，annotationId={}", request.getAnnotationId());
+        return authorAgent.streamAnnotationRewrite(request, StpUtil.getLoginIdAsLong())
+            .map(token -> ServerSentEvent.builder(token).build())
+            .concatWithValues(ServerSentEvent.builder(SSE_DONE).build())
+            .onErrorResume(e -> {
+                log.error("[annotationAiRewriteStream][批注改写流式异常，annotationId={}]",
+                    request.getAnnotationId(), e);
                 return Flux.just(ServerSentEvent.<String>builder()
-                        .event("error")
-                        .data("批注不存在")
-                        .build());
-            }
-            novelId = annotation.getNovelId();
-        } else {
-            // 快捷改写：通过 chapterId 获取 novelId
-            novelId = request.getNovelId();
-        }
-
-        return authorAgent.streamAnnotationRewrite(
-                        novelId,
-                        request.getFullChapterContent(),
-                        request.getOriginalText(),
-                        request.getAnnotationContent(),
-                        userId)
-                .map(token -> ServerSentEvent.<String>builder().data(token).build())
-                .concatWith(Flux.just(ServerSentEvent.<String>builder().data("[DONE]").build()))
-                .onErrorResume(e -> {
-                    log.error("批注 AI 改写流式异常，annotationId={}，异常信息：{}",
-                            request.getAnnotationId(), e.getMessage());
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data(e.getMessage() != null ? e.getMessage() : "AI 改写异常")
-                            .build());
-                });
-    }
-
-    // ==================== 请求 DTO ====================
-
-    /**
-     * 创建批注请求。
-     */
-    @Data
-    public static class CreateAnnotationRequest {
-
-        /**
-         * 章节 ID
-         */
-        private Long chapterId;
-
-        /**
-         * 小说 ID
-         */
-        private Long novelId;
-
-        /**
-         * 批注起始字符偏移量
-         */
-        private Integer startOffset;
-
-        /**
-         * 批注结束字符偏移量
-         */
-        private Integer endOffset;
-
-        /**
-         * 被批注的原文内容
-         */
-        private String originalText;
-
-        /**
-         * 批注内容
-         */
-        private String annotationContent;
-    }
-
-    /**
-     * 更新批注请求。
-     */
-    @Data
-    public static class UpdateAnnotationRequest {
-
-        /**
-         * 批注内容
-         */
-        private String annotationContent;
-    }
-
-    /**
-     * AI 改写结果请求。
-     */
-    @Data
-    public static class AiRewriteResultRequest {
-
-        /**
-         * AI 改写结果文本
-         */
-        private String rewriteResult;
-    }
-
-    /**
-     * 批注 AI 改写请求。
-     */
-    @Data
-    public static class AnnotationRewriteRequest {
-
-        /**
-         * 批注 ID
-         */
-        private Long annotationId;
-
-        /**
-         * 章节 ID
-         */
-        private Long chapterId;
-
-        /**
-         * 整章正文内容（保证改写连贯性）
-         */
-        private String fullChapterContent;
-
-        /**
-         * 被批注的原文片段
-         */
-        private String originalText;
-
-        /**
-         /** 改写要求（用户输入的提示词） */
-        private String annotationContent;
-
-        /**
-         * 小说 ID（快捷改写模式使用，不关联批注时需要传入）
-         */
-        private Long novelId;
+                    .event(ChatEventEnum.ERROR.getCode())
+                    .data(e.getMessage() != null ? e.getMessage() : REWRITE_STREAM_ERROR_MESSAGE)
+                    .build());
+            });
     }
 }

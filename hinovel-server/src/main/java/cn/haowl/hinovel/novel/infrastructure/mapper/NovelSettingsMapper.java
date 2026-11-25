@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 /**
  * 小说配置 Mapper。
  *
- * <p>基于 MyBatis-Plus 实现小说配置的数据访问操作。</p>
+ * 基于 MyBatis-Plus 实现小说配置的数据访问操作。
  *
  * @author haowl
  */
@@ -34,7 +34,7 @@ public interface NovelSettingsMapper extends BaseMapper<NovelSettings> {
      */
     default NovelSettings selectUserDefault(Long userId) {
         return selectOne(new LambdaQueryWrapper<NovelSettings>()
-                .eq(NovelSettings::getNovelId, 0L)
+                .eq(NovelSettings::getNovelId, NovelSettings.USER_DEFAULT_NOVEL_ID)
                 .eq(NovelSettings::getUserId, userId));
     }
 }

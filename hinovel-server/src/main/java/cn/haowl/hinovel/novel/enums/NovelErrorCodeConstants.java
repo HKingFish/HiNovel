@@ -2,13 +2,16 @@ package cn.haowl.hinovel.novel.enums;
 
 import cn.haowl.hinovel.common.exception.ErrorCode;
 
-import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.*;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.NOVEL_CHAPTER_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.NOVEL_CHARACTER_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.NOVEL_NOVEL_ERROR_CODE_MIN;
+import static cn.haowl.hinovel.common.exception.ServiceErrorCodeRange.NOVEL_OUTLINE_ERROR_CODE_MIN;
 
 /**
  * Novel 模块错误码常量接口。
  *
- * <p>定义 Novel 小说模块相关的错误码。
- * 错误码范围：[1-002-000-000 ~ 1-003-000-000)</p>
+ * 定义 Novel 小说模块相关的错误码。
+ * 错误码范围：[1-002-000-000 ~ 1-003-000-000)
  *
  * @author haowl
  * @see ErrorCode

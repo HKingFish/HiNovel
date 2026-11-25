@@ -5,8 +5,8 @@ import cn.haowl.hinovel.common.exception.ErrorCode;
 /**
  * 全局通用错误码常量接口。
  *
- * <p>定义跨模块使用的通用错误码，如认证、授权、系统错误等。
- * 错误码范围：1-000-xxx-xxx</p>
+ * 定义跨模块使用的通用错误码，如认证、授权、系统错误等。
+ * 错误码范围：1-000-xxx-xxx
  *
  * @author haowl
  * @see ErrorCode

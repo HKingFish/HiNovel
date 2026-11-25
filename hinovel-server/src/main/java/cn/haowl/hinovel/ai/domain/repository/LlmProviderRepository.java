@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * LLM 提供方仓储接口。
  *
- * <p>定义 LLM 提供方实体的存储和查询操作。</p>
+ * 定义 LLM 提供方实体的存储和查询操作。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
@@ -30,6 +30,11 @@ public interface LlmProviderRepository {
      * @return LLM 提供方实体
      */
     Optional<LlmProvider> findById(Long id);
+
+    /**
+     * 按 ID 和所属用户查询提供方。
+     */
+    Optional<LlmProvider> findByIdAndUserId(Long id, Long userId);
 
     /**
      * 查询所有激活的 LLM 提供方。
@@ -70,11 +75,12 @@ public interface LlmProviderRepository {
     List<LlmProvider> findAllByUserId(Long userId);
 
     /**
-     * 删除 LLM 提供方。
+     * 删除指定用户的 LLM 提供方。
      *
-     * @param id 提供方 ID
+     * @param id     提供方 ID
+     * @param userId 所属用户 ID
      */
-    void deleteById(Long id);
+    boolean deleteByIdAndUserId(Long id, Long userId);
 
     /**
      * 判断名称是否存在。

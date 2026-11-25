@@ -1,6 +1,11 @@
 package cn.haowl.hinovel.common.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -8,7 +13,7 @@ import java.time.LocalDateTime;
 /**
  * 实体基类。
  *
- * <p>包含通用审计字段：id、creator、updater、createTime、updateTime、deleted、version。</p>
+ * 包含通用审计字段：id、creator、updater、createTime、updateTime、deleted、version。
  *
  * @author haowl
  * @since 2024
@@ -49,7 +54,7 @@ public abstract class BaseEntity {
     /**
      * 逻辑删除标志。
      *
-     * <p>0-正常, 1-已删除。</p>
+     * 0-正常, 1-已删除。
      */
     @TableLogic
     private Integer deleted;

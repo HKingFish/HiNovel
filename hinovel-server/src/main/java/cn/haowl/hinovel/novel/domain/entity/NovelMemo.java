@@ -2,13 +2,17 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 /**
  * 小说创作手记实体。
  *
- * <p>用于记录小说创作过程中的笔记内容，支持 Markdown 格式，
- * 仅供作者个人阅读，不参与 AI 流程。</p>
+ * 用于记录小说创作过程中的笔记内容，支持 Markdown 格式，
+ * 仅供作者个人阅读，不参与 AI 流程。
  *
  * @author haowl
  */

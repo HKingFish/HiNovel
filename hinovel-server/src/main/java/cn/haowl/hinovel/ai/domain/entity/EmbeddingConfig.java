@@ -1,16 +1,20 @@
 package cn.haowl.hinovel.ai.domain.entity;
 
-import cn.haowl.hinovel.ai.constant.EmbeddingModelType;
+import cn.haowl.hinovel.ai.constant.EmbeddingModelTypeEnum;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 /**
  * 嵌入式模型配置实体。
  *
- * <p>存储用户自定义的 Embedding 模型配置，支持用户隔离，
- * 每个用户可配置独立的 Embedding 模型（OpenAI 兼容接口）。</p>
+ * 存储用户自定义的 Embedding 模型配置，支持用户隔离，
+ * 每个用户可配置独立的 Embedding 模型（OpenAI 兼容接口）。
  *
  * @author wylon
  * @date 2026/3/23 14:56
@@ -36,7 +40,7 @@ public class EmbeddingConfig extends BaseEntity {
     /**
      * 模型类型。
      *
-     * @see EmbeddingModelType
+     * @see EmbeddingModelTypeEnum
      */
     private String modelType;
 
@@ -80,13 +84,13 @@ public class EmbeddingConfig extends BaseEntity {
      * @param dimensions 向量维度
      * @return 嵌入式模型配置实体
      */
-    public static EmbeddingConfig create(Long userId, String name, String modelType,
-                                         String baseUrl, String apiKey,
-                                         String modelName, Integer dimensions) {
+    public static EmbeddingConfig create(
+        Long userId, String name, String modelType, String baseUrl,
+        String apiKey, String modelName, Integer dimensions) {
         EmbeddingConfig config = new EmbeddingConfig();
         config.setUserId(userId);
         config.setName(name);
-        config.setModelType(modelType != null ? modelType : EmbeddingModelType.OPENAI.getValue());
+        config.setModelType(modelType != null ? modelType : EmbeddingModelTypeEnum.OPENAI.getValue());
         config.setBaseUrl(baseUrl);
         config.setApiKey(apiKey);
         config.setModelName(modelName);

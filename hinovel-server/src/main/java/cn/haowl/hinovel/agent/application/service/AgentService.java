@@ -2,17 +2,22 @@ package cn.haowl.hinovel.agent.application.service;
 
 import cn.haowl.hinovel.agent.constant.AgentConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
+import cn.haowl.hinovel.agent.domain.entity.AgentSkillBinding;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.interfaces.dto.AgentRequest;
-import lombok.RequiredArgsConstructor;
+import cn.haowl.hinovel.ai.application.llm.LlmProviderService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import static cn.haowl.hinovel.agent.constant.SkillConstants.DE_AI_SKILL_ID;
+import static cn.haowl.hinovel.agent.constant.SkillConstants.WRITING_TEMPLATE_ID;
+import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_BUILTIN_CANNOT_DELETE;
 import static cn.haowl.hinovel.agent.enums.AgentErrorCodeConstants.AGENT_NOT_OWNED;
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
@@ -20,16 +25,30 @@ import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.except
 /**
  * Agent 管理应用服务。
  *
- * <p>协调领域层完成 Agent 的创建、更新、删除、查询及缓存管理，
- * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。</p>
+ * 协调领域层完成 Agent 的创建、更新、删除和查询，
+ * 通过仓储接口访问数据，使用领域实体的工厂方法和富方法操作业务逻辑。
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AgentService {
 
-    private final AgentRepository agentRepository;
-    private final StringRedisTemplate redisTemplate;
+    /**
+     * Agent 持久化。
+     */
+    @Autowired
+    private AgentRepository agentRepository;
+
+    /**
+     * 内置 Skill 挂载。
+     */
+    @Autowired
+    private SkillService skillService;
+
+    /**
+     * LLM 提供方归属校验。
+     */
+    @Autowired
+    private LlmProviderService llmProviderService;
 
     /**
      * 创建 Agent。
@@ -40,25 +59,21 @@ public class AgentService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Agent create(Long userId, AgentRequest request) {
-        // 通过工厂方法创建用户自定义 Agent
-        Agent agent = Agent.createUserAgent(
+        llmProviderService.validateOwnership(request.getLlmProviderId(), userId);
+        Agent agent =
+            Agent.createUserAgent(
                 userId, request.getName(),
-                request.getDescription(), request.getSystemPrompt()
-        );
+                request.getDescription(), request.getSystemPrompt());
 
-        // 通过富方法配置模型参数
-        agent.configureModel(request.getLlmProviderId(), request.getModelName());
-        agent.setCustomBaseUrl(request.getCustomBaseUrl());
-        agent.configureTemperature(request.getTemperature());
-        agent.configureMaxTokens(request.getMaxTokens());
-        agent.setTopP(request.getTopP());
-        agent.setRoleId(request.getRoleId());
-        if (request.getMaxIterations() != null) {
-            agent.setMaxIterations(request.getMaxIterations());
-        }
+        applyModelConfig(agent, request);
 
         agent = agentRepository.save(agent);
-        log.info("Agent 创建成功: id={}, userId={}", agent.getId(), userId);
+        List<Long> skillIds = request.getSkillIds();
+        if (skillIds == null && WRITING_TEMPLATE_ID.equals(request.getRoleId())) {
+            skillIds = List.of(DE_AI_SKILL_ID);
+        }
+        applySkillBindings(agent, skillIds);
+        log.info("[create][Agent 创建成功: id={}, userId={}]", agent.getId(), userId);
         return agent;
     }
 
@@ -78,7 +93,9 @@ public class AgentService {
      * @return 内置 Agent 列表
      */
     public List<Agent> listBuiltin() {
-        return agentRepository.findBuiltinAgents();
+        List<Agent> agents = agentRepository.findBuiltinAgents();
+        fillSkillIds(agents);
+        return agents;
     }
 
     /**
@@ -88,7 +105,9 @@ public class AgentService {
      * @return Agent 列表
      */
     public List<Agent> listAvailable(Long userId) {
-        return agentRepository.findAvailableByUserId(userId);
+        List<Agent> agents = agentRepository.findAvailableByUserId(userId);
+        fillSkillIds(agents);
+        return agents;
     }
 
     /**
@@ -103,9 +122,10 @@ public class AgentService {
             .orElseThrow(() -> exception(NOT_FOUND));
 
         // 权限校验：非内置 Agent 只能被创建者访问
-        if (agent.isUserDefined() && !agent.belongsTo(userId)) {
+        if (!agent.isAvailableTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
+        agent.setSkillIds(skillService.listBoundSkillIds(agent.getId()).stream().map(Long::intValue).toList());
         return agent;
     }
 
@@ -119,82 +139,50 @@ public class AgentService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Agent update(Long agentId, Long userId, AgentRequest request) {
-        Agent agent = agentRepository.findById(agentId)
+        Agent agent = agentRepository.findByIdForUpdate(agentId)
             .orElseThrow(() -> exception(NOT_FOUND));
 
         // 内置 Agent 所有用户均可修改；用户自建 Agent 仅限创建者修改
-        if (agent.isUserDefined() && !agent.belongsTo(userId)) {
+        if (!agent.isAvailableTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
+        llmProviderService.validateOwnership(request.getLlmProviderId(), userId);
 
-        // 通过富方法更新属性
         agent.updateName(request.getName());
         agent.updateDescription(request.getDescription());
         agent.updateSystemPrompt(request.getSystemPrompt());
-        agent.configureModel(request.getLlmProviderId(), request.getModelName());
-        agent.setCustomBaseUrl(request.getCustomBaseUrl());
-        agent.configureTemperature(request.getTemperature());
-        agent.configureMaxTokens(request.getMaxTokens());
-        agent.setTopP(request.getTopP());
-        agent.setRoleId(request.getRoleId());
-        if (request.getMaxIterations() != null) {
-            agent.setMaxIterations(request.getMaxIterations());
-        }
+        applyModelConfig(agent, request);
 
         agent = agentRepository.save(agent);
 
-        // 主动失效 Redis 缓存
-        evictCache(agentId);
-        log.info("Agent 更新成功: id={}", agentId);
+        // 按传入的 skillIds 替换绑定（null 表示不修改）
+        applySkillBindings(agent, request.getSkillIds());
+
+        log.info("[update][Agent 更新成功: id={}]", agentId);
         return agent;
     }
 
     /**
-     * 删除 Agent（内置 Agent 允许删除）。
+     * 删除当前用户自建的 Agent。
      *
      * @param agentId Agent ID
      * @param userId  用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long agentId, Long userId) {
-        Agent agent = agentRepository.findById(agentId)
+        Agent agent = agentRepository.findByIdForUpdate(agentId)
             .orElseThrow(() -> exception(NOT_FOUND));
 
-        // 内置 Agent 所有用户均可删除；用户自建 Agent 仅限创建者删除
-        if (agent.isUserDefined() && !agent.belongsTo(userId)) {
+        if (agent.isBuiltin()) {
+            throw exception(AGENT_BUILTIN_CANNOT_DELETE);
+        }
+        if (!agent.isAvailableTo(userId)) {
             throw exception(AGENT_NOT_OWNED);
         }
 
         agentRepository.deleteById(agentId);
-        evictCache(agentId);
-        log.info("Agent 删除成功: id={}", agentId);
-    }
-
-    /**
-     * 获取 Agent（带 Redis 缓存）。
-     *
-     * @param agentId Agent ID
-     * @return Agent 实体
-     */
-    public Agent getWithCache(Long agentId) {
-        String cacheKey = AgentConstants.REDIS_KEY_PREFIX_AGENT_CONFIG + agentId;
-        Agent agent = agentRepository.findById(agentId)
-            .orElseThrow(() -> exception(NOT_FOUND));
-
-        redisTemplate.opsForValue().set(
-                cacheKey, String.valueOf(agentId),
-                AgentConstants.AGENT_CACHE_TTL_SECONDS, TimeUnit.SECONDS
-        );
-        return agent;
-    }
-
-    /**
-     * 主动失效 Agent 缓存。
-     *
-     * @param agentId Agent ID
-     */
-    public void evictCache(Long agentId) {
-        redisTemplate.delete(AgentConstants.REDIS_KEY_PREFIX_AGENT_CONFIG + agentId);
+        skillService.replaceAgentBindings(agentId, List.of());
+        log.info("[delete][Agent 删除成功: id={}]", agentId);
     }
 
     /**
@@ -215,5 +203,51 @@ public class AgentService {
     public Agent getBuiltinInterviewAgent() {
         return agentRepository.findBuiltinByName(AgentConstants.BUILTIN_AGENT_INTERVIEW_ASSISTANT)
             .orElseThrow(() -> exception(NOT_FOUND, "内置面试助手 Agent 未初始化，请联系管理员"));
+    }
+
+    /**
+     * 应用创建和更新共用的模型配置。
+     */
+    private void applyModelConfig(Agent agent, AgentRequest request) {
+        agent.configureModel(request.getLlmProviderId(), request.getModelName());
+        agent.setCustomBaseUrl(request.getCustomBaseUrl());
+        agent.configureTemperature(request.getTemperature());
+        agent.configureMaxTokens(request.getMaxTokens());
+        agent.setTopP(request.getTopP());
+        agent.setRoleId(request.getRoleId());
+        if (request.getMaxIterations() != null) {
+            agent.setMaxIterations(request.getMaxIterations());
+        }
+    }
+
+    /**
+     * 按请求中的 skillIds 替换 Agent 绑定，并把最终绑定回填到返回体。
+     *
+     * @param agent    Agent 实体
+     * @param skillIds 请求中的 Skill ID 列表，null 表示不修改
+     */
+    private void applySkillBindings(Agent agent, List<Long> skillIds) {
+        if (skillIds != null) {
+            skillService.replaceAgentBindings(agent.getId(), skillIds);
+        }
+        agent.setSkillIds(skillService.listBoundSkillIds(agent.getId()).stream().map(Long::intValue).toList());
+    }
+
+    /**
+     * 批量填充 Agent 列表的 skillIds。
+     *
+     * @param agents Agent 列表
+     */
+    private void fillSkillIds(List<Agent> agents) {
+        if (agents == null || agents.isEmpty()) {
+            return;
+        }
+        List<Long> agentIds = agents.stream().map(Agent::getId).toList();
+        Map<Long, List<Integer>> skillIdsByAgent = skillService.listBindings(agentIds).stream()
+            .collect(Collectors.groupingBy(AgentSkillBinding::getAgentId,
+                Collectors.mapping(binding -> binding.getSkillId().intValue(), Collectors.toList())));
+        for (Agent agent : agents) {
+            agent.setSkillIds(List.copyOf(skillIdsByAgent.getOrDefault(agent.getId(), List.of())));
+        }
     }
 }

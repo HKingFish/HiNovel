@@ -2,18 +2,24 @@ package cn.haowl.hinovel.novel.domain.entity;
 
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.common.entity.BaseEntity;
-import cn.haowl.hinovel.novel.constant.AnnotationStatus;
-import cn.haowl.hinovel.novel.constant.AnnotationType;
+import cn.haowl.hinovel.novel.constant.AnnotationStatusEnum;
+import cn.haowl.hinovel.novel.constant.AnnotationTypeEnum;
+import cn.haowl.hinovel.novel.domain.command.CreateAnnotationRequest;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 
 import java.util.Objects;
 
 /**
  * 章节批注实体。
  *
- * <p>存储针对章节某段文字的批注信息，支持作者自批注和审阅者批注两种类型。
- * 作者自批注可触发 AI 改写，审阅者批注仅供参考。</p>
+ * 存储针对章节某段文字的批注信息，支持作者自批注和审阅者批注两种类型。
+ * 作者自批注可触发 AI 改写，审阅者批注仅供参考。
  *
  * @author haowl
  */
@@ -68,19 +74,22 @@ public class ChapterAnnotation extends BaseEntity {
     /**
      * 批注类型。
      *
-     * @see AnnotationType
+     * @see AnnotationTypeEnum
      */
     private String annotationType;
 
     /**
      * 批注状态。
      *
-     * @see AnnotationStatus
+     * @see AnnotationStatusEnum
      */
     private String status;
 
     /**
      * 是否已查看（0-未查看，1-已查看）。
+     *
+     * @see CommonConstants#DISABLED
+     * @see CommonConstants#ENABLED
      */
     private Integer viewed;
 
@@ -89,33 +98,25 @@ public class ChapterAnnotation extends BaseEntity {
     /**
      * 创建作者自批注。
      *
-     * @param chapterId         章节 ID
-     * @param novelId           小说 ID
-     * @param userId            用户 ID
-     * @param startOffset       起始偏移量
-     * @param endOffset         结束偏移量
-     * @param originalText      被批注的原文
-     * @param annotationContent 批注内容
+     * @param request 批注定位与内容
+     * @param userId  批注人 ID
      * @return 批注实体
      */
-    public static ChapterAnnotation createSelfAnnotation(
-            Long chapterId, Long novelId, Long userId,
-            Integer startOffset, Integer endOffset,
-            String originalText, String annotationContent) {
-        Objects.requireNonNull(chapterId, "章节 ID 不能为空");
-        Objects.requireNonNull(novelId, "小说 ID 不能为空");
+    public static ChapterAnnotation createSelfAnnotation(CreateAnnotationRequest request, Long userId) {
+        Objects.requireNonNull(request.getChapterId(), "章节 ID 不能为空");
+        Objects.requireNonNull(request.getNovelId(), "小说 ID 不能为空");
         Objects.requireNonNull(userId, "用户 ID 不能为空");
 
         return ChapterAnnotation.builder()
-                .chapterId(chapterId)
-                .novelId(novelId)
+            .chapterId(request.getChapterId())
+            .novelId(request.getNovelId())
                 .userId(userId)
-                .startOffset(startOffset)
-                .endOffset(endOffset)
-                .originalText(originalText)
-                .annotationContent(annotationContent)
-                .annotationType(AnnotationType.SELF.name())
-                .status(AnnotationStatus.PENDING.name())
+            .startOffset(request.getStartOffset())
+            .endOffset(request.getEndOffset())
+            .originalText(request.getOriginalText())
+            .annotationContent(request.getAnnotationContent())
+            .annotationType(AnnotationTypeEnum.SELF.name())
+            .status(AnnotationStatusEnum.PENDING.name())
                 .build();
     }
 
@@ -134,14 +135,14 @@ public class ChapterAnnotation extends BaseEntity {
      * 采纳批注（将状态标记为已采纳）。
      */
     public void accept() {
-        this.status = AnnotationStatus.ACCEPTED.name();
+        this.status = AnnotationStatusEnum.ACCEPTED.name();
     }
 
     /**
      * 标记为已处理。
      */
     public void resolve() {
-        this.status = AnnotationStatus.RESOLVED.name();
+        this.status = AnnotationStatusEnum.RESOLVED.name();
     }
 
     /**
@@ -157,14 +158,14 @@ public class ChapterAnnotation extends BaseEntity {
      * 是否为作者自批注。
      */
     public boolean isSelfAnnotation() {
-        return AnnotationType.SELF.name().equals(this.annotationType);
+        return AnnotationTypeEnum.SELF == EnumUtils.getEnum(AnnotationTypeEnum.class, this.annotationType);
     }
 
     /**
      * 是否待处理。
      */
     public boolean isPending() {
-        return AnnotationStatus.PENDING.name().equals(this.status);
+        return AnnotationStatusEnum.PENDING == EnumUtils.getEnum(AnnotationStatusEnum.class, this.status);
     }
 
     /**

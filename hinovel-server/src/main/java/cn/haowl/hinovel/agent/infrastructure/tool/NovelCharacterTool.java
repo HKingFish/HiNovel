@@ -1,53 +1,67 @@
 package cn.haowl.hinovel.agent.infrastructure.tool;
 
+import cn.haowl.hinovel.common.exception.BusinessException;
+import cn.haowl.hinovel.novel.application.service.NovelCharacterService;
+import cn.haowl.hinovel.novel.constant.CharacterGenderEnum;
+import cn.haowl.hinovel.novel.constant.CharacterRoleTypeEnum;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacter;
 import cn.haowl.hinovel.novel.domain.entity.NovelCharacterRelation;
-import cn.haowl.hinovel.novel.domain.repository.NovelCharacterRepository;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterCreateRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterRelationCreateRequest;
+import cn.haowl.hinovel.novel.interfaces.dto.CharacterUpdateRequest;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.Optional;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 
 /**
  * 小说人物图谱管理工具。
  *
- * <p>供问答 Agent 调用，提供人物的查询、新增、修改以及人物关系的管理能力。
- * 使用 LangChain4J {@link Tool} 注解，可被 AiService 自动发现和调用。</p>
+ * 供问答 Agent 调用，提供人物的查询、新增、修改以及人物关系的管理能力。
+ * 使用 LangChain4J {@link Tool} 注解，可被 AiService 自动发现和调用。
  *
- * <p>该工具不注册为 Spring Bean，而是在需要时通过构造方法注入依赖，
- * 以支持不同小说使用独立的上下文。</p>
+ * 该工具不注册为 Spring Bean，而是在需要时通过构造方法注入依赖，
+ * 以支持不同小说使用独立的上下文。
  *
  * @author haowl
  */
 @Slf4j
 public class NovelCharacterTool {
 
+    /**
+     * 当前小说 ID。
+     */
     private final Long novelId;
-    private final NovelCharacterRepository characterRepository;
+    /**
+     * 人物应用服务。
+     */
+    private final NovelCharacterService characterService;
 
     /**
      * 构造人物图谱工具实例。
      *
      * @param novelId             小说 ID
-     * @param characterRepository 人物仓储
+     * @param characterService 人物应用服务
      */
-    public NovelCharacterTool(Long novelId, NovelCharacterRepository characterRepository) {
+    public NovelCharacterTool(Long novelId, NovelCharacterService characterService) {
         this.novelId = novelId;
-        this.characterRepository = characterRepository;
+        this.characterService = characterService;
     }
 
     /**
      * 创建工具实例的工厂方法。
      *
      * @param novelId             小说 ID
-     * @param characterRepository 人物仓储
+     * @param characterService 人物应用服务
      * @return 人物图谱工具实例
      */
     public static NovelCharacterTool create(Long novelId,
-                                            NovelCharacterRepository characterRepository) {
-        return new NovelCharacterTool(novelId, characterRepository);
+                                            NovelCharacterService characterService) {
+        return new NovelCharacterTool(novelId, characterService);
     }
 
     // ==================== 人物查询工具 ====================
@@ -60,9 +74,9 @@ public class NovelCharacterTool {
     @Tool("获取小说的所有人物列表，包含人物 ID、姓名、角色类型、身份、性别、年龄等基本信息。" +
             "在新增或修改人物前，先调用此工具了解当前人物图谱。")
     public String listCharacters() {
-        log.info("获取人物列表，小说ID={}", novelId);
+        log.info("[listCharacters][获取人物列表，小说ID={}]", novelId);
         try {
-            List<NovelCharacter> characters = characterRepository.findByNovelId(novelId);
+            List<NovelCharacter> characters = characterService.listCharactersByNovel(novelId);
             if (characters.isEmpty()) {
                 return "当前小说尚无人物。";
             }
@@ -85,7 +99,7 @@ public class NovelCharacterTool {
             }
             return result.toString();
         } catch (Exception e) {
-            log.error("获取人物列表失败，小说ID={}，异常信息：{}", novelId, e.getMessage(), e);
+            log.error("[listCharacters][获取人物列表失败，小说ID={}，异常类型={}]", novelId, e.getClass().getSimpleName());
             return "获取人物列表失败：" + e.getMessage();
         }
     }
@@ -99,20 +113,23 @@ public class NovelCharacterTool {
     @Tool("获取指定人物的完整详细信息，包含外貌、性格、背景、目标、能力等。" +
             "在修改人物信息前，先调用此工具了解人物当前设定。")
     public String getCharacterDetail(@P("人物 ID") Long characterId) {
-        log.info("获取人物详情，小说ID={}，人物ID={}", novelId, characterId);
+        log.info("[getCharacterDetail][获取人物详情，小说ID={}，人物ID={}]", novelId, characterId);
         try {
-            Optional<NovelCharacter> optional = characterRepository.findById(characterId);
-            if (optional.isEmpty()) {
+            NovelCharacter character = characterService.getCharacterInNovel(novelId, characterId);
+            return buildCharacterDetailText(character);
+        } catch (BusinessException e) {
+            if (NOT_FOUND.getCode() == e.getCode()) {
                 return "人物不存在，人物ID：" + characterId;
             }
-            NovelCharacter character = optional.get();
-            if (!character.belongsToNovel(novelId)) {
+            if (FORBIDDEN.getCode() == e.getCode()) {
                 return "该人物不属于当前小说，无法查看。";
             }
-            return buildCharacterDetailText(character);
+            log.error("[getCharacterDetail][获取人物详情失败，小说ID={}，人物ID={}，业务错误码={}]",
+                novelId, characterId, e.getCode());
+            return "获取人物详情失败：" + e.getMessage();
         } catch (Exception e) {
-            log.error("获取人物详情失败，小说ID={}，人物ID={}，异常信息：{}",
-                    novelId, characterId, e.getMessage(), e);
+            log.error("[getCharacterDetail][获取人物详情失败，小说ID={}，人物ID={}，异常类型={}]",
+                novelId, characterId, e.getClass().getSimpleName());
             return "获取人物详情失败：" + e.getMessage();
         }
     }
@@ -140,22 +157,23 @@ public class NovelCharacterTool {
             @P("身份/职业，可为空") String identity,
             @P("性格特点描述，可为空") String personality,
             @P("背景故事描述，可为空") String background) {
-        log.info("创建人物，小说ID={}，姓名={}", novelId, name);
+        log.info("[createCharacter][创建人物，小说ID={}]", novelId);
         try {
-            Integer maxOrder = characterRepository.findMaxSortOrder(novelId);
-            int sortOrder = maxOrder != null ? maxOrder + 1 : 1;
-
-            NovelCharacter character = NovelCharacter.create(novelId, name, roleType, sortOrder);
-            character.updateBasicInfo(name, null, gender, null, identity);
-            character.updateCharacterProfile(null, personality, background, null, null);
-
-            NovelCharacter saved = characterRepository.save(character);
+            CharacterCreateRequest request = new CharacterCreateRequest();
+            request.setNovelId(novelId);
+            request.setName(name);
+            request.setRoleType(roleType);
+            request.setGender(gender);
+            request.setIdentity(identity);
+            request.setPersonality(personality);
+            request.setBackground(background);
+            NovelCharacter saved = characterService.createCharacter(request);
             return "人物创建成功，人物ID：" + saved.getId()
                     + "，姓名：" + saved.getName()
                     + "，角色：" + formatRoleType(saved.getRoleType());
         } catch (Exception e) {
-            log.error("创建人物失败，小说ID={}，姓名={}，异常信息：{}",
-                    novelId, name, e.getMessage(), e);
+            log.error("[createCharacter][创建人物失败，小说ID={}，异常类型={}]",
+                novelId, e.getClass().getSimpleName());
             return "创建人物失败：" + e.getMessage();
         }
     }
@@ -180,30 +198,28 @@ public class NovelCharacterTool {
             @P("角色类型：PROTAGONIST/SUPPORTING/ANTAGONIST/OTHER，空字符串表示不修改") String roleType,
             @P("性别：MALE/FEMALE/OTHER，空字符串表示不修改") String gender,
             @P("身份/职业，空字符串表示不修改") String identity) {
-        log.info("更新人物基本信息，小说ID={}，人物ID={}", novelId, characterId);
+        log.info("[updateCharacterBasicInfo][更新人物基本信息，小说ID={}，人物ID={}]", novelId, characterId);
         try {
-            Optional<NovelCharacter> optional = characterRepository.findById(characterId);
-            if (optional.isEmpty()) {
+            CharacterUpdateRequest request = new CharacterUpdateRequest();
+            request.setName(blankToNull(name));
+            request.setGender(blankToNull(gender));
+            request.setIdentity(blankToNull(identity));
+            request.setRoleType(blankToNull(roleType));
+            NovelCharacter character = characterService.updateCharacterInNovel(novelId, characterId, request);
+            return "人物基本信息更新成功，人物ID：" + characterId + "，姓名：" + character.getName();
+        } catch (BusinessException e) {
+            if (NOT_FOUND.getCode() == e.getCode()) {
                 return "人物不存在，人物ID：" + characterId;
             }
-            NovelCharacter character = optional.get();
-            if (!character.belongsToNovel(novelId)) {
+            if (FORBIDDEN.getCode() == e.getCode()) {
                 return "该人物不属于当前小说，无法修改。";
             }
-
-            character.updateBasicInfo(
-                    blankToNull(name), null,
-                    blankToNull(gender), null, blankToNull(identity)
-            );
-            if (isNotBlank(roleType)) {
-                character.setRoleType(roleType);
-            }
-
-            characterRepository.save(character);
-            return "人物基本信息更新成功，人物ID：" + characterId + "，姓名：" + character.getName();
+            log.error("[updateCharacterBasicInfo][更新人物基本信息失败，小说ID={}，人物ID={}，业务错误码={}]",
+                novelId, characterId, e.getCode());
+            return "更新人物基本信息失败：" + e.getMessage();
         } catch (Exception e) {
-            log.error("更新人物基本信息失败，小说ID={}，人物ID={}，异常信息：{}",
-                    novelId, characterId, e.getMessage(), e);
+            log.error("[updateCharacterBasicInfo][更新人物基本信息失败，小说ID={}，人物ID={}，异常类型={}]",
+                novelId, characterId, e.getClass().getSimpleName());
             return "更新人物基本信息失败：" + e.getMessage();
         }
     }
@@ -228,27 +244,29 @@ public class NovelCharacterTool {
             @P("目标/动机描述，空字符串表示不修改") String goals,
             @P("能力/技能描述，空字符串表示不修改") String abilities,
             @P("外貌特征描述，空字符串表示不修改") String appearance) {
-        log.info("更新人物人设描述，小说ID={}，人物ID={}", novelId, characterId);
+        log.info("[updateCharacterProfile][更新人物人设描述，小说ID={}，人物ID={}]", novelId, characterId);
         try {
-            Optional<NovelCharacter> optional = characterRepository.findById(characterId);
-            if (optional.isEmpty()) {
+            CharacterUpdateRequest request = new CharacterUpdateRequest();
+            request.setAppearance(blankToNull(appearance));
+            request.setPersonality(blankToNull(personality));
+            request.setBackground(blankToNull(background));
+            request.setGoals(blankToNull(goals));
+            request.setAbilities(blankToNull(abilities));
+            NovelCharacter character = characterService.updateCharacterInNovel(novelId, characterId, request);
+            return "人物人设描述更新成功，人物ID：" + characterId + "，姓名：" + character.getName();
+        } catch (BusinessException e) {
+            if (NOT_FOUND.getCode() == e.getCode()) {
                 return "人物不存在，人物ID：" + characterId;
             }
-            NovelCharacter character = optional.get();
-            if (!character.belongsToNovel(novelId)) {
+            if (FORBIDDEN.getCode() == e.getCode()) {
                 return "该人物不属于当前小说，无法修改。";
             }
-
-            character.updateCharacterProfile(
-                    blankToNull(appearance), blankToNull(personality),
-                    blankToNull(background), blankToNull(goals), blankToNull(abilities)
-            );
-
-            characterRepository.save(character);
-            return "人物人设描述更新成功，人物ID：" + characterId + "，姓名：" + character.getName();
+            log.error("[updateCharacterProfile][更新人物人设描述失败，小说ID={}，人物ID={}，业务错误码={}]",
+                novelId, characterId, e.getCode());
+            return "更新人物人设描述失败：" + e.getMessage();
         } catch (Exception e) {
-            log.error("更新人物人设描述失败，小说ID={}，人物ID={}，异常信息：{}",
-                    novelId, characterId, e.getMessage(), e);
+            log.error("[updateCharacterProfile][更新人物人设描述失败，小说ID={}，人物ID={}，异常类型={}]",
+                novelId, characterId, e.getClass().getSimpleName());
             return "更新人物人设描述失败：" + e.getMessage();
         }
     }
@@ -263,14 +281,14 @@ public class NovelCharacterTool {
     @Tool("获取小说的所有人物关系列表，包含关系 ID、主体人物、目标人物、关系类型和描述。" +
             "在新增关系前，先调用此工具了解已有关系，避免重复创建。")
     public String listCharacterRelations() {
-        log.info("获取人物关系列表，小说ID={}", novelId);
+        log.info("[listCharacterRelations][获取人物关系列表，小说ID={}]", novelId);
         try {
-            List<NovelCharacterRelation> relations = characterRepository.findRelationsByNovelId(novelId);
+            List<NovelCharacterRelation> relations = characterService.listRelationsByNovel(novelId);
             if (relations.isEmpty()) {
                 return "当前小说尚无人物关系。";
             }
             // 加载人物名称映射
-            List<NovelCharacter> characters = characterRepository.findByNovelId(novelId);
+            List<NovelCharacter> characters = characterService.listCharactersByNovel(novelId);
 
             StringBuilder result = new StringBuilder();
             result.append("共 ").append(relations.size()).append(" 条人物关系：\n\n");
@@ -288,7 +306,7 @@ public class NovelCharacterTool {
             }
             return result.toString();
         } catch (Exception e) {
-            log.error("获取人物关系列表失败，小说ID={}，异常信息：{}", novelId, e.getMessage(), e);
+            log.error("[listCharacterRelations][获取人物关系列表失败，小说ID={}，异常类型={}]", novelId, e.getClass().getSimpleName());
             return "获取人物关系列表失败：" + e.getMessage();
         }
     }
@@ -311,14 +329,18 @@ public class NovelCharacterTool {
             @P("目标人物 ID") Long targetId,
             @P("关系类型：FRIEND/ENEMY/LOVER/FAMILY/MASTER/COLLEAGUE/OTHER") String relationType,
             @P("关系描述，如'青梅竹马'、'亦师亦友'等") String description) {
-        log.info("创建人物关系，小说ID={}，主体={}，目标={}", novelId, characterId, targetId);
+        log.info("[createCharacterRelation][创建人物关系，小说ID={}，主体={}，目标={}]", novelId, characterId, targetId);
         try {
-            NovelCharacterRelation relation = NovelCharacterRelation.create(
-                    novelId, characterId, targetId, relationType, description);
-            NovelCharacterRelation saved = characterRepository.saveRelation(relation);
+            CharacterRelationCreateRequest request = new CharacterRelationCreateRequest();
+            request.setNovelId(novelId);
+            request.setCharacterId(characterId);
+            request.setTargetId(targetId);
+            request.setRelationType(relationType);
+            request.setDescription(description);
+            NovelCharacterRelation saved = characterService.createRelation(request);
 
             // 获取人物名称用于反馈
-            List<NovelCharacter> characters = characterRepository.findByNovelId(novelId);
+            List<NovelCharacter> characters = characterService.listCharactersByNovel(novelId);
             String sourceName = findCharacterName(characters, characterId);
             String targetName = findCharacterName(characters, targetId);
 
@@ -326,8 +348,8 @@ public class NovelCharacterTool {
                     + "，" + sourceName + " → " + targetName
                     + "，关系：" + relationType;
         } catch (Exception e) {
-            log.error("创建人物关系失败，小说ID={}，主体={}，目标={}，异常信息：{}",
-                    novelId, characterId, targetId, e.getMessage(), e);
+            log.error("[createCharacterRelation][创建人物关系失败，小说ID={}，主体={}，目标={}，异常类型={}]",
+                novelId, characterId, targetId, e.getClass().getSimpleName());
             return "创建人物关系失败：" + e.getMessage();
         }
     }
@@ -379,9 +401,9 @@ public class NovelCharacterTool {
 
         // 加载人物关系
         List<NovelCharacterRelation> relations =
-                characterRepository.findRelationsByCharacterId(character.getId());
+            characterService.listRelationsByCharacter(character.getId());
         if (!relations.isEmpty()) {
-            List<NovelCharacter> allCharacters = characterRepository.findByNovelId(novelId);
+            List<NovelCharacter> allCharacters = characterService.listCharactersByNovel(novelId);
             detail.append("\n【人物关系】\n");
             for (NovelCharacterRelation relation : relations) {
                 String targetName = findCharacterName(allCharacters, relation.getTargetId());
@@ -419,15 +441,8 @@ public class NovelCharacterTool {
      * @return 中文角色类型
      */
     private String formatRoleType(String roleType) {
-        if (roleType == null) {
-            return "其他";
-        }
-        return switch (roleType) {
-            case NovelCharacter.ROLE_TYPE_PROTAGONIST -> "主角";
-            case NovelCharacter.ROLE_TYPE_SUPPORTING -> "配角";
-            case NovelCharacter.ROLE_TYPE_ANTAGONIST -> "反派";
-            default -> "其他";
-        };
+        CharacterRoleTypeEnum type = CharacterRoleTypeEnum.fromCode(roleType);
+        return type == null ? CharacterRoleTypeEnum.OTHER.getDescription() : type.getDescription();
     }
 
     /**
@@ -440,11 +455,8 @@ public class NovelCharacterTool {
         if (gender == null) {
             return "未知";
         }
-        return switch (gender) {
-            case "MALE" -> "男";
-            case "FEMALE" -> "女";
-            default -> "其他";
-        };
+        CharacterGenderEnum type = CharacterGenderEnum.fromCode(gender);
+        return type == null ? CharacterGenderEnum.OTHER.getDescription() : type.getDescription();
     }
 
     /**
@@ -457,13 +469,4 @@ public class NovelCharacterTool {
         return (value != null && !value.isBlank()) ? value : null;
     }
 
-    /**
-     * 判断字符串是否非空白。
-     *
-     * @param value 字符串值
-     * @return 非空白返回 true
-     */
-    private boolean isNotBlank(String value) {
-        return value != null && !value.isBlank();
-    }
 }

@@ -1,8 +1,10 @@
 package cn.haowl.hinovel.agent.infrastructure.tool;
 
+import cn.haowl.hinovel.common.exception.BusinessException;
 import cn.haowl.hinovel.novel.application.service.ChapterOutlineService;
+import cn.haowl.hinovel.novel.application.service.ChapterService;
 import cn.haowl.hinovel.novel.application.service.NovelChapterService;
-import cn.haowl.hinovel.novel.domain.entity.ChapterOutline;
+import cn.haowl.hinovel.novel.domain.command.CreateChapterCommand;
 import cn.haowl.hinovel.novel.domain.entity.NovelChapter;
 import cn.haowl.hinovel.novel.domain.entity.NovelOutline;
 import dev.langchain4j.agent.tool.P;
@@ -11,52 +13,68 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+
 /**
  * 小说创作工具。
  *
- * <p>供问答 Agent 调用，提供全文大纲生成/更新、章节大纲生成/更新、
+ * 供问答 Agent 调用，提供全文大纲生成/更新、章节大纲生成/更新、
  * 章节创建及正文写入等创作能力。使用 LangChain4J {@link Tool} 注解，
- * 可被 AiService 自动发现和调用。</p>
+ * 可被 AiService 自动发现和调用。
  *
- * <p>该工具不注册为 Spring Bean，而是在需要时通过构造方法注入依赖，
- * 以支持不同小说使用独立的上下文。</p>
+ * 该工具不注册为 Spring Bean，而是在需要时通过构造方法注入依赖，
+ * 以支持不同小说使用独立的上下文。
  *
  * @author haowl
  */
 @Slf4j
 public class NovelCreationTool {
 
+    /**
+     * 当前小说 ID。
+     */
     private final Long novelId;
+
+    /**
+     * 当前创作者 ID。
+     */
+    private final Long userId;
+
+    /**
+     * 小说章节应用服务。
+     */
     private final NovelChapterService novelChapterService;
+
+    /**
+     * 共享章节创建和查询用例。
+     */
+    private final ChapterService chapterService;
+
+    /**
+     * 章节大纲应用服务。
+     */
     private final ChapterOutlineService chapterOutlineService;
 
     /**
      * 构造创作工具实例。
      *
      * @param novelId               小说 ID
+     * @param userId                创作者 ID
      * @param novelChapterService   章节应用服务
+     * @param chapterService        共享章节用例
      * @param chapterOutlineService 章节大纲应用服务
      */
-    public NovelCreationTool(Long novelId,
-                             NovelChapterService novelChapterService,
-                             ChapterOutlineService chapterOutlineService) {
+    public NovelCreationTool(
+        Long novelId,
+        Long userId,
+        NovelChapterService novelChapterService,
+        ChapterService chapterService,
+        ChapterOutlineService chapterOutlineService) {
         this.novelId = novelId;
+        this.userId = userId;
         this.novelChapterService = novelChapterService;
+        this.chapterService = chapterService;
         this.chapterOutlineService = chapterOutlineService;
-    }
-
-    /**
-     * 创建工具实例的工厂方法。
-     *
-     * @param novelId               小说 ID
-     * @param novelChapterService   章节应用服务
-     * @param chapterOutlineService 章节大纲应用服务
-     * @return 创作工具实例
-     */
-    public static NovelCreationTool create(Long novelId,
-                                           NovelChapterService novelChapterService,
-                                           ChapterOutlineService chapterOutlineService) {
-        return new NovelCreationTool(novelId, novelChapterService, chapterOutlineService);
     }
 
     // ==================== 全文大纲工具 ====================
@@ -70,15 +88,12 @@ public class NovelCreationTool {
     @Tool("保存或更新小说的全文大纲。当用户要求生成、修改全文大纲时调用此工具。" +
             "传入完整的大纲内容，系统会自动创建或覆盖已有大纲。")
     public String saveNovelOutline(@P("完整的全文大纲内容") String outlineContent) {
-        log.info("保存全文大纲，小说ID={}", novelId);
+        log.info("[saveNovelOutline][保存全文大纲，小说ID={}]", novelId);
         try {
-            NovelOutline outline = new NovelOutline();
-            outline.setNovelId(novelId);
-            outline.setOutlineContent(outlineContent);
-            novelChapterService.saveNovelOutline(outline);
+            novelChapterService.saveNovelOutline(novelId, outlineContent, userId);
             return "全文大纲保存成功，内容字数：" + outlineContent.length();
         } catch (Exception e) {
-            log.error("保存全文大纲失败，小说ID={}，异常信息：{}", novelId, e.getMessage(), e);
+            log.error("[saveNovelOutline][保存全文大纲失败，小说ID={}，异常类型={}]", novelId, e.getClass().getSimpleName());
             return "保存全文大纲失败：" + e.getMessage();
         }
     }
@@ -91,15 +106,15 @@ public class NovelCreationTool {
     @Tool("获取小说当前的全文大纲内容。在生成或修改大纲前，" +
             "先调用此工具了解已有大纲，避免覆盖用户已有内容。")
     public String getNovelOutline() {
-        log.info("获取全文大纲，小说ID={}", novelId);
+        log.info("[getNovelOutline][获取全文大纲，小说ID={}]", novelId);
         try {
-            NovelOutline outline = novelChapterService.getNovelOutline(novelId);
-            if (outline == null || outline.isEmpty()) {
+            NovelOutline outline = novelChapterService.getNovelOutline(novelId, userId);
+            if (outline.isEmpty()) {
                 return "当前小说尚未设置全文大纲。";
             }
             return "【全文大纲】\n" + outline.getOutlineContent();
         } catch (Exception e) {
-            log.error("获取全文大纲失败，小说ID={}，异常信息：{}", novelId, e.getMessage(), e);
+            log.error("[getNovelOutline][获取全文大纲失败，小说ID={}，异常类型={}]", novelId, e.getClass().getSimpleName());
             return "获取全文大纲失败：" + e.getMessage();
         }
     }
@@ -118,18 +133,13 @@ public class NovelCreationTool {
     public String saveChapterOutline(
             @P("章节 ID") Long chapterId,
             @P("章节大纲内容") String outlineContent) {
-        log.info("保存章节大纲，小说ID={}，章节ID={}", novelId, chapterId);
+        log.info("[saveChapterOutline][保存章节大纲，小说ID={}，章节ID={}]", novelId, chapterId);
         try {
-            ChapterOutline outline = ChapterOutline.builder()
-                    .novelId(novelId)
-                    .chapterId(chapterId)
-                    .outlineContent(outlineContent)
-                    .build();
-            chapterOutlineService.saveOrUpdateOutline(outline);
+            chapterOutlineService.saveUserOutline(novelId, chapterId, userId, outlineContent);
             return "章节大纲保存成功，章节ID：" + chapterId + "，内容字数：" + outlineContent.length();
         } catch (Exception e) {
-            log.error("保存章节大纲失败，小说ID={}，章节ID={}，异常信息：{}",
-                    novelId, chapterId, e.getMessage(), e);
+            log.error("[saveChapterOutline][保存章节大纲失败，小说ID={}，章节ID={}，异常类型={}]",
+                novelId, chapterId, e.getClass().getSimpleName());
             return "保存章节大纲失败：" + e.getMessage();
         }
     }
@@ -144,9 +154,9 @@ public class NovelCreationTool {
     @Tool("获取小说的所有章节列表，包含章节 ID、章节号、标题、字数和状态。" +
             "在创建新章节或操作已有章节前，先调用此工具了解当前章节结构。")
     public String listChapters() {
-        log.info("获取章节列表，小说ID={}", novelId);
+        log.info("[listChapters][获取章节列表，小说ID={}]", novelId);
         try {
-            List<NovelChapter> chapters = novelChapterService.getNovelChapters(novelId);
+            List<NovelChapter> chapters = chapterService.listChaptersByNovel(userId, novelId);
             if (chapters.isEmpty()) {
                 return "当前小说尚无章节。";
             }
@@ -162,7 +172,7 @@ public class NovelCreationTool {
             }
             return result.toString();
         } catch (Exception e) {
-            log.error("获取章节列表失败，小说ID={}，异常信息：{}", novelId, e.getMessage(), e);
+            log.error("[listChapters][获取章节列表失败，小说ID={}，异常类型={}]", novelId, e.getClass().getSimpleName());
             return "获取章节列表失败：" + e.getMessage();
         }
     }
@@ -179,20 +189,23 @@ public class NovelCreationTool {
     public String createChapterWithContent(
             @P("章节标题") String title,
             @P("章节正文内容") String content) {
-        log.info("创建新章节，小说ID={}，标题={}", novelId, title);
+        log.info("[createChapterWithContent][创建新章节，小说ID={}]", novelId);
         try {
-            NovelChapter chapter = new NovelChapter();
-            chapter.setNovelId(novelId);
-            chapter.setTitle(title);
-            chapter.setContent(content);
-            NovelChapter created = novelChapterService.createChapter(chapter);
+            NovelChapter created =
+                chapterService.createChapter(
+                    userId,
+                    CreateChapterCommand.builder()
+                        .novelId(novelId)
+                        .title(title)
+                        .content(content)
+                        .build());
             return "章节创建成功，章节ID：" + created.getId()
                     + "，第" + created.getChapterNumber() + "章"
                     + "，标题：" + created.getTitle()
                     + "，字数：" + created.getWordCount();
         } catch (Exception e) {
-            log.error("创建章节失败，小说ID={}，标题={}，异常信息：{}",
-                    novelId, title, e.getMessage(), e);
+            log.error("[createChapterWithContent][创建章节失败，小说ID={}，异常类型={}]",
+                novelId, e.getClass().getSimpleName());
             return "创建章节失败：" + e.getMessage();
         }
     }
@@ -209,23 +222,22 @@ public class NovelCreationTool {
     public String updateChapterContent(
             @P("章节 ID") Long chapterId,
             @P("新的章节正文内容") String content) {
-        log.info("更新章节内容，小说ID={}，章节ID={}", novelId, chapterId);
+        log.info("[updateChapterContent][更新章节内容，小说ID={}，章节ID={}]", novelId, chapterId);
         try {
-            NovelChapter chapter = novelChapterService.getChapter(chapterId);
-            if (chapter == null) {
-                return "章节不存在，章节ID：" + chapterId;
-            }
-            if (!chapter.belongsToNovel(novelId)) {
-                return "该章节不属于当前小说，无法操作。";
-            }
-            chapter.setContent(content);
-            novelChapterService.updateChapter(chapter);
+            NovelChapter chapter = novelChapterService.updateChapterContent(novelId, chapterId, userId, content);
             return "章节内容更新成功，章节ID：" + chapterId
                     + "，标题：" + chapter.getTitle()
                     + "，更新后字数：" + content.length();
+        } catch (BusinessException e) {
+            if (FORBIDDEN.getCode() == e.getCode()) {
+                return "该章节不属于当前小说，无法操作。";
+            }
+            log.error("[updateChapterContent][更新章节内容失败，小说ID={}，章节ID={}，业务错误码={}]",
+                novelId, chapterId, e.getCode());
+            return "更新章节内容失败：" + e.getMessage();
         } catch (Exception e) {
-            log.error("更新章节内容失败，小说ID={}，章节ID={}，异常信息：{}",
-                    novelId, chapterId, e.getMessage(), e);
+            log.error("[updateChapterContent][更新章节内容失败，小说ID={}，章节ID={}，异常类型={}]",
+                novelId, chapterId, e.getClass().getSimpleName());
             return "更新章节内容失败：" + e.getMessage();
         }
     }

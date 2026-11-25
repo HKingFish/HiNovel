@@ -1,6 +1,8 @@
 package cn.haowl.hinovel.infra.oss.domain.repository;
 
+import cn.haowl.hinovel.infra.oss.constant.OssUploadStatusEnum;
 import cn.haowl.hinovel.infra.oss.domain.entity.OssUploadLog;
+import cn.haowl.hinovel.infra.oss.domain.query.OssUploadLogQuery;
 
 import java.util.List;
 import java.util.Optional;
@@ -8,7 +10,7 @@ import java.util.Optional;
 /**
  * OSS 上传日志仓储接口。
  *
- * <p>定义上传日志实体的存储和查询操作。</p>
+ * 定义上传日志实体的存储和查询操作。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -32,29 +34,29 @@ public interface OssUploadLogRepository {
     Optional<OssUploadLog> findById(Long id);
 
     /**
-     * 根据文件URL查询上传日志。
+     * 按文件 URL 和用户查询有效上传日志。
      *
-     * @param fileUrl 文件URL
+     * @param fileUrl 文件 URL
+     * @param userId 所属用户 ID
      * @return 上传日志实体
      */
-    Optional<OssUploadLog> findByFileUrl(String fileUrl);
+    Optional<OssUploadLog> findActiveByFileUrlAndUserId(String fileUrl, Long userId);
 
     /**
-     * 根据用户ID和业务类型查询上传日志列表。
+     * 按用户和可选业务类型查询有效上传记录。
      *
-     * @param userId  用户ID
-     * @param bizType 业务类型
+     * @param query 查询条件
      * @return 上传日志列表
      */
-    List<OssUploadLog> findByUserIdAndBizType(Long userId, String bizType);
+    List<OssUploadLog> findActiveByCondition(OssUploadLogQuery query);
 
     /**
      * 更新上传日志状态。
      *
-     * @param fileUrl 文件URL
+     * @param id 日志 ID
      * @param status  新状态
      */
-    void updateStatusByFileUrl(String fileUrl, String status);
+    void updateStatus(Long id, OssUploadStatusEnum status);
 
     /**
      * 删除上传日志。

@@ -2,28 +2,41 @@ package cn.haowl.hinovel.user.domain.service;
 
 import cn.haowl.hinovel.user.domain.entity.User;
 import cn.haowl.hinovel.user.domain.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
 import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.*;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ACCOUNT_DISABLED;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.EMAIL_ALREADY_EXISTS;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.LOGIN_FAILED;
+import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.USERNAME_ALREADY_EXISTS;
 
 /**
  * 认证领域服务。
  *
- * <p>处理用户认证相关的业务逻辑。</p>
+ * 处理用户认证相关的业务逻辑。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
  */
 @Service
-@RequiredArgsConstructor
 public class AuthDomainService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    /**
+     * 用户仓储。
+     */
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * 密码编码器。
+     */
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * 注册新用户。
@@ -40,8 +53,7 @@ public class AuthDomainService {
         if (userRepository.existsByUsername(username)) {
             throw exception(USERNAME_ALREADY_EXISTS);
         }
-        User user = User.create(username, email, password, passwordEncoder);
-        return userRepository.save(user);
+        return userRepository.save(User.create(username, email, passwordEncoder.encode(password)));
     }
 
     /**
@@ -64,6 +76,19 @@ public class AuthDomainService {
         }
 
         return user;
+    }
+
+    /**
+     * 验证邮箱密码授权凭据。
+     *
+     * @param email    授权账号邮箱
+     * @param password 明文密码
+     * @return 凭据有效的用户
+     */
+    public Optional<User> authenticateByEmail(String email, String password) {
+        return userRepository.findByEmail(email)
+            .filter(user -> !user.isDisabled())
+            .filter(user -> user.verifyPassword(password, passwordEncoder));
     }
 
     /**

@@ -1,7 +1,8 @@
-import {defineStore} from 'pinia'
-import {computed, ref} from 'vue'
-import type {LoginRequest, RegisterRequest} from '@/api/auth'
-import {login as apiLogin, logout as apiLogout, register as apiRegister} from '@/api/auth'
+import { defineStore } from 'pinia'
+import { useNovelRouteStore } from './novel-route'
+import { computed, ref } from 'vue'
+import type { LoginRequest, RegisterRequest } from '@/api/auth'
+import { login as apiLogin, logout as apiLogout, register as apiRegister } from '@/api/auth'
 
 interface UserInfo {
     id: number
@@ -14,9 +15,7 @@ interface UserInfo {
 
 export const useAuthStore = defineStore('auth', () => {
     const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
-    const user = ref<UserInfo | null>(
-        JSON.parse(localStorage.getItem('userInfo') || 'null')
-    )
+    const user = ref<UserInfo | null>(JSON.parse(localStorage.getItem('userInfo') || 'null'))
 
     const isLoggedIn = computed(() => !!accessToken.value)
     const isAdmin = computed(() => user.value?.role === 'ADMIN')
@@ -24,7 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
     /** 登录并持久化 Token */
     async function login(data: LoginRequest) {
         const res = await apiLogin(data)
-        const {accessToken: at, userInfo} = res.data
+        const { accessToken: at, userInfo } = res.data
         accessToken.value = at
         user.value = userInfo
         localStorage.setItem('accessToken', at)
@@ -41,11 +40,17 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             await apiLogout()
         } finally {
-            accessToken.value = null
-            user.value = null
-            localStorage.clear()
+            clearSession()
         }
     }
 
-    return {accessToken, user, isLoggedIn, isAdmin, login, register, logout}
+    function clearSession() {
+        useNovelRouteStore().clearLastNovelPath()
+        accessToken.value = null
+        user.value = null
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('userInfo')
+    }
+
+    return { accessToken, user, isLoggedIn, isAdmin, login, register, logout, clearSession }
 })

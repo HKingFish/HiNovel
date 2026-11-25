@@ -5,14 +5,17 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 /**
  * 用户密码工具类。
  *
- * <p>基于 BCrypt 单向哈希算法，提供密码加密与验证功能。
- * BCrypt 每次加密结果不同，但可通过 matches 方法验证明文与密文是否匹配。</p>
+ * 基于 BCrypt 单向哈希算法，提供密码加密与验证功能。
+ * BCrypt 每次加密结果不同，但可通过 matches 方法验证明文与密文是否匹配。
  *
  * @author haowl
  * @date 2026/3/23 16:30
  */
 public final class PasswordUtil {
 
+    /**
+     * 禁止实例化密码工具类。
+     */
     private PasswordUtil() {
     }
 
@@ -40,12 +43,5 @@ public final class PasswordUtil {
      */
     public static boolean matches(String rawPassword, String encodedPassword) {
         return ENCODER.matches(rawPassword, encodedPassword);
-    }
-
-    public static void main(String[] args) {
-
-
-        System.out.println(PasswordUtil.encode("123456"));
-//        System.out.println(PasswordUtil.matches("Admin@123456", "$2a$10$WpZ56OswYJxgmh/hS/aHsOom/ZlvlBQY3iiT3TCA5MtovG/5SVQIa"));
     }
 }

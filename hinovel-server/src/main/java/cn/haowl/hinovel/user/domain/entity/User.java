@@ -1,10 +1,14 @@
 package cn.haowl.hinovel.user.domain.entity;
 
 import cn.haowl.hinovel.common.entity.BaseEntity;
-import cn.haowl.hinovel.user.constant.UserRole;
-import cn.haowl.hinovel.user.constant.UserStatus;
+import cn.haowl.hinovel.user.constant.UserRoleEnum;
+import cn.haowl.hinovel.user.constant.UserStatusEnum;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.EnumUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Objects;
@@ -16,7 +20,7 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ORIGINAL_PASSWO
 /**
  * 用户实体。
  *
- * <p>用户领域模型，包含用户基本信息和相关业务行为。</p>
+ * 用户领域模型，包含用户基本信息和相关业务行为。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30
@@ -25,7 +29,6 @@ import static cn.haowl.hinovel.user.enums.UserErrorCodeConstants.ORIGINAL_PASSWO
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @TableName("user")
 public class User extends BaseEntity {
 
@@ -52,14 +55,14 @@ public class User extends BaseEntity {
     /**
      * 用户角色。
      *
-     * @see UserRole
+     * @see UserRoleEnum
      */
     private String role;
 
     /**
      * 账号状态。
      *
-     * @see UserStatus
+     * @see UserStatusEnum
      */
     private String status;
 
@@ -68,17 +71,16 @@ public class User extends BaseEntity {
      *
      * @param username        用户名
      * @param email           邮箱
-     * @param rawPassword     明文密码
-     * @param passwordEncoder 密码编码器
+     * @param encodedPassword BCrypt 密文
      * @return 用户实体
      */
-    public static User create(String username, String email, String rawPassword, PasswordEncoder passwordEncoder) {
+    public static User create(String username, String email, String encodedPassword) {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setRole(UserRole.USER.name());
-        user.setStatus(UserStatus.ACTIVE.name());
+        user.setPassword(encodedPassword);
+        user.setRole(UserRoleEnum.USER.name());
+        user.setStatus(UserStatusEnum.ACTIVE.name());
         return user;
     }
 
@@ -102,20 +104,20 @@ public class User extends BaseEntity {
      * 禁用用户。
      */
     public void disable() {
-        if (UserStatus.DISABLED.name().equals(this.status)) {
+        if (isDisabled()) {
             throw exception(ACCOUNT_DISABLED);
         }
-        this.status = UserStatus.DISABLED.name();
+        this.status = UserStatusEnum.DISABLED.name();
     }
 
     /**
      * 启用用户。
      */
     public void enable() {
-        if (UserStatus.ACTIVE.name().equals(this.status)) {
+        if (isActive()) {
             return;
         }
-        this.status = UserStatus.ACTIVE.name();
+        this.status = UserStatusEnum.ACTIVE.name();
     }
 
     /**
@@ -135,7 +137,7 @@ public class User extends BaseEntity {
      * @return 是否被禁用
      */
     public boolean isDisabled() {
-        return UserStatus.DISABLED.name().equals(this.status);
+        return UserStatusEnum.DISABLED == EnumUtils.getEnum(UserStatusEnum.class, this.status);
     }
 
     /**
@@ -144,7 +146,7 @@ public class User extends BaseEntity {
      * @return 是否激活
      */
     public boolean isActive() {
-        return UserStatus.ACTIVE.name().equals(this.status);
+        return UserStatusEnum.ACTIVE == EnumUtils.getEnum(UserStatusEnum.class, this.status);
     }
 
     /**
@@ -153,7 +155,7 @@ public class User extends BaseEntity {
      * @return 是否为管理员
      */
     public boolean isAdmin() {
-        return UserRole.ADMIN.name().equals(this.role);
+        return UserRoleEnum.ADMIN == EnumUtils.getEnum(UserRoleEnum.class, this.role);
     }
 
     /**
@@ -192,6 +194,9 @@ public class User extends BaseEntity {
         return Objects.equals(getId(), that.getId());
     }
 
+    /**
+     * 根据用户 ID 计算散列值。
+     */
     @Override
     public int hashCode() {
         return Objects.hash(getId());

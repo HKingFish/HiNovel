@@ -3,15 +3,21 @@ package cn.haowl.hinovel.common.constant;
 /**
  * 通用常量类。
  *
- * <p>定义系统通用的常量配置。</p>
+ * 定义系统通用的常量配置。
  *
  * @author haowl
  * @since 2024
  */
 public final class CommonConstants {
 
+    /**
+     * 国际化成功消息键。
+     */
     public static final String MSG_KEY_SUCCESS = "200";
 
+    /**
+     * 禁止实例化常量类。
+     */
     private CommonConstants() {
     }
 
@@ -176,65 +182,6 @@ public final class CommonConstants {
      * 长度限制：5000。
      */
     public static final int LENGTH_5000 = 5000;
-
-    // ==================== 通用状态 ====================
-
-    /**
-     * 状态：激活。
-     */
-    public static final String STATUS_ACTIVE = "ACTIVE";
-
-    /**
-     * 状态：未激活。
-     */
-    public static final String STATUS_INACTIVE = "INACTIVE";
-
-    /**
-     * 状态：待处理。
-     */
-    public static final String STATUS_PENDING = "PENDING";
-
-    /**
-     * 状态：处理中。
-     */
-    public static final String STATUS_PROCESSING = "PROCESSING";
-
-    /**
-     * 状态：成功。
-     */
-    public static final String STATUS_SUCCESS = "SUCCESS";
-
-    /**
-     * 状态：失败。
-     */
-    public static final String STATUS_FAILED = "FAILED";
-
-    /**
-     * 状态：已删除。
-     */
-    public static final String STATUS_DELETED = "DELETED";
-
-    // ==================== 角色类型 ====================
-
-    /**
-     * 角色：普通用户。
-     */
-    public static final String ROLE_USER = "USER";
-
-    /**
-     * 角色：管理员。
-     */
-    public static final String ROLE_ADMIN = "ADMIN";
-
-    /**
-     * 角色：系统。
-     */
-    public static final String ROLE_SYSTEM = "SYSTEM";
-
-    /**
-     * 角色：助手。
-     */
-    public static final String ROLE_ASSISTANT = "ASSISTANT";
 
     // ==================== 布尔值字符串 ====================
 

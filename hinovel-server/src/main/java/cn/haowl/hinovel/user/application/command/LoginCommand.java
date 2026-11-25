@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 /**
  * 用户登录命令。
  *
- * <p>表示用户登录的写操作请求。</p>
+ * 表示用户登录的写操作请求。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30

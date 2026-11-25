@@ -1,11 +1,11 @@
 package cn.haowl.hinovel.agent.infrastructure.repository;
 
-import cn.haowl.hinovel.common.constant.CommonConstants;
 import cn.haowl.hinovel.agent.domain.entity.Agent;
 import cn.haowl.hinovel.agent.domain.repository.AgentRepository;
 import cn.haowl.hinovel.agent.infrastructure.mapper.AgentMapper;
+import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,15 +14,18 @@ import java.util.Optional;
 /**
  * Agent 仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现 Agent 仓储接口。</p>
+ * 基于 MyBatis-Plus 实现 Agent 仓储接口。
  *
  * @author haowl
  */
 @Repository
-@RequiredArgsConstructor
 public class AgentRepositoryImpl implements AgentRepository {
 
-    private final AgentMapper agentMapper;
+    /**
+     * Agent 表访问。
+     */
+    @Autowired
+    private AgentMapper agentMapper;
 
     @Override
     public Agent save(Agent agent) {
@@ -41,6 +44,13 @@ public class AgentRepositoryImpl implements AgentRepository {
     @Override
     public Optional<Agent> findById(Long id) {
         return Optional.ofNullable(agentMapper.selectById(id));
+    }
+
+    @Override
+    public Optional<Agent> findByIdForUpdate(Long id) {
+        return Optional.ofNullable(agentMapper.selectOne(new LambdaQueryWrapper<Agent>()
+                .eq(Agent::getId, id)
+                .last("FOR UPDATE")));
     }
 
     @Override

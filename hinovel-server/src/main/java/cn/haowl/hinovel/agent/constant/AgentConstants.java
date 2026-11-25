@@ -3,30 +3,23 @@ package cn.haowl.hinovel.agent.constant;
 /**
  * Agent 模块常量类。
  *
- * <p>定义 Agent 模块相关的常量配置。</p>
+ * 定义 Agent 模块相关的常量配置。
  *
  * @author haowl
  * @since 2024
  */
 public final class AgentConstants {
 
+    /**
+     * 限制常量或工具类实例化。
+     */
     private AgentConstants() {
     }
-
-    /**
-     * Redis Agent 配置键前缀。
-     */
-    public static final String REDIS_KEY_PREFIX_AGENT_CONFIG = "agent:config:";
 
     /**
      * Redis 限流键前缀。
      */
     public static final String REDIS_KEY_PREFIX_RATE_LIMIT = "rate:limit:";
-
-    /**
-     * Agent 缓存 TTL（秒）。
-     */
-    public static final long AGENT_CACHE_TTL_SECONDS = 1800L;
 
     /**
      * 默认最大迭代次数。
@@ -114,14 +107,34 @@ public final class AgentConstants {
     public static final int PLOT_POINT_PREVIEW_LENGTH = 50;
 
     /**
-     * 审核通过状态。
+     * 小说向量集合前缀。
      */
-    public static final String AUDIT_PASS = "pass";
+    public static final String NOVEL_VECTOR_COLLECTION_PREFIX = "novel_";
 
     /**
-     * 审核失败状态。
+     * 向量元数据中的章节 ID 键。
      */
-    public static final String AUDIT_FAIL = "fail";
+    public static final String VECTOR_CHAPTER_ID = "chapterId";
+
+    /**
+     * 向量元数据中的章节标题键。
+     */
+    public static final String VECTOR_CHAPTER_TITLE = "chapterTitle";
+
+    /**
+     * 向量元数据中的内容类型键。
+     */
+    public static final String VECTOR_CONTENT_TYPE = "contentType";
+
+    /**
+     * 向量元数据中的小说 ID 键。
+     */
+    public static final String VECTOR_NOVEL_ID = "novelId";
+
+    /**
+     * 向量元数据中的分片序号键。
+     */
+    public static final String VECTOR_SEGMENT_INDEX = "segmentIndex";
 
     // ==================== 小说配置默认值 ====================
 
@@ -142,45 +155,4 @@ public final class AgentConstants {
      */
     public static final int RATE_LIMIT_WINDOW_MINUTES = 1;
 
-    /**
-     * 首次请求计数值（用于判断是否需要设置过期时间）。
-     */
-    public static final long FIRST_REQUEST_COUNT = 1L;
-
-    // ==================== Mock 响应常量 ====================
-
-    /**
-     * Mock 重新生成响应 ID 前缀。
-     */
-    public static final String MOCK_REGENERATE_ID_PREFIX = "mock-regenerate-id-";
-
-    /**
-     * Mock 批量审核响应 ID 前缀。
-     */
-    public static final String MOCK_BATCH_AUDIT_ID_PREFIX = "mock-batch-audit-id-";
-
-    /**
-     * Mock 重新生成默认内容。
-     */
-    public static final String MOCK_REGENERATE_CONTENT = "重新生成的内容...";
-
-    /**
-     * Mock 批量审核默认摘要。
-     */
-    public static final String MOCK_BATCH_AUDIT_SUMMARY = "所有审核通过";
-
-    /**
-     * Mock 重新生成处理时间（毫秒）。
-     */
-    public static final long MOCK_REGENERATE_PROCESSING_TIME_MS = 1800L;
-
-    /**
-     * Mock 批量审核处理时间（毫秒）。
-     */
-    public static final long MOCK_BATCH_AUDIT_PROCESSING_TIME_MS = 3000L;
-
-    /**
-     * Mock 响应 ID 序号起始值。
-     */
-    public static final int MOCK_RESPONSE_ID_START = 1;
 }

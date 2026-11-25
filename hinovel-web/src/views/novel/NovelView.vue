@@ -1,10 +1,15 @@
 <template>
-    <div class="novel-editor-page">
+    <div :class="{ focused: isFocusMode }" class="novel-editor-page">
         <!-- 顶部标题栏 -->
         <header class="editor-header">
             <div class="header-left">
                 <el-button :icon="ArrowLeft" type="primary" plain class="back-btn" @click="goBack"> 返回 </el-button>
-                <el-input v-model="chapterTitle" placeholder="请输入章节标题" class="chapter-title-input" />
+                <el-input
+                    v-model="chapterTitle"
+                    :disabled="!currentChapterId"
+                    class="chapter-title-input"
+                    placeholder="请输入章节标题"
+                />
             </div>
             <div class="header-center">
                 <span class="novel-title-badge">{{ novelDisplayTitle || '加载中...' }}</span>
@@ -26,12 +31,25 @@
                 >
                     {{ isFocusMode ? '退出专注' : '专注模式' }}
                 </el-button>
-                <el-button type="primary" :icon="Upload" @click="publishChapter"> 发布 </el-button>
+                <el-button :disabled="!currentChapterId" :icon="Upload" type="primary" @click="publishChapter">
+                    发布
+                </el-button>
             </div>
         </header>
 
         <!-- 编辑器主体 -->
-        <div class="editor-body">
+        <nav v-if="!isFocusMode" aria-label="编辑区域" class="editor-sections">
+            <button
+                v-for="section in editorSections"
+                :key="section.id"
+                :aria-pressed="editorSection === section.id"
+                type="button"
+                @click="openEditorSection(section.id)"
+            >
+                {{ section.label }}
+            </button>
+        </nav>
+        <div :data-section="editorSection" class="editor-body">
             <!-- 左侧边栏 - 章节列表（支持收起/展开） -->
             <aside class="editor-sidebar" :class="{ collapsed: isSidebarCollapsed }">
                 <div class="sidebar-main">
@@ -161,7 +179,10 @@
                                 <div
                                     class="chapter-item"
                                     :class="{ active: currentChapterId === chapter.id }"
-                                    @click="selectChapter(chapter.id)"
+                                    @click="
+                                        selectChapter(chapter.id)
+                                        editorSection = 'content'
+                                    "
                                 >
                                     <div class="chapter-content">
                                         <div class="chapter-header-row">
@@ -350,105 +371,123 @@
 
             <!-- 中间内容编辑区 -->
             <div class="content-panel">
-                <div class="content-header">
-                    <span class="content-title">
-                        <el-icon><EditPen /></el-icon>
-                        正文内容
-                    </span>
-                    <div class="content-actions">
-                        <span class="word-count">字数：{{ wordCount }}</span>
-                        <el-tooltip content="选择背景色" placement="bottom" :show-after="300">
-                            <div class="bg-color-picker">
-                                <div
-                                    class="bg-color-btn"
-                                    :style="{ backgroundColor: editorBgColor }"
-                                    @click="showBgColorPicker = !showBgColorPicker"
-                                >
-                                    <el-icon :size="14">
-                                        <Palette />
-                                    </el-icon>
-                                </div>
-                                <div v-if="showBgColorPicker" class="bg-color-options">
+                <div v-if="!currentChapterId" class="no-chapter" role="status">
+                    <el-skeleton v-if="isLoadingChapters" :rows="3" animated />
+                    <template v-else-if="chapterListFailed">
+                        <h2>章节加载失败</h2>
+                        <el-button @click="loadChapters">重新加载</el-button>
+                    </template>
+                    <template v-else>
+                        <h2>{{ chapters.length ? '选择要写的章节' : '还没有可编辑的章节' }}</h2>
+                        <el-button :icon="Plus" type="primary" @click="openCreateChapterDialog">新建章节</el-button>
+                    </template>
+                </div>
+                <template v-else>
+                    <div class="content-header">
+                        <span class="content-title">
+                            <el-icon><EditPen /></el-icon>
+                            正文内容
+                        </span>
+                        <div class="content-actions">
+                            <span class="word-count">字数：{{ wordCount }}</span>
+                            <el-tooltip :show-after="300" content="选择背景色" placement="bottom">
+                                <div class="bg-color-picker">
                                     <div
-                                        v-for="color in bgColorOptions"
-                                        :key="color.value"
-                                        class="bg-color-option"
-                                        :class="{ active: editorBgColor === color.value }"
-                                        :style="{ backgroundColor: color.value }"
-                                        @click="selectBgColor(color.value)"
+                                        :style="{ backgroundColor: editorBgColor }"
+                                        aria-label="选择背景色"
+                                        class="bg-color-btn"
+                                        role="button"
+                                        tabindex="0"
+                                        @click="showBgColorPicker = !showBgColorPicker"
+                                        @keydown.enter.prevent="showBgColorPicker = !showBgColorPicker"
+                                        @keydown.space.prevent="showBgColorPicker = !showBgColorPicker"
                                     >
-                                        <span v-if="editorBgColor === color.value" class="check-icon">✓</span>
+                                        <el-icon :size="14">
+                                            <Brush />
+                                        </el-icon>
+                                    </div>
+                                    <div v-if="showBgColorPicker" class="bg-color-options">
+                                        <div
+                                            v-for="color in bgColorOptions"
+                                            :key="color.value"
+                                            :class="{ active: editorBgColor === color.value }"
+                                            :style="{ backgroundColor: color.value }"
+                                            class="bg-color-option"
+                                            @click="selectBgColor(color.value)"
+                                        >
+                                            <span v-if="editorBgColor === color.value" class="check-icon">✓</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </el-tooltip>
-                        <el-tooltip content="清除多余空白行" placement="bottom" :show-after="300">
-                            <el-button size="small" text class="clean-blank-btn" @click="cleanBlankLines">
-                                <el-icon :size="14">
-                                    <Delete />
-                                </el-icon>
-                                清除空行
+                            </el-tooltip>
+                            <el-tooltip :show-after="300" content="清除多余空白行" placement="bottom">
+                                <el-button class="clean-blank-btn" size="small" text @click="cleanBlankLines">
+                                    <el-icon :size="14">
+                                        <Delete />
+                                    </el-icon>
+                                    清除空行
+                                </el-button>
+                            </el-tooltip>
+                            <el-button
+                                :class="[
+                                    'save-btn',
+                                    hasUnsavedChanges ? 'save-btn-unsaved' : 'save-btn-saved',
+                                    { 'save-btn-pulse': hasUnsavedChanges },
+                                ]"
+                                :icon="hasUnsavedChanges ? Warning : Check"
+                                :loading="isSaving"
+                                size="default"
+                                @click="manualSave"
+                            >
+                                {{ hasUnsavedChanges ? '未保存' : '已保存' }}
                             </el-button>
-                        </el-tooltip>
-                        <el-button
-                            size="default"
-                            :icon="hasUnsavedChanges ? Warning : Check"
-                            :loading="isSaving"
-                            :class="[
-                                'save-btn',
-                                hasUnsavedChanges ? 'save-btn-unsaved' : 'save-btn-saved',
-                                { 'save-btn-pulse': hasUnsavedChanges },
-                            ]"
-                            @click="manualSave"
-                        >
-                            {{ hasUnsavedChanges ? '未保存' : '已保存' }}
-                        </el-button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="content-body">
-                    <TiptapEditor
-                        ref="contentEditorRef"
-                        v-model="chapterContent"
-                        placeholder="开始你的创作之旅..."
-                        :annotations="chapterAnnotations"
-                        :background-color="editorBgColor"
-                        @blur="handleEditorBlur"
-                        @stats-change="handleStatsChange"
-                        @create-annotation="handleCreateAnnotation"
-                        @delete-annotation="handleDeleteAnnotation"
-                        @ai-rewrite-annotation="handleAiRewriteAnnotation"
-                        @accept-rewrite="handleAcceptRewrite"
-                        @view-annotation="handleViewAnnotation"
-                        @quick-rewrite="handleQuickRewrite"
-                        @accept-quick-rewrite="handleAcceptQuickRewrite"
-                    />
-                </div>
+                    <div class="content-body">
+                        <TiptapEditor
+                            ref="contentEditorRef"
+                            v-model="chapterContent"
+                            :annotations="chapterAnnotations"
+                            :background-color="editorBgColor"
+                            placeholder="写下这一章的正文…"
+                            @blur="handleEditorBlur"
+                            @stats-change="handleStatsChange"
+                            @create-annotation="handleCreateAnnotation"
+                            @delete-annotation="handleDeleteAnnotation"
+                            @ai-rewrite-annotation="handleAiRewriteAnnotation"
+                            @accept-rewrite="handleAcceptRewrite"
+                            @view-annotation="handleViewAnnotation"
+                            @quick-rewrite="handleQuickRewrite"
+                            @accept-quick-rewrite="handleAcceptQuickRewrite"
+                        />
+                    </div>
 
-                <div class="content-footer">
-                    <div class="footer-left">
-                        <el-icon><Document /></el-icon>
-                        <span>字数 {{ wordCount }}</span>
-                        <el-divider direction="vertical" />
-                        <span>行数 {{ lineCount }}</span>
-                        <el-divider direction="vertical" />
-                        <span>段落 {{ paragraphCount }}</span>
+                    <div class="content-footer">
+                        <div class="footer-left">
+                            <el-icon><Document /></el-icon>
+                            <span>字数 {{ wordCount }}</span>
+                            <el-divider direction="vertical" />
+                            <span>行数 {{ lineCount }}</span>
+                            <el-divider direction="vertical" />
+                            <span>段落 {{ paragraphCount }}</span>
+                        </div>
+                        <div class="footer-right">
+                            <el-button class="footer-action-btn" size="small" @click="copyChapterContent">
+                                <el-icon :size="13">
+                                    <DocumentCopy />
+                                </el-icon>
+                                复制
+                            </el-button>
+                            <el-button class="footer-action-btn" size="small" @click="exportChapterContent">
+                                <el-icon :size="13">
+                                    <Download />
+                                </el-icon>
+                                导出
+                            </el-button>
+                        </div>
                     </div>
-                    <div class="footer-right">
-                        <el-button size="small" class="footer-action-btn" @click="copyChapterContent">
-                            <el-icon :size="13">
-                                <DocumentCopy />
-                            </el-icon>
-                            复制
-                        </el-button>
-                        <el-button size="small" class="footer-action-btn" @click="exportChapterContent">
-                            <el-icon :size="13">
-                                <Download />
-                            </el-icon>
-                            导出
-                        </el-button>
-                    </div>
-                </div>
+                </template>
             </div>
 
             <!-- 正文面板与功能区之间的拖拽手柄 -->
@@ -842,6 +881,20 @@
                                                     class="message-text ai-markdown-content"
                                                     v-html="renderMarkdown(msg.content)"
                                                 ></div>
+                                                <div
+                                                    v-if="msg.role === 'assistant' && msg.loadedSkillNames?.length"
+                                                    class="message-skills"
+                                                >
+                                                    <span>已加载 Skill</span>
+                                                    <el-tag
+                                                        v-for="name in msg.loadedSkillNames"
+                                                        :key="name"
+                                                        effect="plain"
+                                                        size="small"
+                                                    >
+                                                        {{ name }}
+                                                    </el-tag>
+                                                </div>
                                                 <!-- 消息操作按钮 -->
                                                 <div v-if="msg.content" class="message-actions">
                                                     <el-tooltip
@@ -906,7 +959,7 @@
                                 :rows="10"
                                 placeholder="询问关于小说的问题... (Enter发送, Shift+Enter换行)"
                                 class="chat-input"
-                                :disabled="isChatLoading"
+                                :disabled="isChatLoading || chatHistoryLoading"
                                 @keydown.enter.prevent="handleChatInputEnter"
                             />
                             <div class="chat-action-buttons">
@@ -925,7 +978,7 @@
                                     type="primary"
                                     :icon="Promotion"
                                     size="default"
-                                    :disabled="!chatInput.trim()"
+                                    :disabled="chatHistoryLoading || !chatInput.trim()"
                                     class="send-btn"
                                     @click="sendChatMessage"
                                 >
@@ -1039,7 +1092,11 @@
 
                     <!-- 小说设置面板 -->
                     <div v-show="activeFunctionTab === 'settings'" class="function-tab-content">
-                        <div v-loading="isLoadingSettings" class="tab-panel-body settings-panel-body">
+                        <div v-if="!isLoadingSettings && !settingsReady" class="no-chapter" role="status">
+                            <p>设置尚未加载</p>
+                            <el-button @click="loadSettingsPanel">重新加载</el-button>
+                        </div>
+                        <div v-else v-loading="isLoadingSettings" class="tab-panel-body settings-panel-body">
                             <div class="settings-tab-bar">
                                 <div
                                     class="settings-tab-item"
@@ -1067,7 +1124,7 @@
                             <div v-show="settingsActiveTab === 'agent'" class="settings-scroll-area">
                                 <div class="settings-card">
                                     <div class="settings-card-header">
-                                        <el-icon :size="15" color="#667eea">
+                                        <el-icon :size="15" color="var(--pine)">
                                             <UserFilled />
                                         </el-icon>
                                         <span>作者 Agent</span>
@@ -1147,6 +1204,7 @@
                             <el-button
                                 type="primary"
                                 :loading="isSavingSettings"
+                                :disabled="!settingsReady"
                                 class="settings-save-btn"
                                 @click="saveSettingsPanel"
                             >
@@ -1162,7 +1220,9 @@
                 <!-- 活动栏（竖排图标） -->
                 <div class="activity-bar">
                     <el-tooltip content="小说大纲" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="小说大纲"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'outline' }"
                             @click="switchFunctionTab('outline')"
@@ -1170,10 +1230,12 @@
                             <el-icon :size="20">
                                 <Document />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="人物图谱" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="人物图谱"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'character' }"
                             @click="switchFunctionTab('character')"
@@ -1181,10 +1243,12 @@
                             <el-icon :size="20">
                                 <Share />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="历史版本" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="历史版本"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'history' }"
                             @click="switchFunctionTab('history')"
@@ -1192,10 +1256,12 @@
                             <el-icon :size="20">
                                 <Clock />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="AI 问答" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="AI 问答"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'chat' }"
                             @click="switchFunctionTab('chat')"
@@ -1203,10 +1269,12 @@
                             <el-icon :size="20">
                                 <ChatDotRound />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="批注列表" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="批注"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'annotations' }"
                             @click="switchFunctionTab('annotations')"
@@ -1218,10 +1286,12 @@
                             <span v-if="unreadAnnotationCount > 0" class="activity-badge">
                                 {{ unreadAnnotationCount > 9 ? '9+' : unreadAnnotationCount }}
                             </span>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="创作手记" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="备忘录"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'memo' }"
                             @click="switchFunctionTab('memo')"
@@ -1229,10 +1299,12 @@
                             <el-icon :size="20">
                                 <Notebook />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                     <el-tooltip content="小说设置" placement="left" :show-after="300">
-                        <div
+                        <button
+                            aria-label="小说设置"
+                            type="button"
                             class="activity-icon"
                             :class="{ active: activeFunctionTab === 'settings' }"
                             @click="switchFunctionTab('settings')"
@@ -1240,7 +1312,7 @@
                             <el-icon :size="20">
                                 <Setting />
                             </el-icon>
-                        </div>
+                        </button>
                     </el-tooltip>
                 </div>
             </div>
@@ -1502,7 +1574,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, reactive, ref, toRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
     ArrowDown,
@@ -1544,8 +1616,8 @@ import {
     WarningFilled,
 } from '@element-plus/icons-vue'
 import { ElIcon, ElInput, ElMessage, ElMessageBox } from 'element-plus'
-import * as echarts from 'echarts'
-import { marked } from 'marked'
+import { type ECharts, type EChartsOption, initCharacterChart } from '@/utils/character-chart'
+import { renderMarkdown } from '@/utils/render-markdown'
 import draggable from 'vuedraggable'
 import {
     batchUpdateChapterSort,
@@ -1572,11 +1644,9 @@ import {
 } from '@/api/chapter'
 import {
     aiAudit,
-    type AIAuditIssue,
     type AIAuditorRequest,
     type AIAuditorResponse,
     type AIAuthorRequest,
-    aiBatchAudit,
     aiChatStream,
     aiRegenerate,
     aiRewriteStream,
@@ -1617,6 +1687,7 @@ import { getNovelMemo, saveNovelMemo } from '@/api/novel-memo'
 import {
     acceptAnnotation as acceptAnnotationApi,
     annotationAiRewriteStream,
+    type AnnotationRewriteCallbacks,
     type ChapterAnnotation as AnnotationData,
     createAnnotation,
     deleteAnnotation as deleteAnnotationApi,
@@ -1626,18 +1697,13 @@ import {
     saveAiRewriteResult as saveAiRewriteResultApi,
 } from '@/api/annotation'
 
-// 配置 marked 选项，支持流式输出中的换行渲染
-marked.setOptions({
-    breaks: true,
-    gfm: true,
-})
-
 defineOptions({ name: 'NovelView' })
 
 const route = useRoute()
 const router = useRouter()
 const novelRouteStore = useNovelRouteStore()
-const novelId = computed(() => Number(route.params.id))
+// 每个 KeepAlive 实例始终使用打开时的小说 ID。
+const novelId = String(route.params.id)
 
 // 小说基本信息
 const novelInfo = ref<Novel | null>(null)
@@ -1649,7 +1715,7 @@ const novelTotalWordCount = computed(() => novelInfo.value?.wordCount || 0)
  */
 const loadNovelInfo = async () => {
     try {
-        const res = await getNovelDetail(novelId.value)
+        const res = await getNovelDetail(novelId)
         novelInfo.value = res.data
     } catch (error) {
         console.error('加载小说信息失败:', error)
@@ -1660,7 +1726,7 @@ const loadNovelInfo = async () => {
 const chapterTitle = ref('')
 
 // 当前章节ID
-const currentChapterId = ref(0)
+const currentChapterId = ref('')
 
 // 章节内容
 const chapterContent = ref('')
@@ -1689,11 +1755,11 @@ const lastSavedOutline = ref({
     plotPointsText: '',
     emotionTone: '',
     sceneSetting: '',
-    selectedCharacters: [] as number[],
+    selectedCharacters: [] as string[],
 })
 
 // 本地草稿管理
-const DRAFT_KEY = computed(() => `novel_draft_${novelId.value}_${currentChapterId.value}`)
+const DRAFT_KEY = computed(() => `novel_draft_${novelId}_${currentChapterId.value}`)
 const draftContent = ref('') // 本地草稿内容
 const lastDraftSaveTime = ref<Date | null>(null)
 
@@ -1705,7 +1771,7 @@ const saveDraftToLocal = () => {
         content: chapterContent.value,
         title: chapterTitle.value,
         chapterId: currentChapterId.value,
-        novelId: novelId.value,
+        novelId,
         saveTime: new Date().toISOString(),
         wordCount: chapterContent.value.length,
         // 大纲相关字段
@@ -1731,11 +1797,22 @@ const loadDraftFromLocal = (): boolean => {
     if (!currentChapterId.value) return false
 
     try {
-        const draftStr = localStorage.getItem(DRAFT_KEY.value)
+        const draftKey = DRAFT_KEY.value
+        // 旧版本曾将路由中的小说 ID 转为数字，按旧键兼容尚未同步的草稿。
+        const legacyDraftKey = `novel_draft_${Number(novelId)}_${currentChapterId.value}`
+        const savedDraft = localStorage.getItem(draftKey)
+        const draftStr = savedDraft ?? localStorage.getItem(legacyDraftKey)
         if (draftStr) {
             const draft = JSON.parse(draftStr)
             // 检查是否是对应当前章节
-            if (draft.chapterId == currentChapterId.value && draft.novelId == novelId.value) {
+            if (
+                String(draft.chapterId) === currentChapterId.value &&
+                (String(draft.novelId) === novelId || draft.novelId === Number(novelId))
+            ) {
+                if (!savedDraft && legacyDraftKey !== draftKey) {
+                    localStorage.setItem(draftKey, draftStr)
+                    localStorage.removeItem(legacyDraftKey)
+                }
                 // 判断正文是否有变化（trim 后比较，避免空白差异导致误判）
                 const draftContentTrimmed = (draft.content || '').trim()
                 const currentContentTrimmed = (chapterContent.value || '').trim()
@@ -1778,7 +1855,7 @@ const loadDraftFromLocal = (): boolean => {
                                 sceneSetting.value = draft.sceneSetting
                             }
                             if (draft.selectedCharacters !== undefined) {
-                                selectedCharacters.value = draft.selectedCharacters
+                                selectedCharacters.value = draft.selectedCharacters.map(String)
                             }
                             draftContent.value = draft.content || ''
                             hasUnsavedChanges.value = true
@@ -1813,6 +1890,7 @@ const clearDraft = () => {
 // 章节列表
 const chapters = ref<Chapter[]>([])
 const isLoadingChapters = ref(false)
+const chapterListFailed = ref(false)
 const chapterListRef = ref<HTMLDivElement>()
 
 // 分页相关
@@ -1843,8 +1921,8 @@ watch([chapterSearchKeyword, chapterFilterStatus, chapterFilterVector], () => {
 // 编辑章节
 const showEditChapter = ref(false)
 const editingChapter = ref<Chapter>({
-    id: 0,
-    novelId: 0,
+    id: '',
+    novelId: '',
     chapterNumber: 0,
     title: '',
     content: '',
@@ -1871,27 +1949,7 @@ const editingNovelOutlineContent = ref('')
 /**
  * 将 Markdown 文本渲染为 HTML
  */
-const renderedNovelOutline = computed(() => {
-    if (!novelOutline.value) return ''
-    return marked(novelOutline.value) as string
-})
-
-/**
- * 将 Markdown 文本渲染为 HTML（通用方法，用于 AI 问答消息等场景）
- * 支持流式输出中不完整的 Markdown 片段安全渲染
- *
- * @param content Markdown 原始文本
- * @returns 渲染后的 HTML 字符串
- */
-const renderMarkdown = (content: string): string => {
-    if (!content) return ''
-    try {
-        return marked(content) as string
-    } catch {
-        // 流式输出中 Markdown 片段可能不完整，降级为纯文本展示
-        return content.replace(/\n/g, '<br>')
-    }
-}
+const renderedNovelOutline = computed(() => renderMarkdown(novelOutline.value))
 
 /**
  * 复制消息内容到剪贴板（复制原始 Markdown 文本，非 HTML）
@@ -2047,12 +2105,7 @@ const chapterOutline = ref('')
 const plotPointsText = ref('')
 
 // 涉及人物
-const _involvedCharacters = ref([
-    { id: 1, name: '孙悟空', color: '#667eea' },
-    { id: 2, name: '唐僧', color: '#f5576c' },
-    { id: 3, name: '猪八戒', color: '#4facfe' },
-])
-const selectedCharacters = ref<number[]>([])
+const selectedCharacters = ref<string[]>([])
 
 // 情感基调
 const emotionTone = ref('')
@@ -2118,8 +2171,8 @@ const handleChatScroll = () => {
  * 处理AI问答输入框回车事件
  * Enter发送消息，Shift+Enter换行
  */
-const handleChatInputEnter = (e: KeyboardEvent) => {
-    if (e.shiftKey) {
+const handleChatInputEnter = (e: Event) => {
+    if (!(e instanceof KeyboardEvent) || e.shiftKey || e.isComposing) {
         // Shift+Enter 换行，不阻止默认行为
         return
     }
@@ -2129,20 +2182,28 @@ const handleChatInputEnter = (e: KeyboardEvent) => {
 }
 
 // 问答会话管理
-const chatSessionId = ref<number>(0)
+const chatSessionId = ref<ChatSessionItem['id']>(0)
 const chatSessions = ref<ChatSessionItem[]>([])
-let chatAbortController: AbortController | null = null
+const chatHistoryLoading = ref(false)
+let chatHistoryVersion = 0
+let activeChatStream: {
+    controller: AbortController
+    sessionId: ChatSessionItem['id']
+    reply: ChatMessageLocal
+    messages: ChatMessageLocal[]
+    hasMore: boolean
+} | null = null
 
 // 人物图谱
 const miniGraphRef = ref<HTMLDivElement>()
-let miniChartInstance: echarts.ECharts | null = null
+let miniChartInstance: ECharts | null = null
 
 // 历史版本
 const historyVersions = ref<ChapterVersion[]>([])
 const isLoadingVersions = ref(false)
 
 // 预览版本
-const previewVersionId = ref<number | null>(null)
+const previewVersionId = ref<string | null>(null)
 const previewVersionContent = ref('')
 
 // 版本备注弹窗
@@ -2167,9 +2228,11 @@ const settingsActiveTab = ref('agent')
 const isLoadingSettings = ref(false)
 const isSavingSettings = ref(false)
 const hasOwnSettings = ref(false)
+const settingsReady = ref(false)
+let settingsLoadRequest = 0
 const agents = ref<AgentConfig[]>([])
 const agentConfig = ref<NovelAgentConfig>({
-    novelId: 0,
+    novelId: '',
     authorAgentId: undefined,
     editorAgentId: undefined,
     qaAgentId: undefined,
@@ -2177,6 +2240,20 @@ const agentConfig = ref<NovelAgentConfig>({
 const novelSettingsForm = ref<NovelSettings>(createDefaultSettings())
 
 // 专注模式（从布局缓存恢复）
+const editorSections = [
+    { id: 'chapters', label: '章节' },
+    { id: 'outline', label: '本章大纲' },
+    { id: 'content', label: '正文' },
+    { id: 'tools', label: '工具' },
+] as const
+type EditorSection = (typeof editorSections)[number]['id']
+const editorSection = ref<EditorSection>('content')
+const openEditorSection = (section: EditorSection) => {
+    editorSection.value = section
+    if (section === 'chapters') isSidebarCollapsed.value = false
+    if (section === 'tools' && !activeFunctionTab.value) switchFunctionTab('outline')
+    if (section === 'tools') nextTick(() => miniChartInstance?.resize())
+}
 const isFocusMode = toRef(layoutStore, 'isFocusMode')
 
 // 左侧章节菜单收起状态（从布局缓存恢复）
@@ -2266,7 +2343,7 @@ const sortedAnnotations = computed(() => {
  *
  * @param chapterId 章节 ID
  */
-const loadChapterAnnotations = async (chapterId: number) => {
+const loadChapterAnnotations = async (chapterId: string) => {
     try {
         const res = await getChapterAnnotations(chapterId)
         chapterAnnotations.value = res.data || []
@@ -2289,7 +2366,7 @@ const handleCreateAnnotation = async (data: {
     try {
         const res = await createAnnotation({
             chapterId: currentChapterId.value,
-            novelId: novelId.value,
+            novelId,
             startOffset: data.startOffset,
             endOffset: data.endOffset,
             originalText: data.originalText,
@@ -2309,7 +2386,7 @@ const handleCreateAnnotation = async (data: {
  */
 const handleDeleteAnnotation = async (annotationId: string) => {
     try {
-        await deleteAnnotationApi(Number(annotationId))
+        await deleteAnnotationApi(annotationId)
         chapterAnnotations.value = chapterAnnotations.value.filter((a) => String(a.id) !== String(annotationId))
         ElMessage.success('批注已删除')
     } catch (error) {
@@ -2324,18 +2401,15 @@ const handleDeleteAnnotation = async (annotationId: string) => {
  */
 const handleAiRewriteAnnotation = (
     data: {
-        annotationId: number
+        annotationId: string
         originalText: string
         annotationContent: string
         fullChapterContent: string
     },
-    callbacks: {
-        onToken: (token: string) => void
-        onComplete: (fullText: string) => void
-        onError: (error: Error) => void
-    },
+    callbacks: AnnotationRewriteCallbacks,
+    signal: AbortSignal,
 ) => {
-    annotationAiRewriteStream(
+    void annotationAiRewriteStream(
         {
             annotationId: data.annotationId,
             chapterId: currentChapterId.value,
@@ -2345,15 +2419,16 @@ const handleAiRewriteAnnotation = (
         },
         {
             onToken: callbacks.onToken,
-            onComplete: (fullText: string) => {
-                // 改写完成后保存结果到后端
-                saveAiRewriteResultApi(data.annotationId, fullText).catch((error) => {
-                    console.error('保存 AI 改写结果失败:', error)
-                })
+            onComplete: async (fullText: string) => {
+                await saveAiRewriteResultApi(data.annotationId, fullText)
+                if (signal.aborted) return
+                const annotation = chapterAnnotations.value.find((item) => item.id === data.annotationId)
+                if (annotation) annotation.aiRewriteResult = fullText
                 callbacks.onComplete(fullText)
             },
             onError: callbacks.onError,
         },
+        signal,
     )
 }
 
@@ -2372,7 +2447,7 @@ const handleAcceptRewrite = async (data: { annotationId: string; originalText: s
         chapterContent.value.substring(originalIndex + data.originalText.length)
 
     try {
-        await acceptAnnotationApi(Number(data.annotationId))
+        await acceptAnnotationApi(data.annotationId)
         chapterAnnotations.value = chapterAnnotations.value.filter((a) => String(a.id) !== String(data.annotationId))
         hasUnsavedChanges.value = true
         ElMessage.success('已采纳改写结果')
@@ -2389,21 +2464,19 @@ const handleAcceptRewrite = async (data: { annotationId: string; originalText: s
  */
 const handleQuickRewrite = (
     data: { originalText: string; rewritePrompt: string; fullChapterContent: string },
-    callbacks: {
-        onToken: (token: string) => void
-        onComplete: (fullText: string) => void
-        onError: (error: Error) => void
-    },
+    callbacks: AnnotationRewriteCallbacks,
+    signal: AbortSignal,
 ) => {
-    annotationAiRewriteStream(
+    void annotationAiRewriteStream(
         {
             chapterId: currentChapterId.value,
-            novelId: novelId.value,
+            novelId,
             fullChapterContent: data.fullChapterContent,
             originalText: data.originalText,
             annotationContent: data.rewritePrompt,
         },
         callbacks,
+        signal,
     )
 }
 
@@ -2434,7 +2507,7 @@ const unreadAnnotationCount = computed(() => {
 /**
  * 判断批注是否已读
  */
-const isAnnotationRead = (annotationId: number): boolean => {
+const isAnnotationRead = (annotationId: string): boolean => {
     const annotation = chapterAnnotations.value.find((a) => a.id === annotationId)
     return annotation ? annotation.viewed === 1 : true
 }
@@ -2449,7 +2522,7 @@ const handleViewAnnotation = (annotationId: string) => {
             ...chapterAnnotations.value[index],
             viewed: 1,
         }
-        markAnnotationViewed(Number(annotationId)).catch((error) => {
+        markAnnotationViewed(annotationId).catch((error) => {
             console.error('标记批注已查看失败:', error)
         })
     }
@@ -2468,7 +2541,7 @@ const handleAnnotationListClick = (annotation: AnnotationData) => {
  */
 const handleResolveAnnotation = async (annotationId: string) => {
     try {
-        await resolveAnnotationApi(Number(annotationId))
+        await resolveAnnotationApi(annotationId)
         const annotation = chapterAnnotations.value.find((a) => String(a.id) === String(annotationId))
         if (annotation) {
             annotation.status = 'RESOLVED'
@@ -2499,10 +2572,7 @@ const isSavingMemo = ref(false)
 /**
  * 渲染手记 Markdown 内容
  */
-const renderedMemoContent = computed(() => {
-    if (!memoContent.value) return ''
-    return marked(memoContent.value) as string
-})
+const renderedMemoContent = computed(() => renderMarkdown(memoContent.value))
 
 /**
  * 加载创作手记
@@ -2510,7 +2580,7 @@ const renderedMemoContent = computed(() => {
 const loadMemo = async () => {
     isLoadingMemo.value = true
     try {
-        const res = await getNovelMemo(novelId.value)
+        const res = await getNovelMemo(novelId)
         memoContent.value = res.data?.content || ''
     } catch (error) {
         console.error('加载创作手记失败:', error)
@@ -2531,7 +2601,7 @@ const cancelEditMemo = () => {
 const saveMemoHandler = async () => {
     isSavingMemo.value = true
     try {
-        await saveNovelMemo(novelId.value, editingMemoContent.value)
+        await saveNovelMemo(novelId, editingMemoContent.value)
         memoContent.value = editingMemoContent.value
         isEditingMemo.value = false
         ElMessage.success('手记已保存')
@@ -2712,11 +2782,12 @@ const goBack = () => {
 // 加载章节列表（第一页）
 const loadChapters = async () => {
     isLoadingChapters.value = true
+    chapterListFailed.value = false
     chapterPageNum.value = 1
     hasMoreChapters.value = true
     try {
         const res = await getNovelChaptersPage(
-            novelId.value,
+            novelId,
             chapterPageNum.value,
             chapterPageSize,
             chapterFilterStatus.value,
@@ -2731,6 +2802,7 @@ const loadChapters = async () => {
             await selectChapter(chapters.value[0].id)
         }
     } catch (error) {
+        chapterListFailed.value = true
         ElMessage.error('加载章节列表失败')
     } finally {
         isLoadingChapters.value = false
@@ -2745,7 +2817,7 @@ const loadMoreChapters = async () => {
     try {
         const nextPage = chapterPageNum.value + 1
         const res = await getNovelChaptersPage(
-            novelId.value,
+            novelId,
             nextPage,
             chapterPageSize,
             chapterFilterStatus.value,
@@ -2782,7 +2854,6 @@ const handleChapterListScroll = () => {
 }
 
 // 快速定位锚点列表（倒序排列，与章节列表排序一致）
-const _QUICK_JUMP_VISIBLE_COUNT = 5
 const quickJumpAnchors = computed(() => {
     const total = chapterTotal.value
     if (total <= 10) return []
@@ -2845,7 +2916,7 @@ const jumpToChapter = async (targetChapterNumber: number) => {
         while (hasMoreChapters.value) {
             const nextPage = chapterPageNum.value + 1
             const res = await getNovelChaptersPage(
-                novelId.value,
+                novelId,
                 nextPage,
                 chapterPageSize,
                 chapterFilterStatus.value,
@@ -2929,7 +3000,7 @@ const scrollJumpRail = (direction: number) => {
 const loadNovelOutline = async () => {
     isLoadingOutline.value = true
     try {
-        const res = await getNovelOutline(novelId.value)
+        const res = await getNovelOutline(novelId)
         if (res.data) {
             novelOutline.value = res.data.outlineContent || ''
         }
@@ -2941,7 +3012,7 @@ const loadNovelOutline = async () => {
 }
 
 // 选择章节
-const selectChapter = async (id: number) => {
+const selectChapter = async (id: string) => {
     // 如果有未保存的更改，先保存到本地
     if (hasUnsavedChanges.value && currentChapterId.value) {
         saveDraftToLocal()
@@ -3018,7 +3089,7 @@ const addChapter = async () => {
     isCreatingChapter.value = true
     try {
         const res = await createChapter({
-            novelId: novelId.value,
+            novelId,
             title: newChapterTitle.value.trim(),
         })
         if (res.data) {
@@ -3029,6 +3100,8 @@ const addChapter = async () => {
             }
             // 新创建的章节插入到列表头部（倒序排列）
             chapters.value.unshift(res.data)
+            chapterTotal.value++
+            editorSection.value = 'content'
             showCreateChapter.value = false
             await selectChapter(res.data.id)
             ElMessage.success('章节创建成功')
@@ -3101,7 +3174,7 @@ const updateChapter = async () => {
 const handleDragEnd = async () => {
     const chapterIds = chapters.value.map((c) => c.id)
     try {
-        await batchUpdateChapterSort(novelId.value, chapterIds)
+        await batchUpdateChapterSort(novelId, chapterIds)
         // 拖拽后重新加载以同步章节号
         await loadChapters()
         ElMessage.success('排序已更新')
@@ -3119,7 +3192,7 @@ const handleReorderChapters = async () => {
             cancelButtonText: '取消',
             type: 'warning',
         })
-        await reorderChaptersApi(novelId.value)
+        await reorderChaptersApi(novelId)
         // 重新加载章节列表
         chapters.value = []
         chapterPageNum.value = 1
@@ -3146,13 +3219,15 @@ const confirmDeleteChapter = (chapter: Chapter) => {
                 const index = chapters.value.findIndex((c) => c.id === chapter.id)
                 if (index !== -1) {
                     chapters.value.splice(index, 1)
+                    chapterTotal.value = Math.max(0, chapterTotal.value - 1)
                 }
                 if (currentChapterId.value === chapter.id) {
                     // 如果删除的是当前章节，切换到其他章节
                     if (chapters.value.length > 0) {
                         await selectChapter(chapters.value[0].id)
                     } else {
-                        currentChapterId.value = 0
+                        currentChapterId.value = ''
+                        chapterTitle.value = ''
                         chapterContent.value = ''
                         chapterOutline.value = ''
                     }
@@ -3309,99 +3384,25 @@ const regenerateContent = async () => {
     }
 }
 
-// 批量审核功能（处理大纲过长的情况）
-const _performBatchAudit = async () => {
-    if (!chapterContent.value.trim()) {
-        ElMessage.warning('请先输入需要审核的内容')
-        return
-    }
-
-    isAiProcessing.value = true
-    aiProcessingType.value = 'audit'
-
-    try {
-        // 计算章节范围，确保有重叠
-        const currentChapter = chapters.value.find((c) => c.id === currentChapterId.value)
-        if (!currentChapter) return
-
-        const totalChapters = chapters.value.length
-        const chapterRanges = []
-
-        // 生成重叠的章节范围
-        const batchSize = 5 // 每个审核负责5个章节
-        const overlap = 2 // 重叠2个章节
-
-        for (let i = 1; i <= totalChapters; i += batchSize - overlap) {
-            chapterRanges.push({
-                startChapter: Math.max(1, i),
-                endChapter: Math.min(totalChapters, i + batchSize - 1),
-            })
-        }
-
-        const request = {
-            chapterId: currentChapterId.value,
-            content: chapterContent.value,
-            novelOutline: novelOutline.value,
-            chapterRanges,
-        }
-
-        const response = await aiBatchAudit(request)
-
-        // 合并审核结果
-        const mergedIssues: AIAuditIssue[] = []
-        response.audits.forEach((audit) => {
-            audit.issues.forEach((issue) => {
-                // 避免重复问题
-                if (!mergedIssues.some((existing) => existing.originalText === issue.originalText)) {
-                    mergedIssues.push(issue)
-                }
-            })
-        })
-
-        // 创建合并后的审核结果
-        auditResult.value = {
-            id: response.id,
-            overallAssessment: response.overallAssessment,
-            issues: mergedIssues,
-            summary: response.summary,
-            processingTime: response.audits.reduce((sum, audit) => sum + audit.processingTime, 0),
-        }
-
-        showAuditResult.value = true
-    } catch (error) {
-        ElMessage.error('批量审核失败，请稍后重试')
-    } finally {
-        isAiProcessing.value = false
-        aiProcessingType.value = null
-    }
-}
-
 // 切换专注模式
 const toggleFocusMode = () => {
     isFocusMode.value = !isFocusMode.value
     if (isFocusMode.value) {
-        ElMessage.success('已进入专注模式，本章大纲已收起')
+        editorSection.value = 'content'
+        ElMessage.success('已进入专注模式')
     } else {
         ElMessage.info('已退出专注模式')
     }
-}
-
-// AI 问答（切换到问答 Tab）
-const _openAIChat = () => {
-    activeFunctionTab.value = 'chat'
-    nextTick(() => {
-        scrollToBottom()
-    })
 }
 
 /**
  * 初始化或加载问答会话（切换到问答 Tab 时调用）
  */
 const initChatSession = async () => {
-    if (!novelId.value) return
+    if (!novelId || chatHistoryLoading.value || chatSessionId.value) return
 
     // 优先从 store 恢复缓存的问答状态（避免切换页面后断开）
-    const cachedState = chatStore.getChatState(novelId.value)
+    const cachedState = chatStore.getChatState(novelId)
     if (cachedState && cachedState.sessions.length > 0) {
         chatSessions.value = cachedState.sessions
         chatSessionId.value = cachedState.sessionId
@@ -3416,9 +3417,12 @@ const initChatSession = async () => {
         return
     }
 
+    const version = ++chatHistoryVersion
+    chatHistoryLoading.value = true
     try {
         // 加载该小说的会话列表
-        const res = await listChatSessions(novelId.value)
+        const res = await listChatSessions(novelId)
+        if (chatHistoryVersion !== version) return
         chatSessions.value = res.data || []
 
         if (chatSessions.value.length > 0) {
@@ -3427,9 +3431,11 @@ const initChatSession = async () => {
             await loadChatHistory(chatSessionId.value)
         } else {
             // 创建新会话
-            const sessionRes = await createChatSession(novelId.value, '默认对话')
+            const sessionRes = await createChatSession(novelId, '默认对话')
+            if (chatHistoryVersion !== version) return
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
+            chatHasMore.value = false
             // 新会话添加欢迎消息
             chatMessages.value = [
                 {
@@ -3442,11 +3448,14 @@ const initChatSession = async () => {
         // 保存到 store
         persistChatState()
     } catch (error) {
+        if (chatHistoryVersion !== version) return
         console.error('初始化问答会话失败:', error)
         // 降级为本地模式，不阻塞用户使用
         chatMessages.value = [
             { role: 'assistant', content: '问答服务暂时不可用，请稍后重试。', time: new Date().toLocaleTimeString() },
         ]
+    } finally {
+        if (chatHistoryVersion === version) chatHistoryLoading.value = false
     }
 }
 
@@ -3454,16 +3463,30 @@ const initChatSession = async () => {
  * 将当前问答状态持久化到 store（切换页面时不丢失）
  */
 const persistChatState = () => {
-    if (!novelId.value) return
-    chatStore.saveChatState(novelId.value, chatSessionId.value, chatSessions.value, chatMessages.value)
+    if (!novelId) return
+    chatStore.saveChatState(novelId, chatSessionId.value, chatSessions.value, chatMessages.value)
 }
 
 /**
  * 加载会话的历史消息（分页，首次加载最近的消息）
  */
-const loadChatHistory = async (sessionId: number) => {
+const loadChatHistory = async (sessionId: ChatSessionItem['id']) => {
+    const version = ++chatHistoryVersion
+    chatLoadingMore.value = false
+    if (activeChatStream?.sessionId === sessionId) {
+        chatMessages.value = activeChatStream.messages
+        chatHasMore.value = activeChatStream.hasMore
+        chatHistoryLoading.value = false
+        persistChatState()
+        scrollToBottom(false)
+        return
+    }
+    chatHistoryLoading.value = true
+    chatMessages.value = []
+    chatHasMore.value = false
     try {
         const res = await listChatMessagesPage(sessionId, undefined, CHAT_PAGE_SIZE)
+        if (chatHistoryVersion !== version) return
         const pageResult = res.data
         const messages = pageResult?.messages || []
         chatHasMore.value = pageResult?.hasMore ?? false
@@ -3474,6 +3497,7 @@ const loadChatHistory = async (sessionId: number) => {
                 content: msg.content,
                 time: new Date(msg.createTime).toLocaleTimeString(),
                 revoked: msg.revoked,
+                loadedSkillNames: msg.loadedSkillNames,
             }))
         } else {
             chatMessages.value = [
@@ -3491,7 +3515,9 @@ const loadChatHistory = async (sessionId: number) => {
         }
         scrollToBottom(false)
     } catch (error) {
-        console.error('加载聊天历史失败:', error)
+        if (chatHistoryVersion === version) console.error('加载聊天历史失败:', error)
+    } finally {
+        if (chatHistoryVersion === version) chatHistoryLoading.value = false
     }
 }
 
@@ -3499,7 +3525,7 @@ const loadChatHistory = async (sessionId: number) => {
  * 加载更早的历史消息（用户向上滚动时触发）
  */
 const loadMoreChatMessages = async () => {
-    if (chatLoadingMore.value || !chatHasMore.value || !chatSessionId.value) return
+    if (chatHistoryLoading.value || chatLoadingMore.value || !chatHasMore.value || !chatSessionId.value) return
     if (chatMessages.value.length === 0) return
 
     // 获取当前最早消息的 ID 作为游标
@@ -3507,11 +3533,15 @@ const loadMoreChatMessages = async () => {
     if (!firstMsg.id) return
 
     chatLoadingMore.value = true
+    const sessionId = chatSessionId.value
+    const version = chatHistoryVersion
     try {
-        const res = await listChatMessagesPage(chatSessionId.value, firstMsg.id, CHAT_PAGE_SIZE)
+        const res = await listChatMessagesPage(sessionId, firstMsg.id, CHAT_PAGE_SIZE)
+        if (chatHistoryVersion !== version) return
         const pageResult = res.data
         const olderMessages = pageResult?.messages || []
         chatHasMore.value = pageResult?.hasMore ?? false
+        if (activeChatStream?.sessionId === sessionId) activeChatStream.hasMore = chatHasMore.value
 
         if (olderMessages.length > 0) {
             // 记录当前滚动位置，加载后恢复（避免跳动）
@@ -3520,16 +3550,17 @@ const loadMoreChatMessages = async () => {
 
             const mapped = olderMessages.map((msg) => ({
                 id: msg.id,
-                role: msg.role as 'user' | 'assistant',
+                role: msg.role,
                 content: msg.content,
                 time: new Date(msg.createTime).toLocaleTimeString(),
                 revoked: msg.revoked,
+                loadedSkillNames: msg.loadedSkillNames,
             }))
             chatMessages.value.unshift(...mapped)
 
             // 恢复滚动位置（新消息插入到顶部后，保持用户视角不变）
             nextTick(() => {
-                if (el) {
+                if (el && chatHistoryVersion === version) {
                     el.scrollTop = el.scrollHeight - prevScrollHeight
                 }
             })
@@ -3538,14 +3569,14 @@ const loadMoreChatMessages = async () => {
     } catch (error) {
         console.error('加载更多消息失败:', error)
     } finally {
-        chatLoadingMore.value = false
+        if (chatHistoryVersion === version) chatLoadingMore.value = false
     }
 }
 
 /**
  * 切换会话（下拉选择器触发）
  */
-const handleSwitchSession = async (sessionId: number) => {
+const handleSwitchSession = async (sessionId: ChatSessionItem['id']) => {
     if (!sessionId) return
     chatSessionId.value = sessionId
     await loadChatHistory(sessionId)
@@ -3555,10 +3586,14 @@ const handleSwitchSession = async (sessionId: number) => {
  * 新建会话
  */
 const handleCreateSession = async () => {
-    if (!novelId.value) return
+    if (!novelId) return
     try {
-        const sessionRes = await createChatSession(novelId.value, '新对话')
+        const sessionRes = await createChatSession(novelId, '新对话')
         chatSessionId.value = sessionRes.data.id
+        chatHistoryVersion++
+        chatHistoryLoading.value = false
+        chatLoadingMore.value = false
+        chatHasMore.value = false
         chatSessions.value.unshift(sessionRes.data)
         chatMessages.value = [
             {
@@ -3667,21 +3702,19 @@ const sortedChatSessions = computed(() => {
  * 中断 SSE 流并保存已生成的部分回复
  */
 const handleStopChat = async () => {
-    if (!chatAbortController) return
-
-    // 获取当前 AI 消息的已生成内容
-    const lastMessage = chatMessages.value[chatMessages.value.length - 1]
-    const partialContent = lastMessage?.role === 'assistant' ? lastMessage.content : ''
+    if (!activeChatStream) return
+    const { controller, sessionId, reply } = activeChatStream
+    const partialContent = reply.content
 
     // 中断 SSE 流
-    chatAbortController.abort()
-    chatAbortController = null
+    controller.abort()
+    activeChatStream = null
     isChatLoading.value = false
 
     // 如果有已生成的内容，调用后端保存接口
     if (partialContent && partialContent.trim()) {
         try {
-            await savePartialChatResponse(chatSessionId.value, novelId.value, partialContent)
+            await savePartialChatResponse(sessionId, novelId, partialContent)
         } catch {
             console.error('保存中断回复失败')
         }
@@ -3692,12 +3725,12 @@ const handleStopChat = async () => {
 }
 
 const sendChatMessage = async () => {
-    if (!chatInput.value.trim() || isChatLoading.value) return
+    if (!chatInput.value.trim() || isChatLoading.value || chatHistoryLoading.value) return
 
     // 确保有会话
     if (!chatSessionId.value) {
         try {
-            const sessionRes = await createChatSession(novelId.value, '默认对话')
+            const sessionRes = await createChatSession(novelId, '默认对话')
             chatSessionId.value = sessionRes.data.id
             chatSessions.value.unshift(sessionRes.data)
         } catch (error) {
@@ -3719,58 +3752,75 @@ const sendChatMessage = async () => {
     scrollToBottom()
 
     // 预先添加一条空的 AI 消息，用于流式追加内容
-    const aiMessageIndex = chatMessages.value.length
-    chatMessages.value.push({
+    const reply = reactive<ChatMessageLocal>({
         role: 'assistant',
         content: '',
         time: new Date().toLocaleTimeString(),
+        loadedSkillNames: [],
     })
+    chatMessages.value.push(reply)
+    const sessionId = chatSessionId.value
+    const isActiveReply = () => activeChatStream?.reply === reply
+    const isVisibleReply = () => chatSessionId.value === sessionId && chatMessages.value.includes(reply)
 
-    chatAbortController = aiChatStream(
+    const controller = aiChatStream(
         {
-            novelId: novelId.value,
-            sessionId: chatSessionId.value,
+            novelId: novelId,
+            sessionId,
             question: userMessage,
         },
         {
             onToken: (token: string) => {
-                chatMessages.value[aiMessageIndex].content += token
+                if (!isActiveReply()) return
+                reply.content += token
                 // 收到第一个 token 时更新状态提示
-                if (chatMessages.value[aiMessageIndex].content.length === token.length) {
+                if (reply.content.length === token.length) {
                     chatThinkingText.value = '正在生成回答...'
                 }
                 // 智能滚动：如果用户在底部附近则自动滚动
-                ensureScrollToBottom()
+                if (isVisibleReply()) ensureScrollToBottom()
+            },
+            onSkillLoaded: (name: string) => {
+                if (!isActiveReply()) return
+                const names = reply.loadedSkillNames ?? []
+                if (!names.includes(name)) reply.loadedSkillNames = [...names, name]
+                if (isVisibleReply()) ensureScrollToBottom()
             },
             onComplete: () => {
+                if (!isActiveReply()) return
                 isChatLoading.value = false
-                chatAbortController = null
+                activeChatStream = null
                 chatThinkingText.value = 'AI 正在思考...'
+                if (!isVisibleReply()) return
                 // 兜底：如果 AI 消息为空，说明后端异常但未正确传递错误事件
-                if (!chatMessages.value[aiMessageIndex].content) {
-                    chatMessages.value[aiMessageIndex].content = '抱歉，回答生成失败，请稍后重试。'
+                if (!reply.content) {
+                    reply.content = '抱歉，回答生成失败，请稍后重试。'
                     ElMessage.error('AI 问答异常，请检查模型配置或稍后重试')
                 }
                 scrollToBottom()
                 persistChatState()
             },
             onError: (error: Error) => {
+                if (!isActiveReply()) return
                 isChatLoading.value = false
-                chatAbortController = null
+                activeChatStream = null
                 chatThinkingText.value = 'AI 正在思考...'
+                if (!isVisibleReply()) return
                 // 如果 AI 消息为空，显示错误提示
-                if (!chatMessages.value[aiMessageIndex].content) {
-                    chatMessages.value[aiMessageIndex].content = '抱歉，回答生成失败，请稍后重试。'
+                if (!reply.content) {
+                    reply.content = '抱歉，回答生成失败，请稍后重试。'
                 }
                 ElMessage.error('AI 问答失败：' + error.message)
                 scrollToBottom()
             },
             onToolExecuted: (event: ToolExecutedEvent) => {
+                if (!isActiveReply()) return
                 chatThinkingText.value = '正在执行工具：' + event.toolName + '...'
                 handleToolExecutedEvent(event)
             },
         },
     )
+    activeChatStream = { controller, sessionId, reply, messages: chatMessages.value, hasMore: chatHasMore.value }
 }
 
 // ==================== 工具执行事件相关常量 ====================
@@ -3905,10 +3955,10 @@ const getRoleLabel = (roleType?: string): string => {
  * 加载人物图谱数据（从后端获取）
  */
 const loadCharacterGraphData = async () => {
-    if (!novelId.value) return
+    if (!novelId) return
     isLoadingCharacterGraph.value = true
     try {
-        const res = await getCharacterGraph(novelId.value)
+        const res = await getCharacterGraph(novelId)
         characterData.value = res.data.characters || []
         characterRelationData.value = res.data.relations || []
     } catch (error) {
@@ -3923,7 +3973,7 @@ const loadCharacterGraphData = async () => {
 /**
  * 获取人物的关系列表
  */
-const getCharacterRelations = (characterId: number): NovelCharacterRelation[] => {
+const getCharacterRelations = (characterId: string): NovelCharacterRelation[] => {
     return characterRelationData.value.filter((r) => r.characterId === characterId || r.targetId === characterId)
 }
 
@@ -3933,7 +3983,7 @@ const getCharacterRelations = (characterId: number): NovelCharacterRelation[] =>
 const initMiniGraph = () => {
     if (!miniGraphRef.value) return
 
-    miniChartInstance = echarts.init(miniGraphRef.value)
+    miniChartInstance = initCharacterChart(miniGraphRef.value)
 
     const nodes = characterData.value.map((char) => ({
         id: String(char.id),
@@ -3950,7 +4000,7 @@ const initMiniGraph = () => {
     const links: {
         source: string
         target: string
-        value: string
+        relationType: string
         label: { show: boolean; formatter: string; fontSize: number }
     }[] = []
     characterRelationData.value.forEach((rel) => {
@@ -3960,27 +4010,27 @@ const initMiniGraph = () => {
             links.push({
                 source: String(rel.characterId),
                 target: String(rel.targetId),
-                value: rel.relationType,
+                relationType: rel.relationType,
                 label: { show: true, formatter: rel.relationType, fontSize: 10 },
             })
         }
     })
 
-    const option: echarts.EChartsOption = {
+    const option: EChartsOption = {
         tooltip: {
             trigger: 'item',
-            formatter: (params: Record<string, unknown>) => {
-                const p = params as { dataType: string; data: { characterData: NovelCharacter; value: string } }
-                if (p.dataType === 'node') {
-                    const char = p.data.characterData
-                    return `<div style="padding: 8px;">
-                        <div style="font-weight: bold; margin-bottom: 4px;">${char.name}</div>
-                        <div style="color: #666; font-size: 12px;">${getRoleLabel(char.roleType)}</div>
-                        ${char.identity ? `<div style="color: #888; font-size: 11px;">${char.identity}</div>` : ''}
-                        <div style="color: #999; font-size: 11px; margin-top: 4px;">点击查看详情</div>
-                    </div>`
+            renderMode: 'richText',
+            formatter: (params) => {
+                if (Array.isArray(params) || !params.data || typeof params.data !== 'object') return ''
+                if (params.dataType === 'node' && 'id' in params.data) {
+                    const charId = params.data.id
+                    const character = characterData.value.find((item) => item.id === charId)
+                    if (!character) return params.name
+                    return [character.name, getRoleLabel(character.roleType), character.identity, '点击查看详情']
+                        .filter(Boolean)
+                        .join('\n')
                 }
-                return `${p.data.value}`
+                return 'relationType' in params.data ? String(params.data.relationType) : ''
             },
         },
         series: [
@@ -4127,7 +4177,7 @@ const publishChapter = async () => {
 }
 
 // 加载章节大纲
-const loadChapterOutline = async (chapterId: number) => {
+const loadChapterOutline = async (chapterId: string) => {
     try {
         const res = await getChapterOutline(chapterId)
         if (res.data) {
@@ -4139,7 +4189,7 @@ const loadChapterOutline = async (chapterId: number) => {
             if (res.data.involvedCharacters) {
                 try {
                     const characters = JSON.parse(res.data.involvedCharacters)
-                    selectedCharacters.value = Array.isArray(characters) ? characters : []
+                    selectedCharacters.value = Array.isArray(characters) ? characters.map(String) : []
                 } catch {
                     selectedCharacters.value = []
                 }
@@ -4205,7 +4255,7 @@ const AI_OUTLINE_POLL_INTERVAL = 3000
 /**
  * 发布后开始轮询 AI 大纲生成结果
  */
-const startPollingAiOutline = (chapterId: number) => {
+const startPollingAiOutline = (chapterId: string) => {
     let pollCount = 0
     const poll = async () => {
         if (pollCount >= AI_OUTLINE_POLL_MAX) {
@@ -4291,7 +4341,7 @@ const closePreviewVersion = () => {
 }
 
 // 恢复版本
-const restoreVersion = async (versionId: number) => {
+const restoreVersion = async (versionId: string) => {
     if (!currentChapterId.value) return
 
     ElMessageBox.confirm('恢复此版本将覆盖当前内容，是否继续？', '恢复确认', {
@@ -4373,9 +4423,7 @@ const manualSave = async () => {
 
 // 自动保存定时器
 let draftSaveTimer: ReturnType<typeof setTimeout>
-let backendAutoSaveTimer: ReturnType<typeof setTimeout>
 let outlineDraftSaveTimer: ReturnType<typeof setTimeout>
-let outlineBackendSaveTimer: ReturnType<typeof setTimeout>
 
 // 智能同步保存相关状态
 const lastSyncedContent = ref('') // 上次同步到后端的内容
@@ -4384,7 +4432,7 @@ const lastSyncedOutline = ref({
     plotPointsText: '',
     emotionTone: '',
     sceneSetting: '',
-    selectedCharacters: [] as number[],
+    selectedCharacters: [] as string[],
 })
 const contentSyncInterval = ref<number | null>(null) // 内容同步循环定时器
 const outlineSyncInterval = ref<number | null>(null) // 大纲同步循环定时器
@@ -4397,12 +4445,6 @@ const SYNC_INTERVAL = 15000
 const MAX_NO_CHANGE_TIME = 60000
 /** 本地草稿防抖时间（毫秒）：1秒 */
 const DRAFT_DEBOUNCE_TIME = 1000
-
-// 保存草稿到本地（高频）
-const _performDraftSave = () => {
-    if (!hasUnsavedChanges.value || !currentChapterId.value) return
-    saveDraftToLocal()
-}
 
 /**
  * 检查内容是否有实际变化（与上次同步的内容对比）
@@ -4474,7 +4516,7 @@ const performOutlineSync = async (): Promise<boolean> => {
     isOutlineSaving.value = true
     try {
         await saveChapterOutline({
-            novelId: novelId.value,
+            novelId,
             chapterId: currentChapterId.value,
             outlineContent: chapterOutline.value,
             plotPoints: plotPointsText.value,
@@ -4577,22 +4619,6 @@ const stopOutlineSyncLoop = () => {
     }
 }
 
-// 自动保存到后端（低频）- 保留用于兼容，实际逻辑已迁移到 performContentSync
-const _performAutoSave = async () => {
-    await performContentSync()
-}
-
-// 大纲草稿保存到本地（高频，复用 saveDraftToLocal）
-const _performOutlineDraftSave = () => {
-    if (!hasOutlineUnsavedChanges.value || !currentChapterId.value) return
-    saveDraftToLocal()
-}
-
-// 大纲自动保存到后端（低频）- 保留用于兼容，实际逻辑已迁移到 performOutlineSync
-const _performOutlineAutoSave = async () => {
-    await performOutlineSync()
-}
-
 /**
  * 检测大纲字段是否有变更
  */
@@ -4635,7 +4661,7 @@ const saveNovelOutlineHandler = async () => {
     try {
         // 将编辑内容同步到 novelOutline
         novelOutline.value = editingNovelOutlineContent.value
-        await saveNovelOutline(novelId.value, novelOutline.value)
+        await saveNovelOutline(novelId, novelOutline.value)
         isEditingNovelOutline.value = false
         ElMessage.success('大纲保存成功')
     } catch (error) {
@@ -4694,9 +4720,10 @@ watch(selectedCharacters, handleOutlineChange, { deep: true })
  * 如果正在流式输出，中断请求（后端 doOnCancel 会自动保存已生成内容）
  */
 const handleBeforeUnload = () => {
-    if (chatAbortController) {
-        chatAbortController.abort()
-        chatAbortController = null
+    if (currentChapterId.value && (hasUnsavedChanges.value || hasOutlineUnsavedChanges.value)) saveDraftToLocal()
+    if (activeChatStream) {
+        activeChatStream.controller.abort()
+        activeChatStream = null
     }
 }
 
@@ -4729,14 +4756,12 @@ onUnmounted(() => {
     stopContentSyncLoop()
     stopOutlineSyncLoop()
     clearTimeout(draftSaveTimer)
-    clearTimeout(backendAutoSaveTimer)
     clearTimeout(outlineDraftSaveTimer)
-    clearTimeout(outlineBackendSaveTimer)
     window.removeEventListener('beforeunload', handleBeforeUnload)
     // 组件卸载时也中断正在进行的流式请求
-    if (chatAbortController) {
-        chatAbortController.abort()
-        chatAbortController = null
+    if (activeChatStream) {
+        activeChatStream.controller.abort()
+        activeChatStream = null
     }
 })
 
@@ -4754,7 +4779,7 @@ onActivated(() => {
  */
 const loadNovelSettings = async () => {
     try {
-        const res = await getEffectiveSettings(novelId.value)
+        const res = await getEffectiveSettings(novelId)
         if (res.data) {
             novelSettings.value = res.data
         }
@@ -4781,37 +4806,28 @@ const userAgentList = computed(() => {
  * 加载设置面板数据（Agent 列表 + Agent 配置 + 小说设置）
  */
 const loadSettingsPanel = async () => {
+    const request = ++settingsLoadRequest
     isLoadingSettings.value = true
+    settingsReady.value = false
     try {
         // 并行加载 Agent 列表、Agent 配置和小说级别配置
         const [agentList, agentRes, settingsRes] = await Promise.all([
             getAvailableAgentList(),
-            getNovelAgentConfig(novelId.value),
-            getNovelLevelSettings(novelId.value),
+            getNovelAgentConfig(novelId),
+            getNovelLevelSettings(novelId),
         ])
+        const settings = settingsRes.data ?? (await getEffectiveSettings(novelId)).data
+        if (request !== settingsLoadRequest) return
         agents.value = agentList
-        if (agentRes.data) {
-            agentConfig.value = agentRes.data
-        }
-        if (settingsRes.data) {
-            // 小说有自身配置，直接使用
-            novelSettingsForm.value = settingsRes.data
-            hasOwnSettings.value = true
-        } else {
-            // 小说没有自身配置，加载有效配置（合并后的结果）展示
-            hasOwnSettings.value = false
-            try {
-                const effectiveRes = await getEffectiveSettings(novelId.value)
-                novelSettingsForm.value = effectiveRes.data
-            } catch {
-                novelSettingsForm.value = createDefaultSettings()
-            }
-        }
+        agentConfig.value = agentRes.data ?? { novelId }
+        novelSettingsForm.value = settings
+        hasOwnSettings.value = !!settingsRes.data
+        settingsReady.value = true
     } catch (error) {
         console.error('加载设置面板数据失败:', error)
         ElMessage.error('加载设置失败')
     } finally {
-        isLoadingSettings.value = false
+        if (request === settingsLoadRequest) isLoadingSettings.value = false
     }
 }
 
@@ -4819,6 +4835,7 @@ const loadSettingsPanel = async () => {
  * 保存设置面板数据（Agent 配置 + AI 功能配置）
  */
 const saveSettingsPanel = async () => {
+    if (!settingsReady.value || isSavingSettings.value) return
     isSavingSettings.value = true
     try {
         const agentRequest: NovelAgentConfigRequest = {
@@ -4828,8 +4845,8 @@ const saveSettingsPanel = async () => {
         }
         // 并行保存 Agent 配置和小说配置
         await Promise.all([
-            saveNovelAgentConfig(novelId.value, agentRequest),
-            saveNovelSettings(novelId.value, novelSettingsForm.value),
+            saveNovelAgentConfig(novelId, agentRequest),
+            saveNovelSettings(novelId, novelSettingsForm.value),
         ])
         // 保存成功后同步更新运行时配置
         novelSettings.value = { ...novelSettingsForm.value }
@@ -4842,13 +4859,6 @@ const saveSettingsPanel = async () => {
         isSavingSettings.value = false
     }
 }
-
-// 页面关闭前保存草稿（含正文和大纲）
-window.addEventListener('beforeunload', () => {
-    if (currentChapterId.value && (hasUnsavedChanges.value || hasOutlineUnsavedChanges.value)) {
-        saveDraftToLocal()
-    }
-})
 
 /**
  * 监听编辑器失焦事件，失焦时立即保存草稿
@@ -4866,12 +4876,12 @@ const handleEditorBlur = () => {
 
 <style scoped>
 .novel-editor-page {
-    height: calc(100vh - 64px);
+    height: auto;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+    background: var(--paper);
     position: fixed;
-    top: 64px;
+    top: var(--shell-height);
     left: 0;
     right: 0;
     bottom: 0;
@@ -4913,7 +4923,7 @@ const handleEditorBlur = () => {
 .novel-title-badge {
     font-size: 15px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     max-width: 260px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4933,13 +4943,13 @@ const handleEditorBlur = () => {
 }
 
 .novel-word-count-badge {
-    background: rgba(26, 115, 232, 0.08);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.08);
+    color: var(--pine);
 }
 
 .novel-chapter-count-badge {
-    background: rgba(102, 126, 234, 0.08);
-    color: #667eea;
+    background: rgba(40, 85, 69, 0.08);
+    color: var(--pine);
 }
 
 /* 右侧：操作按钮 */
@@ -4952,7 +4962,7 @@ const handleEditorBlur = () => {
 
 .back-btn {
     font-size: 16px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 600;
     background: transparent !important;
     border: none !important;
@@ -4960,7 +4970,7 @@ const handleEditorBlur = () => {
 }
 
 .back-btn:hover {
-    color: #1557b0;
+    color: var(--pine-deep);
     background: transparent !important;
 }
 
@@ -4980,7 +4990,7 @@ const handleEditorBlur = () => {
 .chapter-title-input :deep(.el-input__inner) {
     font-size: 14px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
 }
 
 .focus-mode-btn {
@@ -5005,7 +5015,7 @@ const handleEditorBlur = () => {
 
 /* 左侧边栏 */
 .editor-sidebar {
-    width: 280px;
+    width: clamp(200px, 17vw, 280px);
     min-width: 48px;
     flex-shrink: 0;
     background: #fff;
@@ -5053,8 +5063,8 @@ const handleEditorBlur = () => {
 }
 
 .sidebar-expand-btn:hover {
-    color: #1a73e8;
-    background: rgba(26, 115, 232, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 收起状态下的整体容器 */
@@ -5070,8 +5080,8 @@ const handleEditorBlur = () => {
 }
 
 .sidebar-collapsed-content:hover .sidebar-expand-btn {
-    color: #1a73e8;
-    background: rgba(26, 115, 232, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 收起状态下的章节信息区 */
@@ -5112,7 +5122,7 @@ const handleEditorBlur = () => {
     text-orientation: mixed;
     font-size: 11px;
     font-weight: 600;
-    color: #1a73e8;
+    color: var(--pine);
     letter-spacing: 1px;
     line-height: 1.2;
     max-height: 60px;
@@ -5159,7 +5169,7 @@ const handleEditorBlur = () => {
     padding: 0 20px;
     height: 56px;
     border-bottom: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 /* 收起状态下 header 撑满整个侧边栏，作为点击区域 */
@@ -5176,24 +5186,24 @@ const handleEditorBlur = () => {
 .sidebar-title {
     font-size: 15px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
 .sidebar-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
 .tab-item:hover {
-    color: #1a73e8;
+    color: var(--pine);
 }
 
 .tab-item.active {
-    color: #1a73e8;
-    border-bottom: 2px solid #1a73e8;
+    color: var(--pine);
+    border-bottom: 2px solid var(--pine);
 }
 
 .sidebar-content {
@@ -5256,7 +5266,7 @@ const handleEditorBlur = () => {
     align-items: center;
     justify-content: center;
     border-left: 1px solid #ebeef5;
-    background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
     padding: 8px 0;
     overflow: hidden;
     gap: 4px;
@@ -5337,24 +5347,24 @@ const handleEditorBlur = () => {
     border-left: 3px solid transparent;
     margin: 8px 12px;
     border-radius: 12px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #f0f4f8 100%);
+    background: var(--paper);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     border: 1px solid #e8eaed;
     overflow: hidden;
 }
 
 .chapter-item:hover {
-    background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+    background: var(--surface);
     transform: translateX(3px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-color: #d0d7de;
 }
 
 .chapter-item.active {
-    background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
-    border-left-color: #1a73e8;
+    background: var(--sage);
+    border-left-color: var(--pine);
     border-color: #aecbfa;
-    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.2);
 }
 
 /* 拖拽排序样式 */
@@ -5366,7 +5376,7 @@ const handleEditorBlur = () => {
 }
 
 .drag-handle:hover {
-    color: #1a73e8;
+    color: var(--pine);
 }
 
 .drag-handle:active {
@@ -5375,12 +5385,12 @@ const handleEditorBlur = () => {
 
 .chapter-drag-ghost {
     opacity: 0.4;
-    background: #e8f0fe;
+    background: var(--sage);
 }
 
 .chapter-drag-chosen {
-    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.3);
-    border-color: #1a73e8;
+    box-shadow: 0 6px 20px rgba(40, 85, 69, 0.3);
+    border-color: var(--pine);
 }
 
 .chapter-content {
@@ -5408,7 +5418,7 @@ const handleEditorBlur = () => {
     font-size: 13px;
     color: #5f6368;
     font-weight: 600;
-    background: rgba(26, 115, 232, 0.1);
+    background: rgba(40, 85, 69, 0.1);
     padding: 2px 8px;
     border-radius: 4px;
     white-space: nowrap;
@@ -5417,7 +5427,7 @@ const handleEditorBlur = () => {
 
 .chapter-name {
     font-size: 15px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -5478,8 +5488,8 @@ const handleEditorBlur = () => {
 
 /* 向量已入库 */
 .status-vector-done {
-    background: rgba(26, 115, 232, 0.12);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.12);
+    color: var(--pine);
 }
 
 /* 向量未入库 */
@@ -5495,8 +5505,8 @@ const handleEditorBlur = () => {
 }
 
 .status-clickable:hover {
-    background: rgba(26, 115, 232, 0.15);
-    color: #1a73e8;
+    background: rgba(40, 85, 69, 0.15);
+    color: var(--pine);
     transform: scale(1.05);
 }
 
@@ -5565,7 +5575,8 @@ const handleEditorBlur = () => {
 
 /* 中间大纲面板 */
 .outline-panel {
-    min-width: 300px;
+    max-width: 26vw;
+    min-width: 220px;
     max-width: 700px;
     flex-shrink: 1;
     background: #fff;
@@ -5587,12 +5598,12 @@ const handleEditorBlur = () => {
     border-bottom: 1px solid #f0f0f0;
     font-size: 15px;
     font-weight: 600;
-    color: #202124;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    color: var(--ink);
+    background: var(--paper);
 }
 
 .outline-header .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -5643,7 +5654,7 @@ const handleEditorBlur = () => {
 }
 
 .section-label .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 16px;
 }
 
@@ -5669,9 +5680,9 @@ const handleEditorBlur = () => {
 }
 
 .outline-textarea :deep(.el-textarea__inner:focus) {
-    border-color: #1a73e8;
+    border-color: var(--pine);
     background: #fff;
-    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+    box-shadow: 0 0 0 2px rgba(40, 85, 69, 0.1);
 }
 
 .full-width {
@@ -5743,7 +5754,7 @@ const handleEditorBlur = () => {
 }
 
 .collapse-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 16px;
 }
 
@@ -5778,18 +5789,18 @@ const handleEditorBlur = () => {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     border: none;
     height: 40px;
     border-radius: 8px;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
     transition: all 0.3s;
 }
 
 .ai-continue-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
 }
 
 .ai-icon {
@@ -5826,20 +5837,20 @@ const handleEditorBlur = () => {
     padding: 0 24px;
     height: 56px;
     border-bottom: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 .content-title {
     font-size: 16px;
     font-weight: 600;
-    color: #202124;
+    color: var(--ink);
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .content-title .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -5865,8 +5876,8 @@ const handleEditorBlur = () => {
 }
 
 .clean-blank-btn:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.06);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.06);
 }
 
 /* 背景色选择器 */
@@ -5889,8 +5900,8 @@ const handleEditorBlur = () => {
 }
 
 .bg-color-btn:hover {
-    border-color: #1a73e8;
-    box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
+    border-color: var(--pine);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.2);
 }
 
 .bg-color-options {
@@ -5926,12 +5937,12 @@ const handleEditorBlur = () => {
 }
 
 .bg-color-option.active {
-    border-color: #1a73e8;
+    border-color: var(--pine);
 }
 
 .check-icon {
     font-size: 12px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: bold;
 }
 
@@ -5943,25 +5954,25 @@ const handleEditorBlur = () => {
 }
 
 .save-btn-saved {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
 }
 
 .save-btn-saved:hover {
-    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+    background: var(--pine-deep);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
 }
 
 .save-btn-unsaved {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: var(--el-color-danger);
     color: #fff;
     box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
 }
 
 .save-btn-unsaved:hover {
-    background: linear-gradient(135deg, #e082e0 0%, #e04660 100%);
+    background: #87392e;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
 }
@@ -5993,7 +6004,7 @@ const handleEditorBlur = () => {
     justify-content: space-between;
     padding: 14px 24px;
     border-top: 1px solid #f0f0f0;
-    background: linear-gradient(90deg, #fafbfc 0%, #f5f7fa 100%);
+    background: var(--paper);
 }
 
 .footer-left {
@@ -6029,9 +6040,9 @@ const handleEditorBlur = () => {
 }
 
 .footer-action-btn:hover {
-    color: #667eea;
-    border-color: #667eea;
-    background: rgba(102, 126, 234, 0.04);
+    color: var(--pine);
+    border-color: var(--pine);
+    background: rgba(40, 85, 69, 0.04);
 }
 
 /* 右侧功能区（活动栏 + 内容面板） */
@@ -6041,7 +6052,7 @@ const handleEditorBlur = () => {
     min-width: 48px;
     background: #fff;
     border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 12px rgba(40, 85, 69, 0.06);
     border: 1px solid #eef0f8;
     overflow: hidden;
 }
@@ -6055,7 +6066,7 @@ const handleEditorBlur = () => {
     padding: 12px 0;
     gap: 4px;
     border-left: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #f5f6fc 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
@@ -6072,17 +6083,18 @@ const handleEditorBlur = () => {
 }
 
 .activity-icon:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 .activity-icon.active {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.12);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.12);
 }
 
 /* 内容面板（去掉独立边框，融入 function-area） */
 .function-panel {
+    max-width: 28vw;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -6097,14 +6109,14 @@ const handleEditorBlur = () => {
     padding: 0 12px 0 16px;
     height: 44px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
 .panel-title-text {
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     letter-spacing: 0.3px;
 }
 
@@ -6190,13 +6202,13 @@ const handleEditorBlur = () => {
 .inline-history-item:hover {
     border-color: #d8ddf5;
     background: #f8f9fe;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
 }
 
 .inline-history-item.active {
-    border-color: rgba(102, 126, 234, 0.3);
-    background: rgba(102, 126, 234, 0.06);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    border-color: rgba(40, 85, 69, 0.3);
+    background: rgba(40, 85, 69, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.1);
 }
 
 /* 发布标记 */
@@ -6235,8 +6247,8 @@ const handleEditorBlur = () => {
     border-bottom: 1px solid #f0f0f5;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    color: var(--ink);
+    background: var(--paper);
 }
 
 .inline-version-preview .preview-content {
@@ -6253,7 +6265,7 @@ const handleEditorBlur = () => {
     font-family: inherit;
     font-size: 13px;
     line-height: 1.6;
-    color: #303133;
+    color: var(--ink);
 }
 
 /* AI 问答内嵌面板 */
@@ -6263,7 +6275,7 @@ const handleEditorBlur = () => {
     gap: 4px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
     min-height: 48px;
 }
@@ -6336,14 +6348,14 @@ const handleEditorBlur = () => {
     justify-content: center;
     cursor: pointer;
     z-index: 10;
-    color: #667eea;
+    color: var(--pine);
     transition: all 0.2s ease;
     border: 1px solid #e8e8f0;
 
     &:hover {
-        background: #667eea;
+        background: var(--pine);
         color: #fff;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        box-shadow: 0 4px 12px rgba(40, 85, 69, 0.35);
     }
 }
 
@@ -6375,7 +6387,7 @@ const handleEditorBlur = () => {
 }
 
 .chat-message.user .message-text {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border-radius: 12px 12px 2px 12px;
 }
@@ -6387,6 +6399,15 @@ const handleEditorBlur = () => {
     max-width: 80%;
 }
 
+.message-skills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    color: #606266;
+    font-size: 12px;
+}
+
 .message-text {
     padding: 10px 14px;
     background: #fff;
@@ -6394,7 +6415,7 @@ const handleEditorBlur = () => {
     font-size: 13px;
     line-height: 1.6;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-    color: #303133;
+    color: var(--ink);
 }
 
 /* AI 回复 Markdown 渲染样式 */
@@ -6475,7 +6496,7 @@ const handleEditorBlur = () => {
 }
 
 .ai-markdown-content :deep(blockquote) {
-    border-left: 3px solid #667eea;
+    border-left: 3px solid var(--pine);
     padding: 4px 12px;
     margin: 6px 0;
     color: #6b7280;
@@ -6525,7 +6546,7 @@ const handleEditorBlur = () => {
 }
 
 .copy-message-btn:hover {
-    color: #667eea;
+    color: var(--pine);
     background: #f0f1ff;
 }
 
@@ -6545,8 +6566,8 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-btn:hover {
-    color: #667eea;
-    background: rgba(102, 126, 234, 0.08);
+    color: var(--pine);
+    background: rgba(40, 85, 69, 0.08);
 }
 
 /* 微信风格撤回提示（居中灰色小字） */
@@ -6711,7 +6732,7 @@ const handleEditorBlur = () => {
 }
 
 .restore-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border: none;
     font-size: 12px;
@@ -6742,8 +6763,8 @@ const handleEditorBlur = () => {
     gap: 10px;
     font-size: 18px;
     font-weight: 600;
-    color: #1a73e8;
-    background: linear-gradient(135deg, #e8f0fe 0%, #d4e4ff 100%);
+    color: var(--pine);
+    background: var(--sage);
     padding: 10px 28px;
     border-radius: 10px;
     border: 1px solid #aecbfa;
@@ -6792,7 +6813,7 @@ const handleEditorBlur = () => {
     z-index: 5;
     background: #fff;
     border-bottom: 1px solid #eef0f8;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 4px 16px rgba(40, 85, 69, 0.1);
     max-height: 50%;
     overflow-y: auto;
 }
@@ -6803,7 +6824,7 @@ const handleEditorBlur = () => {
     justify-content: space-between;
     padding: 12px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
 }
 
 .inline-detail-avatar {
@@ -6821,7 +6842,7 @@ const handleEditorBlur = () => {
 .detail-name-text {
     font-size: 16px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
 }
 
 .inline-detail-body {
@@ -6853,12 +6874,12 @@ const handleEditorBlur = () => {
     transition: background 0.2s ease;
 
     &:hover {
-        background: rgba(102, 126, 234, 0.06);
+        background: rgba(40, 85, 69, 0.06);
     }
 }
 
 .inline-relation-name {
-    color: #303133;
+    color: var(--ink);
     font-weight: 500;
 }
 
@@ -6879,7 +6900,7 @@ const handleEditorBlur = () => {
 }
 
 .goto-edit-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--pine);
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -6927,7 +6948,7 @@ const handleEditorBlur = () => {
 .inline-info-value {
     font-size: 13px;
     font-weight: 500;
-    color: #303133;
+    color: var(--ink);
 }
 
 /* 详情分区 */
@@ -6944,7 +6965,7 @@ const handleEditorBlur = () => {
 
 .inline-section-text {
     font-size: 13px;
-    color: #303133;
+    color: var(--ink);
     line-height: 1.6;
     padding: 6px 10px;
     background: #f8f9fe;
@@ -6984,7 +7005,7 @@ const handleEditorBlur = () => {
     background: #f0f7ff;
     border-radius: 8px;
     font-size: 13px;
-    color: #1a73e8;
+    color: var(--pine);
     line-height: 1.5;
 }
 
@@ -6999,7 +7020,7 @@ const handleEditorBlur = () => {
     border-radius: 8px;
     font-size: 14px;
     line-height: 1.8;
-    color: #202124;
+    color: var(--ink);
 }
 
 /* AI 审核结果弹窗 */
@@ -7039,7 +7060,7 @@ const handleEditorBlur = () => {
 .issues-title {
     margin: 0 0 16px 0;
     font-size: 16px;
-    color: #202124;
+    color: var(--ink);
     font-weight: 600;
 }
 
@@ -7088,7 +7109,7 @@ const handleEditorBlur = () => {
 }
 
 .config-section .section-label .el-icon {
-    color: #1a73e8;
+    color: var(--pine);
     font-size: 18px;
 }
 
@@ -7119,7 +7140,7 @@ const handleEditorBlur = () => {
 .slider-value {
     text-align: center;
     font-size: 14px;
-    color: #1a73e8;
+    color: var(--pine);
     font-weight: 500;
     margin-top: 4px;
 }
@@ -7187,7 +7208,7 @@ const handleEditorBlur = () => {
 .suggestion-content {
     flex: 1;
     line-height: 1.6;
-    color: #202124;
+    color: var(--ink);
 }
 
 .audit-actions {
@@ -7212,7 +7233,7 @@ const handleEditorBlur = () => {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+    background: #f3ecd9;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7221,7 +7242,7 @@ const handleEditorBlur = () => {
 .resync-chapter-title {
     font-size: 17px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
 }
 
 .resync-desc {
@@ -7329,7 +7350,7 @@ const handleEditorBlur = () => {
 }
 
 .markdown-rendered-content :deep(blockquote) {
-    border-left: 3px solid #667eea;
+    border-left: 3px solid var(--pine);
     padding: 4px 12px;
     margin: 8px 0;
     background: #f8f9fe;
@@ -7379,15 +7400,15 @@ const handleEditorBlur = () => {
         background-color: #818cf8;
         height: 36px;
         margin-top: -18px;
-        box-shadow: 0 0 4px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 0 4px rgba(40, 85, 69, 0.3);
     }
 
     &:active::before,
     &:active::after {
-        background-color: #6366f1;
+        background-color: var(--pine);
         height: 40px;
         margin-top: -20px;
-        box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+        box-shadow: 0 0 6px rgba(40, 85, 69, 0.5);
     }
 }
 
@@ -7405,7 +7426,7 @@ const handleEditorBlur = () => {
     gap: 6px;
     padding: 10px 14px;
     border-bottom: 1px solid #f0f0f5;
-    background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
+    background: var(--paper);
     flex-shrink: 0;
 }
 
@@ -7425,14 +7446,14 @@ const handleEditorBlur = () => {
     user-select: none;
 
     &:hover {
-        color: #667eea;
-        background: rgba(102, 126, 234, 0.06);
+        color: var(--pine);
+        background: rgba(40, 85, 69, 0.06);
     }
 
     &.active {
-        color: #667eea;
-        background: rgba(102, 126, 234, 0.1);
-        border-color: rgba(102, 126, 234, 0.2);
+        color: var(--pine);
+        background: rgba(40, 85, 69, 0.1);
+        border-color: rgba(40, 85, 69, 0.2);
     }
 }
 
@@ -7472,7 +7493,7 @@ const handleEditorBlur = () => {
 
     &:hover {
         border-color: #d8ddf5;
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+        box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
     }
 
     &:last-child {
@@ -7486,7 +7507,7 @@ const handleEditorBlur = () => {
     gap: 6px;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     margin-bottom: 10px;
 }
 
@@ -7529,7 +7550,7 @@ const handleEditorBlur = () => {
     gap: 7px;
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid #f0f0f5;
@@ -7572,7 +7593,7 @@ const handleEditorBlur = () => {
 
 .setting-label {
     font-size: 13px;
-    color: #303133;
+    color: var(--ink);
     font-weight: 500;
 }
 
@@ -7630,7 +7651,7 @@ const handleEditorBlur = () => {
     height: 16px;
     padding: 0 4px;
     border-radius: 8px;
-    background: #667eea;
+    background: var(--pine);
     color: #fff;
     font-size: 10px;
     font-weight: 600;
@@ -7665,7 +7686,7 @@ const handleEditorBlur = () => {
     border-color: #d8ddf5;
     border-left-color: #f59e0b;
     background: #f8f9fe;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.06);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.06);
 }
 
 /* 已采纳卡片：绿色竖条 */
@@ -7701,7 +7722,7 @@ const handleEditorBlur = () => {
 
 /* 未读卡片：紫蓝色竖条覆盖 */
 .annotation-list-item.is-unread {
-    border-left-color: #667eea;
+    border-left-color: var(--pine);
     background: #f8f9fe;
 }
 
@@ -7721,7 +7742,7 @@ const handleEditorBlur = () => {
 .annotation-list-author {
     font-size: 12px;
     font-weight: 600;
-    color: #667eea;
+    color: var(--pine);
 }
 
 .annotation-list-time {
@@ -7791,7 +7812,7 @@ const handleEditorBlur = () => {
 
 .annotation-list-content {
     font-size: 12px;
-    color: #303133;
+    color: var(--ink);
     line-height: 1.5;
     margin-bottom: 6px;
     display: -webkit-box;
@@ -7813,7 +7834,7 @@ const handleEditorBlur = () => {
     border: 1px solid #d8ddf5;
     border-radius: 4px;
     background: #eef0ff;
-    color: #667eea;
+    color: var(--pine);
     font-size: 11px;
     cursor: pointer;
     transition: all 0.15s;
@@ -7854,6 +7875,157 @@ const handleEditorBlur = () => {
 .ignore-btn:hover {
     background: #e8e8e8;
     border-color: #d0d0d0;
+}
+
+/* 窄屏一次呈现一个编辑区域，保留各面板的本地编辑状态。 */
+.no-chapter {
+    margin: auto;
+    text-align: center;
+    padding: 20px;
+}
+
+.no-chapter h2 {
+    font: 600 23px/1.5 var(--display-font);
+    margin-bottom: 18px;
+}
+
+.editor-sections {
+    display: none;
+}
+
+.activity-icon {
+    border: 0;
+    background: transparent;
+}
+
+.focused .editor-sidebar,
+.focused .function-area,
+.focused .panel-divider-handle {
+    display: none;
+}
+
+.focused .content-panel {
+    width: min(100%, 980px);
+    flex: 0 1 980px;
+    margin-inline: auto;
+}
+
+@media (max-width: 1100px) {
+    .editor-sections {
+        display: flex;
+        justify-content: center;
+        gap: 4px;
+        padding: 5px;
+        background: var(--surface);
+    }
+
+    .editor-sections button {
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        padding: 6px 14px;
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .editor-sections button[aria-pressed='true'] {
+        background: var(--sage);
+        color: var(--pine);
+        font-weight: 650;
+    }
+
+    .editor-body {
+        padding: 8px;
+        min-height: 0;
+    }
+
+    .editor-body .panel-divider-handle,
+    .editor-body:not([data-section='chapters']) .editor-sidebar,
+    .editor-body:not([data-section='outline']) .outline-panel,
+    .novel-editor-page:not(.focused) .editor-body:not([data-section='content']) .content-panel,
+    .editor-body:not([data-section='tools']) .function-area {
+        display: none;
+    }
+
+    .editor-body > .editor-sidebar,
+    .editor-body > .outline-panel,
+    .editor-body > .function-area {
+        flex: 1 1 0;
+        max-width: none;
+        min-width: 0;
+    }
+
+    .function-panel {
+        flex: 1;
+        max-width: none;
+        min-width: 0;
+    }
+
+    .activity-bar {
+        margin-left: auto;
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 700px) {
+    .editor-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .header-center {
+        grid-area: 1 / 1;
+        min-width: 0;
+    }
+
+    .novel-word-count-badge,
+    .novel-chapter-count-badge {
+        display: none;
+    }
+
+    .header-left {
+        grid-area: 2 / 1 / 3 / 3;
+        gap: 8px;
+    }
+
+    .header-right {
+        grid-area: 1 / 2;
+        gap: 4px;
+    }
+
+    .header-right .el-button + .el-button {
+        margin-left: 0;
+    }
+
+    .chapter-title-input {
+        flex: 1;
+        max-width: none;
+    }
+
+    .content-header,
+    .content-footer {
+        padding: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .content-header {
+        height: auto;
+        min-height: 52px;
+    }
+
+    .content-actions,
+    .footer-left {
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+
+    .content-body {
+        padding: 4px;
+    }
 }
 </style>
 
@@ -7903,13 +8075,13 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-box .revoke-confirm-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background: var(--pine) !important;
     border: none !important;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(40, 85, 69, 0.3);
 }
 
 .revoke-message-box .revoke-confirm-btn:hover {
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 85, 69, 0.4);
     transform: translateY(-1px);
 }
 
@@ -7918,6 +8090,6 @@ const handleEditorBlur = () => {
 }
 
 .revoke-message-box .revoke-cancel-btn:hover {
-    color: #1a73e8 !important;
+    color: var(--pine) !important;
 }
 </style>

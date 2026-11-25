@@ -1,0 +1,199 @@
+package cn.haowl.hinovel.ai.application.llm;
+
+import cn.haowl.hinovel.ai.domain.entity.LlmProvider;
+import cn.haowl.hinovel.ai.domain.repository.LlmProviderRepository;
+import cn.haowl.hinovel.ai.interfaces.dto.LlmProviderRequest;
+import cn.haowl.hinovel.common.service.ApiKeyService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.NOT_FOUND;
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.PARAM_ERROR;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
+/**
+ * LLM 提供方应用服务。
+ *
+ * 处理 LLM 提供方的增删改查、激活与停用，密钥加密落库，面向展示的返回值做脱敏。
+ *
+ * @author haowl
+ * @date 2026/11/12 15:10
+ */
+@Slf4j
+@Service
+public class LlmProviderService {
+
+    /**
+     * LLM 提供方仓储。
+     */
+    @Autowired
+    private LlmProviderRepository llmProviderRepository;
+
+    /**
+     * API 密钥加解密服务。
+     */
+    @Autowired
+    private ApiKeyService apiKeyService;
+
+    /**
+     * LLM 实例工厂，用于配置变更后清除缓存。
+     */
+    @Autowired
+    private LlmProviderFactory llmProviderFactory;
+
+    /**
+     * 创建 LLM 提供方。
+     *
+     * @param userId  所属用户 ID
+     * @param request 创建请求（apiKey 为明文）
+     * @return LLM 提供方实体（apiKey 已脱敏）
+     */
+    public LlmProvider create(Long userId, LlmProviderRequest request) {
+        log.info("[create][创建 LLM 提供方，userId={}]", userId);
+        if (llmProviderRepository.existsByNameAndUserId(request.getName(), userId)) {
+            throw exception(PARAM_ERROR);
+        }
+        // 加密 API 密钥后再存储
+        String encryptedApiKey = apiKeyService.encrypt(request.getApiKey());
+        LlmProvider provider = LlmProvider.create(
+                request.getName(), request.getProviderType(), request.getBaseUrl(),
+                encryptedApiKey, request.getModels(), userId);
+        return maskApiKey(llmProviderRepository.save(provider));
+    }
+
+    /**
+     * 查询指定用户的所有提供方（apiKey 已脱敏，用于前端展示）。
+     *
+     * @param userId 用户 ID
+     * @return 提供方列表
+     */
+    public List<LlmProvider> listByUserId(Long userId) {
+        List<LlmProvider> providers = llmProviderRepository.findAllByUserId(userId);
+        providers.forEach(this::maskApiKey);
+        return providers;
+    }
+
+    /**
+     * 查询当前用户的提供方。
+     *
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
+     * @return LLM 提供方实体
+     */
+    private LlmProvider getOwnedProvider(Long id, Long userId) {
+        return llmProviderRepository.findByIdAndUserId(id, userId)
+            .orElseThrow(() -> exception(NOT_FOUND));
+    }
+
+    /**
+     * 校验提供方归属。
+     */
+    public void validateOwnership(Long id, Long userId) {
+        getOwnedProvider(id, userId);
+    }
+
+    /**
+     * 获取 LLM 提供方详情（apiKey 已脱敏，用于前端展示）。
+     *
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
+     * @return 提供方实体
+     */
+    public LlmProvider getByIdForView(Long id, Long userId) {
+        return maskApiKey(getOwnedProvider(id, userId));
+    }
+
+    /**
+     * 更新 LLM 提供方。
+     *
+     * 前端未修改 apiKey（传入空值或脱敏值）时保留原有加密密钥不变。
+     *
+     * @param id      提供方 ID
+     * @param userId  当前用户 ID
+     * @param request 更新请求
+     * @return 更新后的提供方实体（apiKey 已脱敏）
+     */
+    public LlmProvider update(Long id, Long userId, LlmProviderRequest request) {
+        log.info("[update][更新 LLM 提供方，id={}，userId={}]", id, userId);
+        LlmProvider provider = getOwnedProvider(id, userId);
+        provider.setName(request.getName());
+        provider.setProviderType(request.getProviderType());
+        provider.updateBaseUrl(request.getBaseUrl());
+        provider.updateModels(request.getModels());
+        // 仅当前端传入了新的明文 apiKey 时才重新加密
+        if (apiKeyService.isNewApiKey(request.getApiKey())) {
+            provider.updateApiKey(apiKeyService.encrypt(request.getApiKey()));
+        }
+        llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
+        return maskApiKey(provider);
+    }
+
+    /**
+     * 获取激活的 LLM 提供方列表。
+     *
+     * @param userId 当前用户 ID
+     * @return 激活的提供方列表
+     */
+    public List<LlmProvider> getActiveProviders(Long userId) {
+        return llmProviderRepository.findActiveProvidersByUserId(userId);
+    }
+
+    /**
+     * 激活提供方。
+     *
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
+     */
+    public void activate(Long id, Long userId) {
+        log.info("[activate][激活 LLM 提供方，id={}]", id);
+        LlmProvider provider = getOwnedProvider(id, userId);
+        provider.activate();
+        llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
+    }
+
+    /**
+     * 停用提供方。
+     *
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
+     */
+    public void deactivate(Long id, Long userId) {
+        log.info("[deactivate][停用 LLM 提供方，id={}]", id);
+        LlmProvider provider = getOwnedProvider(id, userId);
+        provider.deactivate();
+        llmProviderRepository.save(provider);
+        llmProviderFactory.evict(id);
+    }
+
+    /**
+     * 删除提供方。
+     *
+     * @param id     提供方 ID
+     * @param userId 当前用户 ID
+     */
+    public void delete(Long id, Long userId) {
+        if (!llmProviderRepository.deleteByIdAndUserId(id, userId)) {
+            throw exception(NOT_FOUND);
+        }
+        llmProviderFactory.evict(id);
+        log.info("[delete][已删除 LLM 提供方，id={}，userId={}]", id, userId);
+    }
+
+    /**
+     * 对提供方的 apiKey 脱敏，避免前端拿到完整密钥。
+     *
+     * @param provider 提供方实体
+     * @return 脱敏后的同一实例
+     */
+    private LlmProvider maskApiKey(LlmProvider provider) {
+        if (provider != null && provider.getApiKey() != null) {
+            provider.setApiKey(apiKeyService.decryptAndMask(provider.getApiKey()));
+        }
+        return provider;
+    }
+}

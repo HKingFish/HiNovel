@@ -1,8 +1,8 @@
 import http from './http'
 
 export interface Chapter {
-    id: number
-    novelId: number
+    id: string
+    novelId: string
     chapterNumber: number
     title: string
     content: string
@@ -16,7 +16,7 @@ export interface Chapter {
 }
 
 export interface ChapterCreateRequest {
-    novelId: number
+    novelId: string
     title?: string
 }
 
@@ -26,8 +26,8 @@ export interface ChapterUpdateRequest {
 }
 
 export interface ChapterVersion {
-    id: number
-    chapterId: number
+    id: string
+    chapterId: string
     content: string
     wordCount: number
     changeDiff?: string
@@ -37,8 +37,8 @@ export interface ChapterVersion {
 }
 
 export interface NovelOutline {
-    id: number
-    novelId: number
+    id: string
+    novelId: string
     outlineContent: string
     createTime: string
     updateTime: string
@@ -47,7 +47,7 @@ export interface NovelOutline {
 /**
  * 获取小说的所有章节
  */
-export function getNovelChapters(novelId: number) {
+export function getNovelChapters(novelId: string) {
     return http.get<never, { data: Chapter[] }>(`/api/novel/chapters/novel/${novelId}`)
 }
 
@@ -61,7 +61,7 @@ export function getNovelChapters(novelId: number) {
  * @param title 标题关键词筛选（可选）
  */
 export function getNovelChaptersPage(
-    novelId: number,
+    novelId: string,
     pageNum: number,
     pageSize: number,
     status?: number,
@@ -95,7 +95,7 @@ export interface ChapterPageResponse {
 /**
  * 获取章节详情
  */
-export function getChapter(chapterId: number) {
+export function getChapter(chapterId: string) {
     return http.get<never, { data: Chapter }>(`/api/novel/chapters/${chapterId}`)
 }
 
@@ -109,14 +109,14 @@ export function createChapter(data: ChapterCreateRequest) {
 /**
  * 更新章节
  */
-export function updateChapter(chapterId: number, data: ChapterUpdateRequest) {
+export function updateChapter(chapterId: string, data: ChapterUpdateRequest) {
     return http.put<never, { data: Chapter }>(`/api/novel/chapters/${chapterId}`, data)
 }
 
 /**
  * 删除章节
  */
-export function deleteChapter(chapterId: number) {
+export function deleteChapter(chapterId: string) {
     return http.delete<never, void>(`/api/novel/chapters/${chapterId}`)
 }
 
@@ -140,7 +140,7 @@ export interface AiOutlineResponse {
  * 发布章节
  * @param chapterId 章节ID
  */
-export function publishChapterApi(chapterId: number) {
+export function publishChapterApi(chapterId: string) {
     return http.post<never, { data: PublishChapterResponse }>(`/api/novel/chapters/${chapterId}/publish`)
 }
 
@@ -148,35 +148,35 @@ export function publishChapterApi(chapterId: number) {
  * 手动同步章节内容到向量数据库
  * @param chapterId 章节ID
  */
-export function syncChapterVectorApi(chapterId: number) {
+export function syncChapterVectorApi(chapterId: string) {
     return http.post<never, { data: void }>(`/api/novel/chapters/${chapterId}/sync-vector`)
 }
 
 /**
  * 获取 AI 生成的章节大纲
  */
-export function getAiOutline(chapterId: number) {
+export function getAiOutline(chapterId: string) {
     return http.get<never, { data: AiOutlineResponse }>(`/api/novel/chapters/${chapterId}/ai-outline`)
 }
 
 /**
  * 用 AI 大纲替换用户大纲
  */
-export function replaceOutlineWithAi(chapterId: number) {
+export function replaceOutlineWithAi(chapterId: string) {
     return http.post<never, { data: void }>(`/api/novel/chapters/${chapterId}/replace-outline`)
 }
 
 /**
  * 获取章节历史版本
  */
-export function getChapterVersions(chapterId: number) {
+export function getChapterVersions(chapterId: string) {
     return http.get<never, { data: ChapterVersion[] }>(`/api/novel/chapters/${chapterId}/versions`)
 }
 
 /**
  * 恢复章节到指定版本
  */
-export function restoreChapterVersion(chapterId: number, versionId: number) {
+export function restoreChapterVersion(chapterId: string, versionId: string) {
     return http.post<never, { data: Chapter }>(`/api/novel/chapters/${chapterId}/restore/${versionId}`)
 }
 
@@ -186,35 +186,35 @@ export function restoreChapterVersion(chapterId: number, versionId: number) {
  * @param versionId 版本ID
  * @param remark 备注内容
  */
-export function updateVersionRemark(chapterId: number, versionId: number, remark: string) {
+export function updateVersionRemark(chapterId: string, versionId: string, remark: string) {
     return http.put<never, { data: void }>(`/api/novel/chapters/${chapterId}/versions/${versionId}/remark`, {remark})
 }
 
 /**
  * 获取小说大纲
  */
-export function getNovelOutline(novelId: number) {
+export function getNovelOutline(novelId: string) {
     return http.get<never, { data: NovelOutline }>(`/api/novel/chapters/outline/novel/${novelId}`)
 }
 
 /**
  * 保存小说大纲
  */
-export function saveNovelOutline(novelId: number, outlineContent: string) {
+export function saveNovelOutline(novelId: string, outlineContent: string) {
     return http.post<never, { data: NovelOutline }>('/api/novel/chapters/outline', { novelId, outlineContent })
 }
 
 /**
  * 修改章节号
  */
-export function updateChapterNumber(chapterId: number, chapterNumber: number) {
+export function updateChapterNumber(chapterId: string, chapterNumber: number) {
     return http.put<never, { data: Chapter }>(`/api/novel/chapters/${chapterId}/chapter-number`, { chapterNumber })
 }
 
 /**
  * 一键重排章节号，使章节号连续
  */
-export function reorderChapters(novelId: number) {
+export function reorderChapters(novelId: string) {
     return http.post<never, { data: void }>(`/api/novel/chapters/novel/${novelId}/reorder`)
 }
 
@@ -222,9 +222,9 @@ export function reorderChapters(novelId: number) {
  * 章节大纲
  */
 export interface ChapterOutline {
-    id: number
-    novelId: number
-    chapterId: number
+    id: string
+    novelId: string
+    chapterId: string
     outlineContent: string
     aiOutlineContent: string
     plotPoints: string
@@ -238,7 +238,7 @@ export interface ChapterOutline {
 /**
  * 获取章节大纲
  */
-export function getChapterOutline(chapterId: number) {
+export function getChapterOutline(chapterId: string) {
     return http.get<never, { data: ChapterOutline }>(`/api/novel/chapter-outline/chapter/${chapterId}`)
 }
 
@@ -255,6 +255,6 @@ export function saveChapterOutline(outline: Partial<ChapterOutline>) {
  * @param novelId 小说 ID
  * @param chapterIds 按期望顺序排列的章节 ID 列表
  */
-export function batchUpdateChapterSort(novelId: number, chapterIds: number[]) {
+export function batchUpdateChapterSort(novelId: string, chapterIds: string[]) {
     return http.put<never, { data: void }>(`/api/novel/chapters/novel/${novelId}/sort`, { chapterIds })
 }

@@ -5,16 +5,16 @@ import lombok.Getter;
 /**
  * 错误码对象。
  *
- * <p>错误码采用 10 位数字格式：1-SSS-MMM-EEE
+ * 错误码采用 10 位数字格式：1-SSS-MMM-EEE
  * <ul>
  *   <li>第 1 位：1，表示业务级别异常</li>
  *   <li>第 2-4 位（SSS）：系统类型，如 001=user, 002=novel, 003=agent</li>
  *   <li>第 5-7 位（MMM）：模块细分，每个系统内有多个模块</li>
  *   <li>第 8-10 位（EEE）：错误序号，每个模块内自增</li>
  * </ul>
- * </p>
  *
- * <p>此设计参考 ruoyi-vue-pro 的错误码规范，便于错误追踪和国际化。</p>
+ *
+ * 此设计参考 ruoyi-vue-pro 的错误码规范，便于错误追踪和国际化。
  *
  * @author haowl
  * @see ServiceErrorCodeRange
@@ -25,7 +25,7 @@ public class ErrorCode {
 
     /**
      * 错误码。
-     * <p>格式：1-SSS-MMM-EEE</p>
+     * 格式：1-SSS-MMM-EEE
      */
     private final Integer code;
 

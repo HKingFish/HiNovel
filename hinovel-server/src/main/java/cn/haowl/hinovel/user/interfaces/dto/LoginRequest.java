@@ -7,7 +7,7 @@ import lombok.Data;
 /**
  * 登录请求 DTO。
  *
- * <p>account 字段兼容用户名和邮箱两种登录方式。</p>
+ * account 字段兼容用户名和邮箱两种登录方式。
  *
  * @author haowl
  * @since 2024
@@ -19,7 +19,10 @@ public class LoginRequest {
     /**
      * 账号（用户名或邮箱）。
      */
-    @Schema(description = "账号（用户名或邮箱）", example = "admin 或 admin@hinovel.com", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(
+        description = "账号（用户名或邮箱）",
+        example = "admin 或 admin@hinovel.com",
+        requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "账号不能为空")
     private String account;
 

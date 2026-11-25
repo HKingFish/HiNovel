@@ -5,11 +5,11 @@
             当前显示的是全局默认配置，保存后将创建该小说的独立配置
         </el-alert>
 
-        <!-- 发布后自动操作 -->
+        <!-- 自动操作 -->
         <div class="settings-group">
             <div class="group-title">
                 <span class="group-dot dot-blue"></span>
-                发布后自动操作
+                自动操作
             </div>
             <div class="switch-list">
                 <div class="switch-item">
@@ -17,14 +17,24 @@
                         <span class="setting-label">自动审核</span>
                         <span class="setting-desc">改写完成后自动调用 AI 审核接口检查内容</span>
                     </div>
-                    <el-switch v-model="local.autoAuditAfterRewrite" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.autoAuditAfterRewrite"
+                        @update:model-value="updateSetting('autoAuditAfterRewrite', $event)"
+                    />
                 </div>
                 <div class="switch-item">
                     <div class="setting-info">
                         <span class="setting-label">自动生成 AI 大纲</span>
                         <span class="setting-desc">发布章节后自动调用 AI 总结章节大纲</span>
                     </div>
-                    <el-switch v-model="local.autoOutlineAfterPublish" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.autoOutlineAfterPublish"
+                        @update:model-value="updateSetting('autoOutlineAfterPublish', $event)"
+                    />
                 </div>
                 <div class="switch-item">
                     <div class="setting-info">
@@ -34,11 +44,11 @@
                     <el-tooltip :content="embeddingTooltip" :disabled="embeddingConfigured" placement="top">
                         <span>
                             <el-switch
-                                v-model="local.autoVectorAfterPublish"
+                                :model-value="modelValue.autoVectorAfterPublish"
                                 :active-value="1"
                                 :inactive-value="0"
                                 :disabled="!embeddingConfigured"
-                                @change="handleVectorSwitchChange"
+                                @update:model-value="updateSetting('autoVectorAfterPublish', $event)"
                             />
                         </span>
                     </el-tooltip>
@@ -48,7 +58,12 @@
                         <span class="setting-label">自动保存内容</span>
                         <span class="setting-desc">编辑器内容变化时自动保存到服务器</span>
                     </div>
-                    <el-switch v-model="local.autoSaveContent" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.autoSaveContent"
+                        @update:model-value="updateSetting('autoSaveContent', $event)"
+                    />
                 </div>
             </div>
         </div>
@@ -62,12 +77,13 @@
             <div class="number-row">
                 <span class="setting-label">携带前情提要章数</span>
                 <el-input-number
-                    v-model="local.rewriteContextChapters"
+                    :model-value="modelValue.rewriteContextChapters"
                     :min="0"
                     :max="10"
                     :step="1"
                     size="small"
                     controls-position="right"
+                    @update:model-value="updateSetting('rewriteContextChapters', $event)"
                 />
             </div>
             <div class="number-hint">AI 改写时携带前几章内容（0 表示不携带）</div>
@@ -77,14 +93,24 @@
                         <span class="setting-label">改写时携带全文大纲</span>
                         <span class="setting-desc">AI 改写时将全文大纲作为参考上下文</span>
                     </div>
-                    <el-switch v-model="local.rewriteIncludeOutline" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.rewriteIncludeOutline"
+                        @update:model-value="updateSetting('rewriteIncludeOutline', $event)"
+                    />
                 </div>
                 <div class="switch-item">
                     <div class="setting-info">
                         <span class="setting-label">审核时携带全文大纲</span>
                         <span class="setting-desc">AI 审核时将全文大纲作为参考上下文</span>
                     </div>
-                    <el-switch v-model="local.auditIncludeOutline" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.auditIncludeOutline"
+                        @update:model-value="updateSetting('auditIncludeOutline', $event)"
+                    />
                 </div>
             </div>
         </div>
@@ -101,18 +127,24 @@
                         <span class="setting-label">问答时携带全文大纲</span>
                         <span class="setting-desc">AI 问答时将全文大纲作为参考上下文</span>
                     </div>
-                    <el-switch v-model="local.qaIncludeOutline" :active-value="1" :inactive-value="0" />
+                    <el-switch
+                        :active-value="1"
+                        :inactive-value="0"
+                        :model-value="modelValue.qaIncludeOutline"
+                        @update:model-value="updateSetting('qaIncludeOutline', $event)"
+                    />
                 </div>
             </div>
             <div class="number-row" style="margin-top: 10px">
                 <span class="setting-label">历史消息条数</span>
                 <el-input-number
-                    v-model="local.qaContextLength"
+                    :model-value="modelValue.qaContextLength"
                     :min="0"
                     :max="50"
                     :step="1"
                     size="small"
                     controls-position="right"
+                    @update:model-value="updateSetting('qaContextLength', $event)"
                 />
             </div>
             <div class="number-hint">AI 问答时携带的历史对话条数（0 表示不携带）</div>
@@ -121,8 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
 import { getEmbeddingConfigList } from '@/api/embedding-config'
 import type { NovelSettings } from '@/api/novel-settings'
 
@@ -151,52 +182,21 @@ const emit = defineEmits<{
     (e: 'update:modelValue', value: NovelSettings): void
 }>()
 
-/** 本地副本，避免直接修改 props */
-const local = ref<NovelSettings>({ ...props.modelValue })
+type SettingField = Exclude<keyof NovelSettings, 'id' | 'novelId' | 'userId' | 'createTime' | 'updateTime'>
+
+function updateSetting(key: SettingField, value: unknown) {
+    if (typeof value === 'number' && Number.isFinite(value) && value !== props.modelValue[key]) {
+        emit('update:modelValue', { ...props.modelValue, [key]: value })
+    }
+}
 
 /** 用户是否已配置 Embedding 模型 */
 const embeddingConfigured = ref(false)
 
 /** Embedding 未配置时的提示文案 */
 const embeddingTooltip = computed(() =>
-    embeddingConfigured.value ? '' : '请先在「Embedding 模型配置」中添加并激活一个模型后再开启此功能',
+    embeddingConfigured.value ? '' : '请先在「模型管理」的嵌入式模型页中添加并激活一个模型后再开启此功能',
 )
-
-/**
- * 监听父组件变化，同步到本地副本。
- */
-watch(
-    () => props.modelValue,
-    (val) => {
-        local.value = { ...val }
-    },
-    { deep: true },
-)
-
-/**
- * 监听本地变更，向上同步。
- */
-watch(
-    local,
-    (val) => {
-        emit('update:modelValue', { ...val })
-    },
-    { deep: true },
-)
-
-/**
- * 自动存储向量开关变更处理。
- *
- * <p>当用户尝试开启但未配置 Embedding 模型时，回滚状态并提示。</p>
- *
- * @param val 当前开关值
- */
-const handleVectorSwitchChange = (val: number | boolean) => {
-    if (val === 1 && !embeddingConfigured.value) {
-        local.value.autoVectorAfterPublish = 0
-        ElMessage.warning('请先在「Embedding 模型配置」中添加并激活一个模型后再开启自动存储向量')
-    }
-}
 
 /**
  * 加载用户 Embedding 配置状态。
@@ -242,7 +242,7 @@ onMounted(() => {
     align-items: center;
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ink);
     margin-bottom: 14px;
 }
 
@@ -255,7 +255,7 @@ onMounted(() => {
 }
 
 .dot-blue {
-    background: #667eea;
+    background: var(--pine);
 }
 
 .dot-orange {
@@ -287,7 +287,7 @@ onMounted(() => {
 
 .setting-label {
     font-size: 14px;
-    color: #303133;
+    color: var(--ink);
     font-weight: 500;
 }
 

@@ -9,6 +9,9 @@ import lombok.Data;
 @Data
 public class ChapterAutoSaveRequest {
 
+    /**
+     * 章节 ID。
+     */
     @NotNull(message = "章节ID不能为空")
     private Long chapterId;
 

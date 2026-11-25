@@ -1,31 +1,26 @@
 package cn.haowl.hinovel.agent.domain.entity;
 
+import cn.haowl.hinovel.agent.constant.ChatMessageRoleEnum;
 import cn.haowl.hinovel.common.entity.BaseEntity;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.List;
 
 /**
  * AI 问答消息实体。
  *
- * <p>记录会话中每条消息的角色和内容，支持多轮对话上下文。</p>
+ * 记录会话中每条消息的角色和内容，支持多轮对话上下文。
  *
  * @author haowl
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("agent_chat_message")
+@TableName(value = "agent_chat_message", autoResultMap = true)
 public class ChatMessage extends BaseEntity {
-
-    /**
-     * 消息角色：用户。
-     */
-    public static final String ROLE_USER = "user";
-
-    /**
-     * 消息角色：AI 助手。
-     */
-    public static final String ROLE_ASSISTANT = "assistant";
 
     /**
      * 会话 ID。
@@ -38,7 +33,9 @@ public class ChatMessage extends BaseEntity {
     private Long novelId;
 
     /**
-     * 消息角色（user / assistant）。
+     * 消息角色。
+     *
+     * @see ChatMessageRoleEnum
      */
     private String role;
 
@@ -46,6 +43,19 @@ public class ChatMessage extends BaseEntity {
      * 消息内容。
      */
     private String content;
+
+    /**
+     * 本次回复首次成功读取的 Skill 名称。
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<String> loadedSkillNames;
+
+    /**
+     * 用户消息及历史空值返回空列表。
+     */
+    public List<String> getLoadedSkillNames() {
+        return !isAssistantMessage() || loadedSkillNames == null ? List.of() : loadedSkillNames;
+    }
 
     /**
      * 是否已撤回。
@@ -69,7 +79,7 @@ public class ChatMessage extends BaseEntity {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setNovelId(novelId);
-        message.setRole(ROLE_USER);
+        message.setRole(ChatMessageRoleEnum.USER.getCode());
         message.setContent(content);
         message.setRevoked(cn.haowl.hinovel.common.constant.CommonConstants.DISABLED);
         return message;
@@ -87,7 +97,7 @@ public class ChatMessage extends BaseEntity {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setNovelId(novelId);
-        message.setRole(ROLE_ASSISTANT);
+        message.setRole(ChatMessageRoleEnum.ASSISTANT.getCode());
         message.setContent(content);
         message.setRevoked(cn.haowl.hinovel.common.constant.CommonConstants.DISABLED);
         return message;
@@ -101,7 +111,7 @@ public class ChatMessage extends BaseEntity {
      * @return 用户消息返回 true
      */
     public boolean isUserMessage() {
-        return ROLE_USER.equals(this.role);
+        return ChatMessageRoleEnum.USER == ChatMessageRoleEnum.fromCode(role);
     }
 
     /**
@@ -110,7 +120,7 @@ public class ChatMessage extends BaseEntity {
      * @return AI 助手消息返回 true
      */
     public boolean isAssistantMessage() {
-        return ROLE_ASSISTANT.equals(this.role);
+        return ChatMessageRoleEnum.ASSISTANT == ChatMessageRoleEnum.fromCode(role);
     }
 
     /**
@@ -136,8 +146,6 @@ public class ChatMessage extends BaseEntity {
      * @return 已撤回返回 true
      */
     public boolean hasRevoked() {
-        return cn.haowl.hinovel.common.constant.CommonConstants.ENABLED == (
-                this.revoked != null ? this.revoked
-                        : cn.haowl.hinovel.common.constant.CommonConstants.DISABLED);
+        return Integer.valueOf(cn.haowl.hinovel.common.constant.CommonConstants.ENABLED).equals(revoked);
     }
 }

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 /**
  * 用户查询条件。
  *
- * <p>表示用户查询的读操作请求。</p>
+ * 表示用户查询的读操作请求。
  *
  * @Author : haowl
  * @Date : 2026/3/12 22:30

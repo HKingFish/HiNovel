@@ -21,11 +21,11 @@ interface LayoutState {
  * 默认布局状态
  */
 const DEFAULT_LAYOUT: LayoutState = {
-    outlinePanelWidth: 460,
+    outlinePanelWidth: 320,
     functionPanelWidth: 400,
-    activeFunctionTab: 'outline',
+    activeFunctionTab: null,
     isSidebarCollapsed: false,
-    isFocusMode: false
+    isFocusMode: false,
 }
 
 /**
@@ -67,17 +67,15 @@ export const useLayoutStore = defineStore('layout', () => {
             functionPanelWidth: functionPanelWidth.value,
             activeFunctionTab: activeFunctionTab.value,
             isSidebarCollapsed: isSidebarCollapsed.value,
-            isFocusMode: isFocusMode.value
+            isFocusMode: isFocusMode.value,
         }
         localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(state))
     }
 
     // 监听所有布局状态变化，自动持久化
-    watch(
-        [outlinePanelWidth, functionPanelWidth, activeFunctionTab, isSidebarCollapsed, isFocusMode],
-        persistLayout,
-        { deep: true }
-    )
+    watch([outlinePanelWidth, functionPanelWidth, activeFunctionTab, isSidebarCollapsed, isFocusMode], persistLayout, {
+        deep: true,
+    })
 
     return {
         outlinePanelWidth,
@@ -85,6 +83,6 @@ export const useLayoutStore = defineStore('layout', () => {
         activeFunctionTab,
         isSidebarCollapsed,
         isFocusMode,
-        persistLayout
+        persistLayout,
     }
 })

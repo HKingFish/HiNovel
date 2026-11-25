@@ -1,5 +1,6 @@
 package cn.haowl.hinovel.infra.oss.config;
 
+import cn.haowl.hinovel.infra.oss.constant.OssConstants;
 import cn.haowl.hinovel.infra.oss.provider.AliyunOssProvider;
 import cn.haowl.hinovel.infra.oss.provider.LocalOssProvider;
 import cn.haowl.hinovel.infra.oss.provider.OssProvider;
@@ -14,7 +15,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * OSS 自动配置类。
  *
- * <p>根据 hinovel.oss.type 配置项，按条件激活对应的 OssProvider 实现。</p>
+ * 根据 hinovel.oss.type 配置项，按条件激活对应的 OssProvider 实现。
  *
  * @author haowl
  * @since 2024
@@ -31,7 +32,11 @@ public class OssAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(OssProvider.class)
-    @ConditionalOnProperty(prefix = "hinovel.oss", name = "type", havingValue = "LOCAL", matchIfMissing = true)
+    @ConditionalOnProperty(
+        prefix = "hinovel.oss",
+        name = "type",
+        havingValue = OssConstants.STORAGE_TYPE_LOCAL,
+        matchIfMissing = true)
     public OssProvider localOssProvider(OssProperties ossProperties) {
         return new LocalOssProvider(ossProperties);
     }
@@ -44,7 +49,7 @@ public class OssAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(OssProvider.class)
-    @ConditionalOnProperty(prefix = "hinovel.oss", name = "type", havingValue = "ALIYUN")
+    @ConditionalOnProperty(prefix = "hinovel.oss", name = "type", havingValue = OssConstants.STORAGE_TYPE_ALIYUN)
     public OssProvider aliyunOssProvider(OssProperties ossProperties) {
         return new AliyunOssProvider(ossProperties);
     }
@@ -52,20 +57,23 @@ public class OssAutoConfiguration {
     /**
      * 本地存储静态资源映射配置。
      *
-     * <p>将 /files/** 请求映射到本地存储目录，仅 LOCAL 模式下生效。</p>
+     * 将 /files/** 请求映射到本地存储目录，仅 LOCAL 模式下生效。
      *
      * @param ossProperties OSS 配置属性
      * @return WebMvcConfigurer 实例
      */
     @Bean
-    @ConditionalOnProperty(prefix = "hinovel.oss", name = "type", havingValue = "LOCAL", matchIfMissing = true)
+    @ConditionalOnProperty(
+        prefix = "hinovel.oss",
+        name = "type",
+        havingValue = OssConstants.STORAGE_TYPE_LOCAL,
+        matchIfMissing = true)
     public WebMvcConfigurer localFileResourceConfigurer(OssProperties ossProperties) {
         return new WebMvcConfigurer() {
             @Override
             public void addResourceHandlers(ResourceHandlerRegistry registry) {
-                String basePath = ossProperties.getLocal().getBasePath();
                 registry.addResourceHandler("/files/**")
-                        .addResourceLocations("file:" + basePath + "/");
+                    .addResourceLocations("file:" + ossProperties.getLocal().getBasePath() + "/");
             }
         };
     }

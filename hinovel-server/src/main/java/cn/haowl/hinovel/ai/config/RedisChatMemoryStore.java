@@ -10,18 +10,27 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Redis 聊天记忆存储。
+ */
 @Component
 public class RedisChatMemoryStore implements ChatMemoryStore {
 
+    /**
+     * Redis 聊天记忆键前缀。
+     */
     public static final String CHAT_MEMORY_PREFIX = "CHAT_MEMORY:";
+
+    /**
+     * 聊天消息序列化文本存储客户端。
+     */
     @Resource
     private RedisTemplate<String, String> redisTemplate;
 
-
     @Override
     public List<ChatMessage> getMessages(Object memoryId) {
-        String retValue = redisTemplate.opsForValue().get(CHAT_MEMORY_PREFIX + memoryId);
-        return ChatMessageDeserializer.messagesFromJson(retValue);
+        return ChatMessageDeserializer.messagesFromJson(
+            redisTemplate.opsForValue().get(CHAT_MEMORY_PREFIX + memoryId));
     }
 
     @Override

@@ -1,313 +1,111 @@
 # HiNovel 部署指南
 
-本文档介绍 HiNovel 的 Docker 部署与本地开发部署方式。
+## 准备
 
-## 环境要求
-
-| 组件 | 版本要求 | 说明 |
-|------|----------|------|
-| Docker | 24.0+ | 容器运行时 |
-| Docker Compose | 2.20+ | 多服务编排 |
-| Node.js | 20+ | **Docker 部署也需要**，用于在宿主机构建前端产物 |
-| 内存 | 建议 4 GB 以上 | |
-| 磁盘 | 建议 20 GB 以上 | |
-
-本地开发额外需要：JDK 21+、Maven 3.9+。
-
-> **为什么 Docker 部署也需要 Node.js？**
-> 前端产物 `dist/` 由宿主机通过 `npm run build` 预先构建，Docker 镜像只托管静态文件。
-> 这样可避免在容器内执行 Vite/Rollup 构建时，因 overlay2 文件系统 IO 瓶颈与内存峰值导致服务器卡死。
-> `docker-build.sh` 的 `up`/`build`/`web` 命令会自动调用宿主机 npm 完成前端构建。
-
----
-
-## 服务与端口
-
-| 服务 | 默认端口 | 环境变量 | 说明 |
-|------|----------|----------|------|
-| 前端（Nginx） | 3000 | `WEB_PORT` | Web 访问入口，默认 3000 避免与服务器已有 nginx/apache 80 端口冲突 |
-| 后端（Spring Boot） | 8080 | `SERVER_PORT` | REST API |
-| MySQL | 3306 | `MYSQL_PORT` | 关系型数据库 |
-| Redis | 6379 | `REDIS_PORT` | 缓存 / Session |
-| Qdrant HTTP | 6333 | `QDRANT_HTTP_PORT` | 向量库 REST / 管理面板 |
-| Qdrant gRPC | 6334 | `QDRANT_GRPC_PORT` | Java 客户端连接端口 |
-
-> **端口冲突提示**：若服务器 80 端口未被占用且希望前端直接走 80，在 `.env` 中设置 `WEB_PORT=80`。
-
----
-
-## 部署前准备
-
-### 1. 获取代码
-
-```bash
-git clone https://github.com/HKingFish/HiNovel.git
-cd HiNovel
-```
-
-### 2. 配置环境变量
+Docker 部署需要 Docker 24+、Compose 2.20+ 和 Node.js 20+。本地运行后端还需要 JDK 21+ 与 Maven 3.9+。Bash 脚本可在 Linux、macOS 或 Windows 的 Git Bash 中运行。
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，**生产环境务必修改所有默认密码与密钥**：
+填写 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 及至少 16 字符的 `API_KEY_SECRET`。默认以 root 登录数据库，两个 MySQL 密码填相同值。使用已经建好的非 root 数据库账号时，通过 `MYSQL_USER` 和 `MYSQL_PASSWORD` 提供应用凭据。`API_KEY_SECRET` 用于解密原有 LLM 密钥，迁移或重建应用时须沿用。
 
-```bash
-# 必填
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_ROOT_PASSWORD=your_root_password
-API_KEY_SECRET=your_random_secret_16chars
-```
+Compose 默认把端口发布到 `127.0.0.1`。远程部署可由宿主机 HTTPS 反向代理转发到 Web 端口，或通过 `WEB_BIND_IP` 明确指定监听地址。对外开放之前，请由数据库管理员替换或禁用种子脚本创建的默认管理员凭据。
 
-> **安全提示**：`API_KEY_SECRET` 用于加密数据库中存储的 LLM API Key，部署后请勿随意更改，否则已加密的 Key 将无法解密。
+| 服务 | 宿主机默认端口 | 设置 |
+|---|---|---|
+| Web / Vite | 3000 | `WEB_PORT` |
+| Spring Boot | 8080 | `SERVER_PORT` |
+| MySQL | 3306 | `MYSQL_PORT` |
+| Redis | 6379 | `REDIS_PORT` |
+| Qdrant HTTP / gRPC | 6333 / 6334 | `QDRANT_HTTP_PORT` / `QDRANT_GRPC_PORT` |
 
-### 3. 数据目录
+容器间使用服务名和容器内端口。修改宿主机端口无需修改容器间连接。开发模式默认从同一份 `.env` 读取端口。
 
-容器数据通过 Volume 挂载到宿主机 `../data` 目录（项目根目录的上一级），删除容器不会丢失数据，且与代码仓库隔离：
-
-```
-../data/
-├── mysql/
-│   ├── data/          # MySQL 数据文件
-│   ├── conf/          # 自定义配置
-│   ├── logs/          # 日志
-│   └── backup/        # 备份（由 scripts/mysql_backup.sh 生成）
-├── redis/
-│   ├── data/
-│   └── conf/
-├── qdrant/
-│   ├── storage/       # 向量数据
-│   └── snapshots/
-├── hinovel/
-│   ├── uploads/       # 上传文件
-│   └── logs/          # 应用日志
-└── nginx/
-    └── logs/
-```
-
-首次启动时 `docker-build.sh` 会自动创建上述目录。
-
----
-
-## Docker Compose 完整部署
-
-### 构建并启动全部服务
+## Docker 部署和更新
 
 ```bash
 bash docker-build.sh up
+bash docker-build.sh status
+bash docker-build.sh logs hinovel-server
 ```
 
-脚本会构建前后端镜像，启动 MySQL、Redis、Qdrant、后端与前端，并等待约 60 秒后输出服务状态。
-
-### 常用命令
+`up` 在宿主机安装前端锁定依赖并构建 `dist/`，随后构建容器镜像并等待各服务通过健康检查。初次启动较慢时，可用 `COMPOSE_WAIT_TIMEOUT=300 bash docker-build.sh up` 延长等待。也可以手动构建前端，再运行 Compose。
 
 ```bash
-bash docker-build.sh status    # 查看服务状态
-bash docker-build.sh logs        # 查看后端日志（默认 hinovel-server）
-bash docker-build.sh logs hinovel-web
-bash docker-build.sh restart     # 重启所有服务（不重新构建）
-bash docker-build.sh down        # 停止并移除容器（数据保留在 ../data）
-bash docker-build.sh build       # 构建前端产物并构建镜像（不启动）
-bash docker-build.sh web         # 单独重新构建并部署前端
-bash docker-build.sh server      # 单独重新构建并部署后端
+(cd hinovel-web && npm ci && npm run build)
+docker compose up --build --wait --wait-timeout 180
 ```
 
-> **注意**：`up`/`build`/`web` 命令会在宿主机执行 `npm run build` 生成前端产物，需要宿主机已安装 Node.js 20+。
-
-若直接使用 Docker Compose，需先手动构建前端产物：
+更新单个应用容器时使用下列命令。已运行的依赖容器不会被重建。
 
 ```bash
-# 1. 宿主机构建前端
-cd hinovel-web && npm ci && npm run build && cd ..
-
-# 2. 构建并启动
-docker compose up -d --build
-docker compose ps
-docker compose logs -f hinovel-server
+bash docker-build.sh web
+bash docker-build.sh server
 ```
 
-### 验证部署
+`bash docker-build.sh restart` 重启现有容器。`bash docker-build.sh down` 移除容器，保留项目上一级 `../data/` 中的 MySQL、Redis、Qdrant、上传文件和日志。更新前数据库与备份目录均沿用原路径。
 
-1. 访问 http://localhost:3000（或你配置的 `WEB_PORT`）
-2. 使用默认管理员登录：`admin` / `Admin@123456`（生产环境请立即修改密码）
-3. 在「LLM 配置」中添加你的大模型 Provider
-4. 创建小说并测试 AI 续写 / 对话功能
+默认 Web 入口为 `http://localhost:3000`。Nginx 转发 `/api/` 与 `/files/`，后端重建后会重新解析上游地址。本地上传默认使用同源 `/files`。已有文件 URL 使用旧前缀的部署，应保留原 `OSS_LOCAL_URL_PREFIX`，直至单独迁移历史 URL。
 
----
-
-## 数据库初始化
-
-### 自动初始化（推荐）
-
-MySQL 容器**首次启动**且 `../data/mysql/data` 为空时，会自动执行：
-
-1. `hinovel-server/sql/schema.sql` — 建表
-2. `hinovel-server/sql/seed.sql` — 初始数据（含 admin 账号、内置 Agent 模板）
-
-> **注意**：初始化在 **MySQL 容器首次启动**时执行，**不在** Docker 镜像构建阶段执行。若 `../data/mysql/data` 已有数据，脚本不会再次运行。
-
-### 手动初始化
-
-容器已运行但库表未创建，或需要重新灌库时：
-
-```powershell
-# Windows
-.\scripts\init-db.ps1
-
-# 清空并重建（会删除 hinovel_platform 全部数据）
-.\scripts\init-db.ps1 -Force
-```
-
-```bash
-# Linux / macOS / Git Bash
-bash scripts/init-db.sh
-bash scripts/init-db.sh --force
-```
-
-若需完全重新自动初始化，停止容器后删除 MySQL 数据目录再启动：
-
-```powershell
-docker compose down
-Remove-Item -Recurse -Force ..\data\mysql\data\*
-docker compose up -d mysql
-```
-
-默认管理员：
-
-| 字段 | 值 |
-|------|-----|
-| 用户名 | `admin` |
-| 邮箱 | `admin@hinovel.com` |
-| 密码 | `Admin@123456` |
-
----
-
-## 本地开发部署
-
-适合需要调试前后端代码的场景。
-
-### 1. 启动基础设施
-
-```bash
-bash docker-build.sh infra
-```
-
-仅启动 MySQL、Redis、Qdrant，不启动应用容器。
-
-### 2. 配置 `.env`
-
-本地开发时 `.env` 中数据库与中间件地址保持 `localhost` 即可（与 `docker-compose.yml` 中基础设施端口映射一致）。
-
-### 3. 启动后端
-
-```bash
-cd hinovel-server
-mvn spring-boot:run
-```
-
-或使用一键脚本（含构建、启动前后端）：
+## 本地开发
 
 ```bash
 bash start.sh
 ```
 
-### 4. 启动前端
+脚本通过 Compose 读取 `.env`，需 Compose 2.27.2+。它会启动基础设施、打包后端并启动 Vite。使用 `--no-infra` 可以复用已运行的 MySQL、Redis 和 Qdrant。前后端的控制台日志在 `logs/`。按 Ctrl+C 停止本地前后端，基础设施继续运行。[Compose 版本说明](https://github.com/docker/compose/releases/tag/v2.27.2)
+
+也可以先执行 `bash docker-build.sh infra`，再从仓库根目录分别运行下列两条命令：
 
 ```bash
-cd hinovel-web
-npm install
-npm run dev
+mvn -f hinovel-server/pom.xml spring-boot:run
+cd hinovel-web && npm ci && npm run dev
 ```
 
-- 前端：http://localhost:3000
-- 后端：http://localhost:8080
-- API 文档（如已启用 Knife4j）：http://localhost:8080/doc.html
+Docker 与本地开发的默认应用端口相同，请先停止同端口的前后端容器，或在 `.env` 改端口。`QDRANT_PORT` 可覆盖本地 Java 使用的 gRPC 端口。
 
----
+## 数据库初始化和迁移
 
-## 更新已运行的服务
+MySQL 数据目录为空时，容器先创建 `MYSQL_DB` 指定的库，再按顺序执行 `schema.sql` 和 `seed.sql`。种子账号为 `admin`，邮箱 `admin@hinovel.com`，初始密码 `Admin@123456`。
 
-更新代码后，只需重建对应服务镜像，**MySQL / Redis / Qdrant 不会被重启**。
-
-推荐使用一键脚本（自动处理前端构建）：
+容器已运行但缺表或种子记录时，可以手动补建。重复执行会保留管理员密码与已有模板。
 
 ```bash
-# 更新前端（宿主机 build + 重启 web 容器）
-bash docker-build.sh web
-
-# 更新后端（重启 server 容器）
-bash docker-build.sh server
+bash scripts/init-db.sh
 ```
 
-也可手动使用 Docker Compose：
+```powershell
+.\scripts\init-db.ps1
+```
+
+`--force`（PowerShell 的 `-Force`）会删除当前容器配置的整个应用库，再重新建表和写入种子。仅在明确要清空目标数据时使用。
+
+已有数据库的表结构升级需单独执行。以小说配置升级为例，先备份，再执行一次迁移：
 
 ```bash
-# 更新后端
-docker compose up -d --build hinovel-server
-
-# 更新前端（必须先在宿主机 build，再重建镜像）
-cd hinovel-web && npm run build && cd ..
-docker compose up -d --build hinovel-web
+bash scripts/mysql_backup.sh
+bash scripts/init-db.sh --sql hinovel-server/sql/upgrade-20261118-novel-settings.sql
 ```
 
-查看更新日志：
-
-```bash
-docker compose logs -f hinovel-server
-docker compose logs -f hinovel-web
+```powershell
+.\scripts\init-db.ps1 -SqlFile .\hinovel-server\sql\upgrade-20261118-novel-settings.sql
 ```
 
-> **注意**：必须加 `--build` 才会重新编译代码；仅 `docker compose up -d` 会复用旧镜像。
+手动执行 SQL 时，客户端必须选定目标库。MySQL 容器的初始化脚本只在新数据目录上运行。调整 `MYSQL_DB` 或容器环境里的密码不会迁移旧库或修改库内密码。
 
-### 数据库迁移
+## 备份
 
-若后端包含 Flyway 迁移脚本，容器重启后会自动执行。若有手动 SQL 脚本，请在 MySQL 中自行执行：
+`bash scripts/mysql_backup.sh` 使用当前 Compose MySQL 容器的应用库名，生成压缩备份。目录默认是 `../data/mysql/backup`，默认保留 7 天。可通过 shell 环境变量 `MYSQL_BACKUP_DIR` 与 `MYSQL_BACKUP_KEEP_DAYS` 覆盖。
 
-```bash
-docker exec -i hinovel-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" hinovel_platform < your_script.sql
+```cron
+0 3 * * * /bin/bash /path/to/HiNovel/scripts/mysql_backup.sh >> /var/log/hinovel-backup.log 2>&1
 ```
 
----
+备份可解压为 SQL 后用上面的 `--sql` 或 `-SqlFile` 导入。在恢复前核对当前容器的目标库。
 
-## 生产环境建议
+## 排查
 
-1. **修改所有默认密码**：`MYSQL_ROOT_PASSWORD`、`REDIS_PASSWORD`、`API_KEY_SECRET`
-2. **使用 HTTPS**：在 Nginx 或云负载均衡层配置 TLS 证书
-3. **限制端口暴露**：生产环境可仅暴露 80/443，MySQL、Redis、Qdrant 不映射到公网
-4. **定期备份**：使用 `scripts/mysql_backup.sh` 配合 crontab 定时备份 MySQL
-
-```bash
-# 示例：每天凌晨 3 点备份
-0 3 * * * /path/to/HiNovel/scripts/mysql_backup.sh >> /var/log/hinovel-backup.log 2>&1
-```
-
-5. **日志与监控**：应用日志位于 `../data/hinovel/logs/`，建议接入日志采集与告警
-6. **Embedding 选型**：
-   - `openai`（推荐入门）：调用 OpenAI 兼容 API，配置简单
-   - `onnx`：本地 BGE-M3 模型，无 API 费用，需自行准备模型文件
-
----
-
-## 常见问题
-
-### 后端启动失败：无法连接 MySQL
-
-- 确认 `docker compose ps` 中 `hinovel-mysql` 状态为 healthy
-- 检查 `.env` 中 `MYSQL_PASSWORD` 与 `MYSQL_ROOT_PASSWORD` 是否一致
-- Docker 部署时后端通过服务名 `mysql` 连接，无需改 `MYSQL_HOST`
-
-### Qdrant 连接失败
-
-- 确认 Qdrant 容器 healthy
-- Java 客户端使用 gRPC 端口 `6334`，不是 HTTP 端口 `6333`
-
-### Embedding / RAG 不可用
-
-- 确认 `OPENAI_EMBEDDING_API_KEY` 已配置且有效
-- 或切换为 `EMBEDDING_TYPE=onnx` 并配置本地模型路径
-
-### 前端无法访问 API
-
-- Docker 部署：Nginx 已配置反向代理，直接访问前端端口即可
-- 本地开发：确认后端在 8080 端口运行，Vite 代理配置见 `hinovel-web/vite.config.ts`
+- MySQL 长时间未就绪时，查看 `bash docker-build.sh logs mysql`。已有数据目录使用原有 root 密码，修改 `.env` 不会修改该密码。
+- 本地开发失败时，检查 `logs/hinovel-server.log` 与 `logs/hinovel-web.log`。容器模式使用 `bash docker-build.sh logs <服务名>`。
+- RAG 使用 Qdrant gRPC 端口，并要求在应用页面启用有效的 OpenAI 兼容 Embedding 配置。

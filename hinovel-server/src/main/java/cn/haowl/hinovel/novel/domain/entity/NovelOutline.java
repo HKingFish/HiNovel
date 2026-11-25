@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 小说大纲实体。
  *
- * <p>属于小说聚合的值对象，管理小说的全文大纲内容。</p>
+ * 属于小说聚合的值对象，管理小说的全文大纲内容。
  *
  * @author haowl
  */

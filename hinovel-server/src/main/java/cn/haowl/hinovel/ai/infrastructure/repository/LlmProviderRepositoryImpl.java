@@ -5,32 +5,38 @@ import cn.haowl.hinovel.ai.domain.repository.LlmProviderRepository;
 import cn.haowl.hinovel.ai.infrastructure.mapper.LlmProviderMapper;
 import cn.haowl.hinovel.common.constant.CommonConstants;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
+import static cn.haowl.hinovel.common.exception.enums.GlobalErrorCodeConstants.SYSTEM_BUSY;
+import static cn.haowl.hinovel.common.exception.util.ServiceExceptionUtil.exception;
+
 /**
  * LLM 提供方仓储实现。
  *
- * <p>基于 MyBatis-Plus 实现 LLM 提供方仓储接口。</p>
+ * 基于 MyBatis-Plus 实现 LLM 提供方仓储接口。
  *
  * @Author : haowl
  * @Date : 2026/3/12 23:30
  */
 @Repository
-@RequiredArgsConstructor
 public class LlmProviderRepositoryImpl implements LlmProviderRepository {
 
-    private final LlmProviderMapper llmProviderMapper;
+    /**
+     * LLM 提供方数据访问映射器。
+     */
+    @Autowired
+    private LlmProviderMapper llmProviderMapper;
 
     @Override
     public LlmProvider save(LlmProvider provider) {
         if (provider.getId() == null) {
             llmProviderMapper.insert(provider);
-        } else {
-            llmProviderMapper.updateById(provider);
+        } else if (0 == llmProviderMapper.updateById(provider)) {
+            throw exception(SYSTEM_BUSY);
         }
         return provider;
     }
@@ -38,6 +44,13 @@ public class LlmProviderRepositoryImpl implements LlmProviderRepository {
     @Override
     public Optional<LlmProvider> findById(Long id) {
         return Optional.ofNullable(llmProviderMapper.selectById(id));
+    }
+
+    @Override
+    public Optional<LlmProvider> findByIdAndUserId(Long id, Long userId) {
+        return Optional.ofNullable(llmProviderMapper.selectOne(new LambdaQueryWrapper<LlmProvider>()
+            .eq(LlmProvider::getId, id)
+            .eq(LlmProvider::getUserId, userId)));
     }
 
     @Override
@@ -79,8 +92,10 @@ public class LlmProviderRepositoryImpl implements LlmProviderRepository {
     }
 
     @Override
-    public void deleteById(Long id) {
-        llmProviderMapper.deleteById(id);
+    public boolean deleteByIdAndUserId(Long id, Long userId) {
+        return llmProviderMapper.delete(new LambdaQueryWrapper<LlmProvider>()
+            .eq(LlmProvider::getId, id)
+            .eq(LlmProvider::getUserId, userId)) > 0;
     }
 
     @Override

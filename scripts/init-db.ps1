@@ -1,59 +1,57 @@
-# ========================================================
-# HiNovel 数据库手动初始化脚本（Windows PowerShell）
-# 适用：MySQL 容器已运行，但数据库未初始化或需重新灌入结构/种子数据
-#
-# 用法：
-#   .\scripts\init-db.ps1
-#   .\scripts\init-db.ps1 -Force   # 清空 hinovel_platform 后重建（危险）
-# ========================================================
-
 param(
-    [switch]$Force
+    [switch]$Force,
+    [string]$SqlFile
 )
 
-$ErrorActionPreference = "Stop"
-$RootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$SchemaFile = Join-Path $RootDir "hinovel-server\sql\schema.sql"
-$SeedFile = Join-Path $RootDir "hinovel-server\sql\seed.sql"
-$EnvFile = Join-Path $RootDir ".env"
-
-if (-not (Test-Path $EnvFile)) {
-    Write-Error "未找到 .env，请先复制 .env.example 为 .env"
+$ErrorActionPreference = 'Stop'
+$RootDir = Split-Path -Parent $PSScriptRoot
+$ComposeArgs = @('compose', '--project-directory', $RootDir, '-f', (Join-Path $RootDir 'docker-compose.yml'))
+$EnvFile = Join-Path $RootDir '.env'
+if (Test-Path -LiteralPath $EnvFile -PathType Leaf) {
+    $ComposeArgs += @('--env-file', $EnvFile)
 }
 
-Get-Content $EnvFile | ForEach-Object {
-    if ($_ -match '^\s*([^#=]+?)=(.*)$') {
-        $name = $matches[1].Trim()
-        $value = $matches[2].Trim()
-        Set-Item -Path "env:$name" -Value $value
+if ($Force -and $SqlFile) {
+    throw '-Force 与 -SqlFile 不能一起使用。'
+}
+if ($SqlFile -and -not (Test-Path -LiteralPath $SqlFile -PathType Leaf)) {
+    throw '找不到指定的 SQL 文件。'
+}
+
+$Database = & docker @ComposeArgs exec -T mysql printenv MYSQL_DATABASE
+if ($LASTEXITCODE -ne 0) {
+    throw 'MySQL 容器未运行或缺少 MYSQL_DATABASE。'
+}
+if ($Database -cnotmatch '^[A-Za-z0-9_]{1,64}$') {
+    throw 'MYSQL_DB 只支持 1 到 64 位字母、数字和下划线。'
+}
+
+$MysqlRunner = 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD exec mysql --protocol=TCP -h 127.0.0.1 -u root --default-character-set=utf8mb4'
+
+function Invoke-MySqlScript {
+    param([string]$Sql, [string]$Command)
+    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $Sql | & docker @ComposeArgs exec -T mysql sh -ec $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "MySQL 执行失败（退出码 $LASTEXITCODE）。"
     }
 }
 
-$MysqlContainer = if ($env:MYSQL_CONTAINER) { $env:MYSQL_CONTAINER } else { "hinovel-mysql" }
-$MysqlUser = if ($env:MYSQL_USER) { $env:MYSQL_USER } else { "root" }
-$MysqlPassword = if ($env:MYSQL_PASSWORD) { $env:MYSQL_PASSWORD } elseif ($env:MYSQL_ROOT_PASSWORD) { $env:MYSQL_ROOT_PASSWORD } else { "root123" }
-$MysqlDb = if ($env:MYSQL_DB) { $env:MYSQL_DB } else { "hinovel_platform" }
-
-$running = docker ps --format "{{.Names}}" | Select-String -Pattern "^$([regex]::Escape($MysqlContainer))$"
-if (-not $running) {
-    Write-Error "MySQL 容器 $MysqlContainer 未运行，请先执行：docker compose up -d mysql"
+if ($SqlFile) {
+    Invoke-MySqlScript (Get-Content -LiteralPath $SqlFile -Raw -Encoding UTF8) "$MysqlRunner -D $Database"
+    Write-Host "SQL 执行完成，目标库：$Database"
+    exit 0
 }
 
-Write-Host ">>> 目标容器：$MysqlContainer"
-Write-Host ">>> 目标数据库：$MysqlDb"
-
+$CreateDatabase = "CREATE DATABASE IF NOT EXISTS ``$Database`` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 if ($Force) {
-    Write-Host ">>> 警告：即将删除并重建数据库 $MysqlDb"
-    $dropSql = "DROP DATABASE IF EXISTS ``$MysqlDb``; CREATE DATABASE ``$MysqlDb`` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    $dropSql | docker exec -i $MysqlContainer mysql -u"$MysqlUser" -p"$MysqlPassword"
+    Write-Host "正在清空并重建数据库 $Database"
+    $CreateDatabase = "DROP DATABASE IF EXISTS ``$Database``; $CreateDatabase"
 }
+Invoke-MySqlScript $CreateDatabase $MysqlRunner
 
-Write-Host ">>> 执行 schema.sql ..."
-Get-Content $SchemaFile -Raw | docker exec -i $MysqlContainer mysql -u"$MysqlUser" -p"$MysqlPassword" $MysqlDb
-
-Write-Host ">>> 执行 seed.sql ..."
-Get-Content $SeedFile -Raw | docker exec -i $MysqlContainer mysql -u"$MysqlUser" -p"$MysqlPassword" $MysqlDb
-
-Write-Host ">>> 数据库初始化完成"
-Write-Host "    管理员账号：admin / Admin@123456"
-Write-Host "    邮箱：admin@hinovel.com"
+foreach ($File in @('schema.sql', 'seed.sql')) {
+    $Path = Join-Path $RootDir "hinovel-server/sql/$File"
+    Invoke-MySqlScript (Get-Content -LiteralPath $Path -Raw -Encoding UTF8) "$MysqlRunner -D $Database"
+}
+Write-Host "数据库初始化完成：$Database"

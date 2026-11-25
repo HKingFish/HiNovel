@@ -11,11 +11,11 @@ import java.util.List;
 /**
  * 环境变量校验器。
  *
- * <p>在 Spring 容器初始化前校验应用运行必需的环境变量是否已配置，
- * 缺失则直接终止启动（fail fast），避免带默认值硬跑导致线上事故。</p>
+ * 在 Spring 容器初始化前校验应用运行必需的环境变量是否已配置，
+ * 缺失则直接终止启动（fail fast），避免带默认值硬跑导致线上事故。
  *
- * <p>注意：{@code MYSQL_ROOT_PASSWORD} 仅用于 MySQL 容器初始化，
- * 后端连接数据库使用 {@code MYSQL_PASSWORD}。</p>
+ * 注意：{@code MYSQL_ROOT_PASSWORD} 仅用于 MySQL 容器初始化，
+ * 后端连接数据库使用 {@code MYSQL_PASSWORD}。
  *
  * @author haowl
  */
@@ -47,10 +47,10 @@ public class EnvConfigValidator implements ApplicationListener<ApplicationEnviro
                 "关键环境变量缺失，应用启动终止。缺失项：%s。请在 .env 文件或系统环境变量中配置后重试。",
                 String.join(", ", missingKeys)
             );
-            log.error(errorMessage);
+            log.error("[onApplicationEvent][{}]", errorMessage);
             throw new IllegalStateException(errorMessage);
         }
 
-        log.info("环境变量校验通过，所有必需配置项已就绪");
+        log.info("[onApplicationEvent][环境变量校验通过，所有必需配置项已就绪]");
     }
 }
